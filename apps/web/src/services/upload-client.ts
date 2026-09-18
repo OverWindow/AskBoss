@@ -1,0 +1,1 @@
+export async function uploadToSignedUrl(url:string,file:File,_token?:string|null){const response=await fetch(url,{method:"POST",headers:{"content-type":file.type,"x-upsert":"false"},body:file});if(!response.ok)throw new Error("파일 업로드에 실패했습니다.");}

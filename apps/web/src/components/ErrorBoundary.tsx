@@ -1,0 +1,2 @@
+import { Component, type ErrorInfo, type ReactNode } from "react";
+export class ErrorBoundary extends Component<{children:ReactNode},{error:Error|null}>{state={error:null};static getDerivedStateFromError(error:Error){return {error};}componentDidCatch(error:Error,info:ErrorInfo){console.error(error,info);}render(){if(this.state.error)return <main className="empty-state"><div><h1>화면을 불러오지 못했습니다.</h1><p>입력한 내용은 가능한 범위에서 보존되어 있습니다.</p><button className="primary-button" onClick={()=>location.reload()}>다시 불러오기</button></div></main>;return this.props.children;}}

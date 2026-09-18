@@ -1,0 +1,5 @@
+:root{
+  --hr-bg:#F7F9FC;--hr-ink:#263A45;--hr-primary:#35576B;--hr-accent:#4E8D7C;--hr-border:rgba(38,58,69,.14);--hr-muted:rgba(38,58,69,.62);--hr-danger:#9A4B4B;--hr-surface:#FFFFFF;
+  --sidebar:17.5rem;--sidebar-collapsed:5rem;--radius:12px;--focus:0 0 0 3px rgba(78,141,124,.28);font-family:Pretendard,Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--hr-ink);background:var(--hr-bg);font-synthesis:none;
+}
+*{box-sizing:border-box}html,body,#root{min-height:100%;margin:0}body{min-width:320px;background:var(--hr-bg);color:var(--hr-ink);font-size:16px;line-height:1.55}button,input,select,textarea{font:inherit;color:inherit}button,a,input,select,textarea{outline:none}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{box-shadow:var(--focus)}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.55}a{color:inherit;text-decoration:none}

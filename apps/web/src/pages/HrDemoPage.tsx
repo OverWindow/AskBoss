@@ -1,0 +1,2 @@
+import { Link } from "react-router-dom";import { ChevronLeft } from "lucide-react";import { HrDashboard } from "../features/hr/HrDashboard";
+export function HrDemoPage(){return <div className="hr-layout"><aside className="hr-nav"><h1>AskBoss · HR</h1><Link to="/"><ChevronLeft size={15} style={{verticalAlign:"middle"}}/> 사용자 화면</Link><a href="#overview">Overview</a><a href="#usage">Usage</a><a href="#topics">Topics</a><a href="#demographics">Demographics</a><a href="#time">Insights</a></aside><HrDashboard/></div>}

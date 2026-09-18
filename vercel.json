@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm --filter @askboss/web build",
+  "outputDirectory": "apps/web/dist",
+  "functions": {
+    "api/[...path].ts": { "maxDuration": 60 }
+  },
+  "rewrites": [
+    { "source": "/boss/:path*", "destination": "/index.html" },
+    { "source": "/hr-demo", "destination": "/index.html" },
+    { "source": "/settings", "destination": "/index.html" },
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/admin/:path*", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/internal/jobs/run", "schedule": "*/5 * * * *" },
+    { "path": "/api/internal/cleanup", "schedule": "17 * * * *" },
+    { "path": "/api/internal/analytics/rollup", "schedule": "35 2 * * *" }
+  ]
+}

@@ -1,0 +1,69 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { buildApp } from "../src/app";
+import { env } from "../src/config/env";
+import { store } from "../src/repositories";
+
+const app = buildApp();
+const origin = "http://localhost:5173";
+
+beforeAll(() => {
+  env.ADMIN_PASSWORD = "correct-horse-battery-staple";
+  env.ADMIN_SESSION_SECRET = "admin-session-secret-that-is-long-enough";
+});
+
+afterAll(() => app.close());
+
+describe("admin API", () => {
+  it("requires an allowed origin for login", async () => {
+    const response = await app.inject({ method: "POST", url: "/api/admin/login", payload: { password: env.ADMIN_PASSWORD } });
+    expect(response.statusCode).toBe(403);
+  });
+
+  it("creates and revokes an HttpOnly admin session", async () => {
+    const login = await app.inject({ method: "POST", url: "/api/admin/login", headers: { origin, "x-forwarded-for": "10.0.0.10" }, payload: { password: env.ADMIN_PASSWORD } });
+    expect(login.statusCode).toBe(200);
+    expect(login.headers["set-cookie"]).toContain("HttpOnly");
+    expect(login.headers["set-cookie"]).toContain("SameSite=Strict");
+    const cookie = String(login.headers["set-cookie"]).split(";")[0]!;
+
+    const dashboard = await app.inject({ method: "GET", url: "/api/admin/dashboard", headers: { cookie } });
+    expect(dashboard.statusCode).toBe(200);
+    expect(dashboard.json()).not.toHaveProperty("tokenHash");
+    expect(JSON.stringify(dashboard.json())).not.toContain(env.ADMIN_PASSWORD);
+
+    const logout = await app.inject({ method: "POST", url: "/api/admin/logout", headers: { origin, cookie } });
+    expect(logout.statusCode).toBe(200);
+    const afterLogout = await app.inject({ method: "GET", url: "/api/admin/dashboard", headers: { cookie } });
+    expect(afterLogout.statusCode).toBe(401);
+  });
+
+  it("locks a source after five failed passwords", async () => {
+    let response;
+    for (let index = 0; index < 5; index++) {
+      response = await app.inject({ method: "POST", url: "/api/admin/login", headers: { origin, "x-forwarded-for": "10.0.0.20" }, payload: { password: "wrong-password" } });
+    }
+    expect(response?.statusCode).toBe(429);
+  });
+
+  it("retries failed jobs and audits maintenance operations", async () => {
+    const login = await app.inject({ method: "POST", url: "/api/admin/login", headers: { origin, "x-forwarded-for": "10.0.0.30" }, payload: { password: env.ADMIN_PASSWORD } });
+    const cookie = String(login.headers["set-cookie"]).split(";")[0]!;
+    const original = await store.createJob({ sessionId: null, bossId: null, type: "CHAT_SUMMARIZE", payload: {} });
+    await store.failJob(original.id, "request timeout containing confidential evidence", false);
+
+    const listed = await app.inject({ method: "GET", url: "/api/admin/jobs?status=FAILED", headers: { cookie } });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json().items[0].errorMessage).toBe("AI 응답 시간 초과");
+    expect(JSON.stringify(listed.json())).not.toContain("confidential");
+
+    const retried = await app.inject({ method: "POST", url: `/api/admin/jobs/${original.id}/retry`, headers: { origin, cookie } });
+    expect(retried.statusCode).toBe(202);
+    const cleanup = await app.inject({ method: "POST", url: "/api/admin/maintenance/cleanup", headers: { origin, cookie } });
+    const rollup = await app.inject({ method: "POST", url: "/api/admin/maintenance/rollup", headers: { origin, cookie } });
+    expect(cleanup.statusCode).toBe(200);
+    expect(rollup.statusCode).toBe(200);
+
+    const dashboard = await app.inject({ method: "GET", url: "/api/admin/dashboard", headers: { cookie } });
+    expect(dashboard.json().recentOperations.map((item: any) => item.type)).toEqual(expect.arrayContaining(["JOB_RETRY", "CLEANUP", "ANALYTICS_ROLLUP"]));
+  });
+});

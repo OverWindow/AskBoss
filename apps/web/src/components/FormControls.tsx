@@ -1,0 +1,4 @@
+import type { InputHTMLAttributes,SelectHTMLAttributes,TextareaHTMLAttributes } from "react";
+export function TextField({label,error,...props}:InputHTMLAttributes<HTMLInputElement>&{label:string;error?:string}){return <div className="field"><label htmlFor={props.id}>{label}</label><input {...props} className={`input ${props.className??""}`}/>{error&&<span className="error-text">{error}</span>}</div>;}
+export function TextArea({label,...props}:TextareaHTMLAttributes<HTMLTextAreaElement>&{label:string}){return <div className="field"><label htmlFor={props.id}>{label}</label><textarea {...props} className="textarea"/></div>;}
+export function SelectField({label,children,...props}:SelectHTMLAttributes<HTMLSelectElement>&{label:string}){return <div className="field"><label htmlFor={props.id}>{label}</label><select {...props} className="select">{children}</select></div>;}
