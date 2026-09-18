@@ -20,11 +20,23 @@ const camelAdminSession = (r: any): AdminSessionRecord => ({ id: r.id, tokenHash
 export class PostgresStore implements Store {
   private sql: Sql;
   private demo = new MemoryStore();
-  constructor(url: string) { this.sql = postgres(url, { max: 5, idle_timeout: 20, prepare: false }); }
+  constructor(url: string) {
+    this.sql = postgres(url, {
+      max: 5,
+      idle_timeout: 20,
+      connect_timeout: 10,
+      prepare: false,
+      connection: {
+        application_name: "askboss-api",
+        statement_timeout: 30_000,
+        lock_timeout: 5_000,
+      },
+    });
+  }
 
   async createSession(tokenHash: string, expiresAt: string) { const [r] = await this.sql`insert into sessions (token_hash, expires_at) values (${tokenHash}, ${expiresAt}) returning *`; return camelSession(r!); }
   async findSession(tokenHash: string) { const [r] = await this.sql`select * from sessions where token_hash=${tokenHash} and expires_at > now()`; return r ? camelSession(r) : null; }
-  async touchSession(id: string) { await this.sql`update sessions set last_seen_at=now() where id=${id}`; }
+  async touchSession(id: string) { await this.sql`update sessions set last_seen_at=now() where id=${id} and last_seen_at<now()-interval '1 minute'`; }
   async deleteSession(id: string) { await this.sql`delete from sessions where id=${id}`; }
   async getProfile(sessionId: string) { const [r] = await this.sql`select * from user_profiles where session_id=${sessionId}`; return r ? { handle: r.handle, ageBand: r.age_band, yearsOfServiceBand: r.years_of_service_band, rank: r.rank, entryPath: r.entry_path, weaknesses: r.weaknesses } : null; }
   async isHandleAvailable(handle: string, sessionId?: string) { const [r] = sessionId ? await this.sql`select count(*)::int as count from user_profiles where lower(handle)=lower(${handle}) and session_id<>${sessionId}` : await this.sql`select count(*)::int as count from user_profiles where lower(handle)=lower(${handle})`; return r!.count === 0; }

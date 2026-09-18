@@ -11,10 +11,5 @@
     { "source": "/settings", "destination": "/index.html" },
     { "source": "/admin", "destination": "/index.html" },
     { "source": "/admin/:path*", "destination": "/index.html" }
-  ],
-  "crons": [
-    { "path": "/api/internal/jobs/run", "schedule": "*/5 * * * *" },
-    { "path": "/api/internal/cleanup", "schedule": "17 * * * *" },
-    { "path": "/api/internal/analytics/rollup", "schedule": "35 2 * * *" }
   ]
 }

@@ -30,4 +30,13 @@ describe("AdminPage", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "운영 관리자" })).toBeInTheDocument());
     expect(screen.getByText("AI 상태와 크레딧")).toBeInTheDocument();
   });
+
+  it("shows a recoverable connection error instead of an endless auth spinner", async () => {
+    mockedApi.mockRejectedValueOnce(new Error("offline"));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><AdminPage/></QueryClientProvider>);
+    expect(await screen.findByRole("heading", { name: "API 연결에 실패했습니다." })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByRole("heading", { name: "관리자 로그인" })).toBeInTheDocument();
+  });
 });

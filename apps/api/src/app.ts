@@ -24,7 +24,7 @@ import { adminRoutes } from "./routes/admin";
 
 export function buildApp(){
   const app=Fastify({logger:{level:env.NODE_ENV==="test"?"silent":"info",redact:["req.headers.cookie","req.headers.authorization","res.headers.set-cookie"]},trustProxy:true});
-  void app.register(cookie);void app.register(corsPlugin);void app.register(rateLimitPlugin);void app.register(requestContext);void app.register(errorHandler);
+  void app.register(cookie);void app.register(corsPlugin);void app.register(rateLimitPlugin);void app.register(requestContext);void errorHandler(app);
   const routes=[sessionRoutes,profileRoutes,bossRoutes,companyRoutes,uploadRoutes,evidenceRoutes,surveyRoutes,personaRoutes,jobRoutes,chatRoutes,monologueRoutes,translationRoutes,hrRoutes,healthRoutes,internalRoutes,adminRoutes];
   for(const route of routes)void app.register(route,{prefix:"/api"});
   return app;
