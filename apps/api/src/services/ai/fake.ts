@@ -1,6 +1,6 @@
 import type { BossPersona, BossSurveyQuestion, CompanyResearch, TranslationResult } from "@askboss/shared";
 import { OBSERVATION_CATEGORIES } from "@askboss/shared";
-import type { AiService } from "./types";
+import type { AiService } from "./types.js";
 
 export class FakeAiService implements AiService {
   async researchCompany(name: string): Promise<CompanyResearch> { return { companyName:name,industry:null,companySizeHint:null,businessSummary:`${name}의 공개 정보는 데모 모드에서 조회하지 않았습니다.`,organizationHints:["보고 체계가 존재할 가능성"],workCultureSignals:["확인되지 않은 추정은 Persona의 약한 근거로만 사용"],confidence:0.25,sourceSummary:[] }; }

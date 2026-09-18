@@ -1,3 +1,3 @@
 import type { FastifyInstance } from "fastify";
-import { HttpError } from "../utils/http";
+import { HttpError } from "../utils/http.js";
 export async function errorHandler(app:FastifyInstance){app.setErrorHandler((error,_request,reply)=>{if(error instanceof HttpError)return reply.code(error.statusCode).send({error:{code:error.code,message:error.message}});if((error as any).code==="23505")return reply.code(409).send({error:{code:"CONFLICT",message:"이미 사용 중인 값입니다."}});if((error as any).code==="57014"){app.log.warn(error);return reply.code(503).send({error:{code:"DATABASE_TIMEOUT",message:"데이터베이스 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."}});}app.log.error(error);return reply.code(500).send({error:{code:"INTERNAL_ERROR",message:"요청을 처리하지 못했습니다."}});});}

@@ -1,16 +1,16 @@
 import OpenAI from "openai";
 import { z, type ZodType } from "zod";
 import { bossPersonaSchema,companyResearchSchema,extractedEvidenceSchema,surveyQuestionsSchema,translationResultSchema } from "@askboss/shared";
-import { env } from "../../config/env";
-import { companyPrompt } from "../../prompts/company";
-import { evidencePrompt } from "../../prompts/evidence";
-import { personaPrompt } from "../../prompts/persona";
-import { surveyPrompt } from "../../prompts/survey";
-import { chatPrompt } from "../../prompts/chat";
-import { translatorPrompt } from "../../prompts/translator";
-import { monologuePrompt } from "../../prompts/monologue";
-import { hrSummaryPrompt } from "../../prompts/hr-summary";
-import type { AiService, BossChatInput } from "./types";
+import { env } from "../../config/env.js";
+import { companyPrompt } from "../../prompts/company.js";
+import { evidencePrompt } from "../../prompts/evidence.js";
+import { personaPrompt } from "../../prompts/persona.js";
+import { surveyPrompt } from "../../prompts/survey.js";
+import { chatPrompt } from "../../prompts/chat.js";
+import { translatorPrompt } from "../../prompts/translator.js";
+import { monologuePrompt } from "../../prompts/monologue.js";
+import { hrSummaryPrompt } from "../../prompts/hr-summary.js";
+import type { AiService, BossChatInput } from "./types.js";
 
 export class MindlogicAiService implements AiService {
   private client=new OpenAI({apiKey:env.MINDLOGIC_API_KEY!,baseURL:env.MINDLOGIC_BASE_URL,maxRetries:0,timeout:90_000});

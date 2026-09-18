@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AGE_BANDS, ALLOWED_MIME_TYPES, AVATARS, CHANNELS, ENTRY_PATHS } from "../constants/options";
+import { AGE_BANDS, ALLOWED_MIME_TYPES, AVATARS, CHANNELS, ENTRY_PATHS } from "../constants/options.js";
 
 export const handleSchema = z.string().trim().min(3).max(20).regex(/^[a-zA-Z0-9_\-가-힣]+$/);
 export const profileSchema = z.object({

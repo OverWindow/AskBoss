@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @askboss/api --filter @askboss/web dev",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "tsc -p api/tsconfig.json --noEmit && pnpm -r typecheck",
     "test": "pnpm -r test",
     "lint": "eslint .",
     "seed:hr": "tsx scripts/seed-hr-demo.ts",

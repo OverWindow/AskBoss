@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
-import { env, hasStorage } from "../config/env";
-import { safeExtension } from "../utils/security";
+import { env, hasStorage } from "../config/env.js";
+import { safeExtension } from "../utils/security.js";
 
 class StorageService {
   private client:SupabaseClient|null=hasStorage?createClient(env.SUPABASE_URL!,env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false}}):null;

@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, BossPersona } from "@askboss/shared";
-import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types";
-import type { CreateBossInput, Store } from "./store";
-import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety";
+import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
+import type { CreateBossInput, Store } from "./store.js";
+import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 
 const globalPersona: BossPersona = {
   summary: "한국 회사에서 흔히 볼 수 있는 중간관리자형의 가상 공통 페르소나입니다.",

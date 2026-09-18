@@ -1,9 +1,9 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { env } from "../config/env";
-import { store } from "../repositories";
-import { HttpError } from "../utils/http";
-import { hmac, randomToken } from "../utils/security";
-import { storage } from "./storage";
+import { env } from "../config/env.js";
+import { store } from "../repositories/index.js";
+import { HttpError } from "../utils/http.js";
+import { hmac, randomToken } from "../utils/security.js";
+import { storage } from "./storage.js";
 
 const COOKIE = "hr_session";
 const ttl = () => new Date(Date.now() + 24 * 60 * 60_000).toISOString();

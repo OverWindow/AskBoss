@@ -1,10 +1,10 @@
 import type { FastifyPluginAsync } from "fastify";
 import { bossInputSchema } from "@askboss/shared";
-import { store } from "../repositories";
-import { requireSession, sessionExpiry } from "../services/session";
-import { HttpError } from "../utils/http";
-import { parse } from "../utils/validation";
-import { storage } from "../services/storage";
+import { store } from "../repositories/index.js";
+import { requireSession, sessionExpiry } from "../services/session.js";
+import { HttpError } from "../utils/http.js";
+import { parse } from "../utils/validation.js";
+import { storage } from "../services/storage.js";
 export const bossRoutes:FastifyPluginAsync=async(app)=>{
   app.get("/bosses",async(request)=>{const s=await requireSession(request);return {bosses:await store.listBosses(s.id)};});
   app.post("/bosses",async(request,reply)=>{const s=await requireSession(request);const body=parse(bossInputSchema,request.body);const boss=await store.createBoss(s.id,body as any,sessionExpiry());return reply.code(201).send({boss});});

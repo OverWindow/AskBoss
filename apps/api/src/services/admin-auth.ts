@@ -1,9 +1,9 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { env } from "../config/env";
-import { store } from "../repositories";
-import { HttpError } from "../utils/http";
-import { hmac, randomToken } from "../utils/security";
+import { env } from "../config/env.js";
+import { store } from "../repositories/index.js";
+import { HttpError } from "../utils/http.js";
+import { hmac, randomToken } from "../utils/security.js";
 
 const COOKIE = "askboss_admin";
 const EIGHT_HOURS = 8 * 60 * 60_000;

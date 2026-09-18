@@ -1,8 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
-import { env } from "../config/env";
-import { store } from "../repositories";
-import { HttpError } from "../utils/http";
-import { ai } from "../services/ai";
+import { env } from "../config/env.js";
+import { store } from "../repositories/index.js";
+import { HttpError } from "../utils/http.js";
+import { ai } from "../services/ai/index.js";
 export const hrRoutes:FastifyPluginAsync=async(app)=>{
   const data=async()=>{if(!env.HR_DEMO_MODE)throw new HttpError(404,"페이지를 찾을 수 없습니다.");return store.getHrDashboard();};
   app.get("/hr/overview",async()=>{const d=await data();return {overview:d.overview,includesDemo:d.includesDemo};});

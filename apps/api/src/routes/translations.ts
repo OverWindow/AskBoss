@@ -1,11 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
 import { feedbackSchema, translationInputSchema } from "@askboss/shared";
-import { store } from "../repositories";
-import { requireSession, sessionExpiry } from "../services/session";
-import { ai } from "../services/ai";
-import { track } from "../services/analytics";
-import { HttpError } from "../utils/http";
-import { parse } from "../utils/validation";
+import { store } from "../repositories/index.js";
+import { requireSession, sessionExpiry } from "../services/session.js";
+import { ai } from "../services/ai/index.js";
+import { track } from "../services/analytics.js";
+import { HttpError } from "../utils/http.js";
+import { parse } from "../utils/validation.js";
 
 const TRANSLATION_TIMEOUT_MS = 60_000;
 const topics = (text: string) => ["보고", "일정", "마감", "야근", "메신저", "피드백", "회의", "자료", "실수", "확인"].filter((word) => text.includes(word));

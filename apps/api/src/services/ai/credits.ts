@@ -1,6 +1,6 @@
 import type { AdminCredits, CreditBucket } from "@askboss/shared";
-import { env } from "../../config/env";
-import { ai } from ".";
+import { env } from "../../config/env.js";
+import { ai } from "./index.js";
 
 let cache: { expiresAt: number; value: AdminCredits } | null = null;
 

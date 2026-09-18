@@ -1,7 +1,7 @@
-import { env } from "../config/env";
-import { store } from "../repositories";
-import type { AnalyticsEventInput, BossRecord, UserProfile } from "../types";
-import { hmac } from "../utils/security";
+import { env } from "../config/env.js";
+import { store } from "../repositories/index.js";
+import type { AnalyticsEventInput, BossRecord, UserProfile } from "../types.js";
+import { hmac } from "../utils/security.js";
 
 const rankOrder=["인턴","사원","주임","대리","과장","차장","부장","팀장","실장","임원","대표"];
 function rankGap(user?:string|null,boss?:string|null){const u=rankOrder.indexOf(user??"");const b=rankOrder.indexOf(boss??"");if(u<0||b<0)return null;const gap=Math.max(0,b-u);return gap>=3?"3단계+":String(gap);}

@@ -1,4 +1,4 @@
-import { evidenceBoundary, jsonOnly } from "./shared";
+import { evidenceBoundary, jsonOnly } from "./shared.js";
 export const personaPrompt = (input: unknown) => `${evidenceBoundary}
 ${jsonOnly}
 사용자가 제공한 관찰을 기반으로 가상의 상사 행동 Persona를 작성하라. 회사 정보보다 반복된 실제 대화, 설문, 직접 입력 순으로 우선한다.

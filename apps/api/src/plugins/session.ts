@@ -1,1 +1,1 @@
-export { createSession, destroySession, optionalSession, requireSession } from "../services/session";
+export { createSession, destroySession, optionalSession, requireSession } from "../services/session.js";

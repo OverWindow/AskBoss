@@ -1,0 +1,12 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext"
+  },
+  "include": [
+    "./[...path].ts",
+    "../apps/api/src/**/*.ts",
+    "../packages/shared/src/**/*.ts"
+  ]
+}

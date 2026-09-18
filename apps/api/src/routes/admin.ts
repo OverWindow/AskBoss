@@ -1,12 +1,12 @@
 import type { FastifyPluginAsync } from "fastify";
 import { adminJobStatusSchema, adminLoginSchema } from "@askboss/shared";
-import { store } from "../repositories";
-import { cleanup } from "../services/cleanup";
-import { getAdminCredits } from "../services/ai/credits";
-import { adminSourceKey, assertAdminOrigin, loginAdmin, logoutAdmin, optionalAdmin, requireAdmin } from "../services/admin-auth";
-import { jobs } from "../services/jobs";
-import { HttpError } from "../utils/http";
-import { parse } from "../utils/validation";
+import { store } from "../repositories/index.js";
+import { cleanup } from "../services/cleanup.js";
+import { getAdminCredits } from "../services/ai/credits.js";
+import { adminSourceKey, assertAdminOrigin, loginAdmin, logoutAdmin, optionalAdmin, requireAdmin } from "../services/admin-auth.js";
+import { jobs } from "../services/jobs.js";
+import { HttpError } from "../utils/http.js";
+import { parse } from "../utils/validation.js";
 
 const maskId = (id: string | null) => id ? `${id.slice(0, 8)}…${id.slice(-4)}` : null;
 const cursor = (value: unknown) => typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : undefined;

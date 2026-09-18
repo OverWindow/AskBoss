@@ -1,5 +1,5 @@
 import { OBSERVATION_CATEGORIES, type BossPersona, type PkiBreakdown } from "@askboss/shared";
-import type { EvidenceRecord } from "../types";
+import type { EvidenceRecord } from "../types.js";
 
 const clamp=(value:number)=>Math.max(0,Math.min(1,value));
 const daysSince=(date:string)=>Math.max(0,(Date.now()-Date.parse(date))/86_400_000);

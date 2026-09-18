@@ -1,12 +1,12 @@
 import type { ServerResponse } from "node:http";
 import type { FastifyPluginAsync } from "fastify";
 import { chatInputSchema } from "@askboss/shared";
-import { store } from "../repositories";
-import { requireSession, sessionExpiry } from "../services/session";
-import { ai } from "../services/ai";
-import { track } from "../services/analytics";
-import { HttpError } from "../utils/http";
-import { parse } from "../utils/validation";
+import { store } from "../repositories/index.js";
+import { requireSession, sessionExpiry } from "../services/session.js";
+import { ai } from "../services/ai/index.js";
+import { track } from "../services/analytics.js";
+import { HttpError } from "../utils/http.js";
+import { parse } from "../utils/validation.js";
 
 const FIRST_DELTA_TIMEOUT_MS = 30_000;
 const DELTA_IDLE_TIMEOUT_MS = 25_000;

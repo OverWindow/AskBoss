@@ -1,10 +1,10 @@
 import postgres, { type Sql } from "postgres";
 import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, Boss, CompanyResearch, UserProfile } from "@askboss/shared";
-import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, EvidenceRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord } from "../types";
-import type { CreateBossInput, Store } from "./store";
-import { MemoryStore } from "./memory-store";
-import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety";
-import { toIsoTimestamp } from "../utils/database";
+import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, EvidenceRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord } from "../types.js";
+import type { CreateBossInput, Store } from "./store.js";
+import { MemoryStore } from "./memory-store.js";
+import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
+import { toIsoTimestamp } from "../utils/database.js";
 
 const camelSession = (r: any): SessionRecord => ({ id: r.id, tokenHash: r.token_hash, createdAt: r.created_at.toISOString(), lastSeenAt: r.last_seen_at.toISOString(), expiresAt: r.expires_at.toISOString() });
 const camelBoss = (r: any): BossRecord => ({

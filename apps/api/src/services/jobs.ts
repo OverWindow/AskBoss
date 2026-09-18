@@ -1,8 +1,8 @@
 import { waitUntil } from "@vercel/functions";
-import { store } from "../repositories";
-import { ai } from "./ai";
-import { storage } from "./storage";
-import { calculatePki } from "./pki";
+import { store } from "../repositories/index.js";
+import { ai } from "./ai/index.js";
+import { storage } from "./storage.js";
+import { calculatePki } from "./pki.js";
 
 class JobService {
   async enqueue(input:Parameters<typeof store.createJob>[0]){const job=await store.createJob(input); this.defer(this.process(job.id)); return job;}

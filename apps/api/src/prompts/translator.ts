@@ -1,4 +1,4 @@
-import { evidenceBoundary, jsonOnly } from "./shared";
+import { evidenceBoundary, jsonOnly } from "./shared.js";
 export const translatorPrompt = (input: unknown) => `${evidenceBoundary}
 ${jsonOnly}
 상사 발언을 쉽게 풀고 가능한 의도와 주의점을 확률적 표현으로 설명한다. 서로 다른 스타일의 답장 3개를 추천한다.

@@ -1,4 +1,4 @@
-import { evidenceBoundary, jsonOnly } from "./shared";
+import { evidenceBoundary, jsonOnly } from "./shared.js";
 export const evidencePrompt = (content: string) => `${evidenceBoundary}
 ${jsonOnly}
 다음 대화 자료에서 발신자, 시각, 메시지, 앞뒤 맥락과 독립 관찰을 추출하라.
