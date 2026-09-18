@@ -139,15 +139,16 @@ export class PostgresStore implements Store {
   }
   async clearAdminLoginFailures(ipHash: string) { await this.sql`delete from admin_login_attempts where ip_hash=${ipHash}`; }
   async getAdminDashboard(): Promise<AdminDashboard> {
-    const [[sessions],[usage],[jobs],[uploads],featureRows,operationRows,failureRows] = await Promise.all([
-      this.sql`select count(*) filter(where expires_at>now())::int total,count(*) filter(where expires_at>now() and last_seen_at>=now()-interval '15 minutes')::int active_15m,count(*) filter(where expires_at>now() and created_at>=now()-interval '24 hours')::int new_24h,count(*) filter(where expires_at>now() and expires_at<=now()+interval '1 hour')::int expiring_1h from sessions`,
-      this.sql`select (select count(*)::int from bosses where scope='SESSION' and expires_at>now()) personal_bosses,(select count(*)::int from chat_messages where created_at>=now()-interval '24 hours') chat_messages_24h,(select count(*)::int from translation_requests where created_at>=now()-interval '24 hours') translations_24h`,
-      this.sql`select count(*) filter(where status='PENDING')::int pending,count(*) filter(where status='RUNNING')::int running,count(*) filter(where status='FAILED')::int failed,extract(epoch from (now()-min(created_at) filter(where status='PENDING')))/60 oldest_pending_minutes from ai_jobs`,
-      this.sql`select count(*)::int expired_incomplete from upload_intents where completed_at is null and expires_at<=now()`,
-      this.sql`select feature,count(*)::int value from analytics_events where occurred_at>=now()-interval '24 hours' group by feature order by value desc`,
-      this.sql`select * from admin_operations order by created_at desc limit 10`,
-      this.sql`select error_message from ai_jobs where status='FAILED'`,
-    ]);
+    // The admin page starts several authenticated requests together. Keep this
+    // aggregate on one query at a time so it cannot exhaust the five-connection
+    // pool while those requests are also refreshing their admin session.
+    const [sessions] = await this.sql`select count(*) filter(where expires_at>now())::int total,count(*) filter(where expires_at>now() and last_seen_at>=now()-interval '15 minutes')::int active_15m,count(*) filter(where expires_at>now() and created_at>=now()-interval '24 hours')::int new_24h,count(*) filter(where expires_at>now() and expires_at<=now()+interval '1 hour')::int expiring_1h from sessions`;
+    const [usage] = await this.sql`select (select count(*)::int from bosses where scope='SESSION' and expires_at>now()) personal_bosses,(select count(*)::int from chat_messages where created_at>=now()-interval '24 hours') chat_messages_24h,(select count(*)::int from translation_requests where created_at>=now()-interval '24 hours') translations_24h`;
+    const [jobs] = await this.sql`select count(*) filter(where status='PENDING')::int pending,count(*) filter(where status='RUNNING')::int running,count(*) filter(where status='FAILED')::int failed,extract(epoch from (now()-min(created_at) filter(where status='PENDING')))/60 oldest_pending_minutes from ai_jobs`;
+    const [uploads] = await this.sql`select count(*)::int expired_incomplete from upload_intents where completed_at is null and expires_at<=now()`;
+    const featureRows = await this.sql`select feature,count(*)::int value from analytics_events where occurred_at>=now()-interval '24 hours' group by feature order by value desc`;
+    const operationRows = await this.sql`select * from admin_operations order by created_at desc limit 10`;
+    const failureRows = await this.sql`select error_message from ai_jobs where status='FAILED'`;
     return { generatedAt:new Date().toISOString(),sessions:{total:sessions!.total,active15m:sessions!.active_15m,new24h:sessions!.new_24h,expiring1h:sessions!.expiring_1h},usage:{personalBosses:usage!.personal_bosses,chatMessages24h:usage!.chat_messages_24h,translations24h:usage!.translations_24h},jobs:{pending:jobs!.pending,running:jobs!.running,failed:jobs!.failed,oldestPendingMinutes:jobs!.oldest_pending_minutes === null ? null : Math.floor(Number(jobs!.oldest_pending_minutes)),failureReasons:summarizeJobFailures(failureRows.map((row:any)=>row.error_message))},uploads:{expiredIncomplete:uploads!.expired_incomplete},featureUsage:featureRows.map((row:any)=>({feature:row.feature,value:row.value})),recentOperations:operationRows.map((row:any)=>({id:row.id,type:row.type,status:row.status,detail:row.detail,createdAt:toIsoTimestamp(row.created_at ?? row.createdAt,"admin_operations.created_at")}))};
   }
   async listAdminSessions(cursor?: string, limit = 20) {
