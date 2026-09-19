@@ -1,6 +1,6 @@
 import type { ServerResponse } from "node:http";
 import type { FastifyPluginAsync } from "fastify";
-import { chatInputSchema } from "@askboss/shared";
+import { chatInputSchema } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { requireSession, sessionExpiry } from "../services/session.js";
 import { ai } from "../services/ai/index.js";

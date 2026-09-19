@@ -1,4 +1,4 @@
-import type { Boss, BossPersona, BossSurveyQuestion, CompanyResearch, TranslationResult, UserProfile } from "@askboss/shared";
+import type { Boss, BossPersona, BossSurveyQuestion, CompanyResearch, TranslationResult, UserProfile } from "../../shared.js";
 import type { ChatMessageRecord, EvidenceRecord, SurveyAnswerRecord } from "../../types.js";
 
 export interface BossChatInput {

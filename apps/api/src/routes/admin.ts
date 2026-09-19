@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { adminJobStatusSchema, adminLoginSchema } from "@askboss/shared";
+import { adminJobStatusSchema, adminLoginSchema } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { cleanup } from "../services/cleanup.js";
 import { getAdminCredits } from "../services/ai/credits.js";

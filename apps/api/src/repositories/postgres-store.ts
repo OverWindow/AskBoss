@@ -1,5 +1,5 @@
 import postgres, { type Sql } from "postgres";
-import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, Boss, CompanyResearch, UserProfile } from "@askboss/shared";
+import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, Boss, CompanyResearch, UserProfile } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, EvidenceRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord } from "../types.js";
 import type { CreateBossInput, Store } from "./store.js";
 import { MemoryStore } from "./memory-store.js";

@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { feedbackSchema, translationInputSchema } from "@askboss/shared";
+import { feedbackSchema, translationInputSchema } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { requireSession, sessionExpiry } from "../services/session.js";
 import { ai } from "../services/ai/index.js";

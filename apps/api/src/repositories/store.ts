@@ -1,4 +1,4 @@
-import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary } from "@askboss/shared";
+import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 
 export interface CreateBossInput {

@@ -1,4 +1,4 @@
-import { OBSERVATION_CATEGORIES, type BossPersona, type PkiBreakdown } from "@askboss/shared";
+import { OBSERVATION_CATEGORIES, type BossPersona, type PkiBreakdown } from "../shared.js";
 import type { EvidenceRecord } from "../types.js";
 
 const clamp=(value:number)=>Math.max(0,Math.min(1,value));

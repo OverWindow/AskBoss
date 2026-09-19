@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { uploadSignSchema, UPLOAD_LIMITS } from "@askboss/shared";
+import { uploadSignSchema, UPLOAD_LIMITS } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { requireSession } from "../services/session.js";
 import { storage } from "../services/storage.js";

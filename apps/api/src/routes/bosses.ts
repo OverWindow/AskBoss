@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { bossInputSchema } from "@askboss/shared";
+import { bossInputSchema } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { requireSession, sessionExpiry } from "../services/session.js";
 import { HttpError } from "../utils/http.js";

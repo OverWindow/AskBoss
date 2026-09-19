@@ -1,5 +1,5 @@
-import type { BossPersona, BossSurveyQuestion, CompanyResearch, TranslationResult } from "@askboss/shared";
-import { OBSERVATION_CATEGORIES } from "@askboss/shared";
+import type { BossPersona, BossSurveyQuestion, CompanyResearch, TranslationResult } from "../../shared.js";
+import { OBSERVATION_CATEGORIES } from "../../shared.js";
 import type { AiService } from "./types.js";
 
 export class FakeAiService implements AiService {

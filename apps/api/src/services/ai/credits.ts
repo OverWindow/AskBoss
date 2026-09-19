@@ -1,4 +1,4 @@
-import type { AdminCredits, CreditBucket } from "@askboss/shared";
+import type { AdminCredits, CreditBucket } from "../../shared.js";
 import { env } from "../../config/env.js";
 import { ai } from "./index.js";
 

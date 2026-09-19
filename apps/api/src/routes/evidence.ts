@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { evidenceSchema } from "@askboss/shared";
+import { evidenceSchema } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { requireSession, sessionExpiry } from "../services/session.js";
 import { jobs } from "../services/jobs.js";

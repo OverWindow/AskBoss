@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { z, type ZodType } from "zod";
-import { bossPersonaSchema,companyResearchSchema,extractedEvidenceSchema,surveyQuestionsSchema,translationResultSchema } from "@askboss/shared";
+import { bossPersonaSchema,companyResearchSchema,extractedEvidenceSchema,surveyQuestionsSchema,translationResultSchema } from "../../shared.js";
 import { env } from "../../config/env.js";
 import { companyPrompt } from "../../prompts/company.js";
 import { evidencePrompt } from "../../prompts/evidence.js";

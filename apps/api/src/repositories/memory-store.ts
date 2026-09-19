@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, BossPersona } from "@askboss/shared";
+import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, BossPersona } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { CreateBossInput, Store } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";

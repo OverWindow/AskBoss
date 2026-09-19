@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { handleSchema, profileSchema } from "@askboss/shared";
+import { handleSchema, profileSchema } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { requireSession } from "../services/session.js";
 import { parse } from "../utils/validation.js";

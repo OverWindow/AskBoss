@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { surveyAnswersSchema } from "@askboss/shared";
+import { surveyAnswersSchema } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { requireSession, sessionExpiry } from "../services/session.js";
 import { ai } from "../services/ai/index.js";
