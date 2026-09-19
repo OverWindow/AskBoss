@@ -39,8 +39,8 @@ describe("Tutorial", () => {
     useUiStore.setState({
       sidebarCollapsed: true,
       mobileNavOpen: false,
-      chatPanelOpen: true,
-      translatorPanelOpen: true,
+      activeWorkspaceTab: "translator",
+      mobilePanelExpanded: false,
       tutorialOpen: false,
     });
   });
@@ -50,19 +50,19 @@ describe("Tutorial", () => {
     vi.restoreAllMocks();
   });
 
-  it("runs automatically once, closes panels, and treats skip as completed", async () => {
+  it("runs automatically once, exposes the default panel, and treats skip as completed", async () => {
     render(<><TutorialTargets/><Tutorial/></>);
     expect(await screen.findByRole("dialog", { name: "서비스 사용 안내" })).toHaveTextContent("모두의 상사");
     expect(useUiStore.getState()).toMatchObject({
       sidebarCollapsed: false,
-      chatPanelOpen: false,
-      translatorPanelOpen: false,
+      activeWorkspaceTab: "chat",
+      mobilePanelExpanded: true,
     });
 
     fireEvent.click(screen.getByRole("button", { name: "건너뛰기" }));
     expect(localStorage.getItem(TUTORIAL_STORAGE_KEY)).toBe("true");
     expect(screen.queryByRole("dialog", { name: "서비스 사용 안내" })).not.toBeInTheDocument();
-    expect(useUiStore.getState()).toMatchObject({ sidebarCollapsed: true, mobileNavOpen: false });
+    expect(useUiStore.getState()).toMatchObject({ sidebarCollapsed: true, mobileNavOpen: false, activeWorkspaceTab: "translator", mobilePanelExpanded: false });
 
     cleanup();
     useUiStore.setState({ tutorialOpen: false });

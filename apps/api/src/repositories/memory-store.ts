@@ -64,7 +64,18 @@ export class MemoryStore implements Store {
   async updateBoss(sessionId: string, bossId: string, patch: Partial<CreateBossInput> & Record<string, unknown>) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); Object.assign(row, patch); return row; }
   async setBossPersona(sessionId: string, bossId: string, persona: any, pki: any) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); Object.assign(row, { persona, pki, status: "READY", personaError: null }); }
   async setBossStatus(sessionId: string, bossId: string, status: BossRecord["status"], error: string | null = null) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); row.status = status; row.personaError = error; }
-  async deleteBoss(sessionId: string, bossId: string) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); this.bosses.delete(bossId); }
+  async deleteBoss(sessionId: string, bossId: string) {
+    const row = await this.getBoss(sessionId, bossId);
+    if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다.");
+    this.bosses.delete(bossId);
+    for (const [key, upload] of this.uploads) if (upload.sessionId === sessionId && upload.bossId === bossId) this.uploads.delete(key);
+    for (const [key, evidence] of this.evidence) if (evidence.sessionId === sessionId && evidence.bossId === bossId) this.evidence.delete(key);
+    this.surveys.delete(bossId);
+    for (const [key, job] of this.jobs) if (job.sessionId === sessionId && job.bossId === bossId) this.jobs.delete(key);
+    for (const [key, thread] of this.threads) if (thread.sessionId === sessionId && thread.bossId === bossId) this.threads.delete(key);
+    for (const [key, translation] of this.translations) if (translation.sessionId === sessionId && translation.bossId === bossId) this.translations.delete(key);
+    this.monologues.delete(`${sessionId}:${bossId}`);
+  }
   async getGlobalBoss() { return this.bosses.get(globalBoss.id)!; }
   async updateGlobalBoss(patch: UpdateGlobalBossInput) { const row = await this.getGlobalBoss(); Object.assign(row, patch); return row; }
   async setGlobalBossPersona(persona: unknown, pki: unknown) { const row = await this.getGlobalBoss(); Object.assign(row, { persona, pki, status: "READY", personaError: null, personaVersion: (row.personaVersion ?? 0) + 1 }); }
@@ -73,6 +84,12 @@ export class MemoryStore implements Store {
   async createUploadIntent(input: Omit<UploadIntentRecord, "id" | "completedAt">) { const row = { ...input, id: randomUUID(), completedAt: null }; this.uploads.set(row.id, row); return row; }
   async getUploadIntent(sessionId: string, id: string) { const row = this.uploads.get(id); return row?.sessionId === sessionId && Date.parse(row.expiresAt) > Date.now() ? row : null; }
   async completeUploadIntent(sessionId: string, id: string) { const row = await this.getUploadIntent(sessionId, id); if (!row) throw new Error("업로드 정보를 찾을 수 없습니다."); row.completedAt = new Date().toISOString(); }
+  async listBossStoragePaths(sessionId: string, bossId: string) {
+    return [...new Set([
+      ...[...this.uploads.values()].filter((row) => row.sessionId === sessionId && row.bossId === bossId).map((row) => row.storagePath),
+      ...[...this.evidence.values()].filter((row) => row.sessionId === sessionId && row.bossId === bossId && row.storagePath).map((row) => row.storagePath!),
+    ])];
+  }
   async createGlobalUploadIntent(input: Omit<GlobalUploadIntentRecord, "id" | "completedAt">) { const row = { ...input, id: randomUUID(), completedAt: null }; this.globalUploads.set(row.id, row); return row; }
   async getGlobalUploadIntent(id: string) { const row = this.globalUploads.get(id); return row && Date.parse(row.expiresAt) > Date.now() ? row : null; }
   async completeGlobalUploadIntent(id: string) { const row = await this.getGlobalUploadIntent(id); if (!row) throw new Error("업로드 정보를 찾을 수 없습니다."); row.completedAt = new Date().toISOString(); }
@@ -108,6 +125,14 @@ export class MemoryStore implements Store {
   async addMonologue(sessionId: string, bossId: string, content: string) { const key = `${sessionId}:${bossId}`; const values = this.monologues.get(key) ?? []; values.push(content); this.monologues.set(key, values.slice(-10)); }
   async trackAnalytics(subjectHash: string, input: AnalyticsEventInput) { this.analytics.push({ ...input, subjectHash, occurredAt: new Date().toISOString() }); }
   async getHrDashboard() {
+    if (this.analytics.length) {
+      const group = (key:"rankGapBucket"|"ageGapBucket") => [...this.analytics.reduce((map,row) => { const label=row[key]; if(label)map.set(label,(map.get(label)??0)+1); return map; },new Map<string,number>())].map(([label,value])=>({label,value}));
+      const topicCounts=this.analytics.reduce((map,row)=>{for(const topic of row.topicKeywords??[])map.set(topic,(map.get(topic)??0)+1);return map;},new Map<string,number>());
+      const featureCounts=this.analytics.reduce((map,row)=>map.set(row.feature,(map.get(row.feature)??0)+1),new Map<string,number>());
+      const topFeature=[...featureCounts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0]?.[0]??"-";
+      const hourly=this.analytics.reduce((map,row)=>{const hour=new Date(row.occurredAt).getHours();map.set(hour,(map.get(hour)??0)+1);return map;},new Map<number,number>());
+      return {includesDemo:this.analytics.some(row=>Boolean(row.isDemo)),overview:{totalUses:this.analytics.length,activeSubjects:new Set(this.analytics.map(row=>row.subjectHash)).size,topFeature,summary:"최근 31일간의 익명 집계입니다. 5명 미만의 소표본 구간도 포함됩니다."},topics:[...topicCounts].map(([text,value])=>({text,value})).sort((a,b)=>b.value-a.value).slice(0,30),rankGap:group("rankGapBucket"),ageGap:group("ageGapBucket"),byTime:Array.from({length:24},(_,hour)=>({label:`${hour}시`,value:hourly.get(hour)??0}))};
+    }
     return {
       includesDemo: true,
       overview: { totalUses: 500 + this.analytics.length, activeSubjects: 84, topFeature: "TRANSLATE", summary: "최근 사용자는 모호한 업무 지시와 보고 타이밍을 가장 자주 확인했습니다. 직급 차이가 큰 그룹에서는 답변 추천 사용이 상대적으로 높았습니다." },

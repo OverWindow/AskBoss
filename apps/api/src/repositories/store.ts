@@ -42,6 +42,7 @@ export interface Store {
   createUploadIntent(input: Omit<UploadIntentRecord, "id" | "completedAt">): Promise<UploadIntentRecord>;
   getUploadIntent(sessionId: string, id: string): Promise<UploadIntentRecord | null>;
   completeUploadIntent(sessionId: string, id: string): Promise<void>;
+  listBossStoragePaths(sessionId: string, bossId: string): Promise<string[]>;
   createGlobalUploadIntent(input: Omit<GlobalUploadIntentRecord, "id" | "completedAt">): Promise<GlobalUploadIntentRecord>;
   getGlobalUploadIntent(id: string): Promise<GlobalUploadIntentRecord | null>;
   completeGlobalUploadIntent(id: string): Promise<void>;

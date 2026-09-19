@@ -6,6 +6,7 @@ import { ai } from "../services/ai/index.js";
 import { track } from "../services/analytics.js";
 import { HttpError } from "../utils/http.js";
 import { parse } from "../utils/validation.js";
+import { plainTextValues } from "../utils/plain-text.js";
 
 const TRANSLATION_TIMEOUT_MS = 60_000;
 const topics = (text: string) => ["보고", "일정", "마감", "야근", "메신저", "피드백", "회의", "자료", "실수", "확인"].filter((word) => text.includes(word));
@@ -29,7 +30,7 @@ export const translationRoutes: FastifyPluginAsync = async (app) => {
     request.raw.once("aborted", onClientAbort);
 
     try {
-      const result = await ai.translateBossMessage({ profile, boss, basePrompt, ...body }, controller.signal);
+      const result = plainTextValues(await ai.translateBossMessage({ profile, boss, basePrompt, ...body }, controller.signal));
       const row = await store.createTranslation({ sessionId: session.id, bossId, inputText: body.inputText, channel: body.channel, result, expiresAt: sessionExpiry() });
       void track(session.id, "TRANSLATE", profile, boss, { topicKeywords: topics(body.inputText) }).catch((error) => request.log.warn(error, "translation analytics failed"));
       return { translationId: row.id, result };

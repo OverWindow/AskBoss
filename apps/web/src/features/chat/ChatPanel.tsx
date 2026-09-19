@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, RefreshCw, Send, X } from "lucide-react";
+import { MessageCircle, RefreshCw, Send } from "lucide-react";
 import type { Boss } from "@askboss/shared";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../services/api-client";
@@ -15,9 +15,8 @@ interface Message {
 
 interface ChatPanelProps {
   boss: Boss;
-  open: boolean;
+  active: boolean;
   simulationRequest: ChatSimulationRequest | null;
-  onClose: () => void;
   onActivity: (state: { thinking: boolean; speech?: string }) => void;
 }
 
@@ -30,7 +29,7 @@ interface SimulationPreview {
   error?: string;
 }
 
-export function ChatPanel({ boss, open, simulationRequest, onClose, onActivity }: ChatPanelProps) {
+export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatPanelProps) {
   const [text, setText] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [threadId, setThreadId] = useState<string>();
@@ -56,12 +55,12 @@ export function ChatPanel({ boss, open, simulationRequest, onClose, onActivity }
   }, [history.data]);
 
   useEffect(() => {
-    if (open) window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
-  }, [open]);
+    if (active) window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+  }, [active]);
 
   useEffect(() => {
-    if (open) bottom.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, open, simulationPreview?.reaction, simulationPreview?.loading]);
+    if (active) bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, active, simulationPreview?.reaction, simulationPreview?.loading]);
 
   useEffect(() => {
     setSimulationPreview(null);
@@ -150,11 +149,8 @@ export function ChatPanel({ boss, open, simulationRequest, onClose, onActivity }
     }
   };
 
-  return <section id="chat-panel" className={`workspace-panel chat-panel ${open ? "is-open" : ""}`} aria-label={`${boss.alias}와 대화`} aria-hidden={!open} aria-busy={streaming || simulationLoading}>
-    <header className="workspace-panel-header">
-      <div><h2><MessageCircle size={18}/>{boss.alias}와 대화</h2></div>
-      <button className="panel-close-button" type="button" onClick={onClose} aria-label="대화 패널 닫기"><X size={18}/></button>
-    </header>
+  return <section id="chat-panel" className="workspace-tab-panel" role="tabpanel" aria-labelledby="workspace-tab-chat" aria-label={`${boss.alias}와 대화`} hidden={!active} aria-busy={streaming || simulationLoading}>
+    <div className="workspace-panel-title"><span className="panel-kicker">CONVERSATION</span><h2><MessageCircle size={18}/>{boss.alias}와 대화</h2></div>
     <p className="panel-hint">가상 시뮬레이션이며 실제 인물의 생각을 단정하지 않습니다.</p>
     <div className="chat-list" aria-live="polite">
       {history.isLoading && <p className="hint">이전 대화를 불러오는 중입니다.</p>}

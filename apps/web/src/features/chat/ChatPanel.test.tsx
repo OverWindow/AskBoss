@@ -23,7 +23,7 @@ describe("ChatPanel simulations", () => {
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
-    render(<QueryClientProvider client={client}><ChatPanel boss={boss} open simulationRequest={{ id: "simulation-1", translationId: "00000000-0000-4000-8000-000000000010", replyIndex: 0, inputText: "이거 언제 되나?", reply: "오늘 오후까지 공유드리겠습니다." }} onClose={() => undefined} onActivity={() => undefined}/></QueryClientProvider>);
+    render(<QueryClientProvider client={client}><ChatPanel boss={boss} active simulationRequest={{ id: "simulation-1", translationId: "00000000-0000-4000-8000-000000000010", replyIndex: 0, inputText: "이거 언제 되나?", reply: "오늘 오후까지 공유드리겠습니다." }} onActivity={() => undefined}/></QueryClientProvider>);
 
     expect(await screen.findByText("임시 시뮬레이션")).toBeInTheDocument();
     expect(screen.getByText("기록되지 않음")).toBeInTheDocument();

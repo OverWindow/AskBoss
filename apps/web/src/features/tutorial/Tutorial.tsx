@@ -35,12 +35,12 @@ const steps: TutorialStep[] = [
   },
   {
     target: "chat",
-    message: "대화 버튼을 열면 나랑 업무 상황을 미리 연습해 볼 수 있고.",
+    message: "우측 대화 탭에서 나랑 업무 상황을 미리 연습해 볼 수 있고.",
     preferredSide: "left",
   },
   {
     target: "translate",
-    message: "상사가 무슨 뜻으로 말한 건지 모르겠다면 번역을 써봐.",
+    message: "상사가 무슨 뜻으로 말한 건지 모르겠다면 옆의 번역 탭을 써봐.",
     preferredSide: "right",
   },
   {
@@ -50,7 +50,7 @@ const steps: TutorialStep[] = [
   },
   {
     target: "workspace",
-    message: "그럼, 일해 볼까? 필요할 때 양옆 기능을 바로 열면 돼.",
+    message: "그럼, 일해 볼까? 아바타를 누르면 내 한마디도 바꿀 수 있어.",
     preferredSide: "top",
   },
 ];
@@ -125,7 +125,7 @@ export function Tutorial() {
   const [targetRect, setTargetRect] = useState<DOMRect>();
   const [position, setPosition] = useState<BubblePosition>({ left: EDGE_GAP, top: EDGE_GAP, side: "bottom" });
   const bubbleRef = useRef<HTMLElement>(null);
-  const previousLayout = useRef<{ sidebarCollapsed: boolean; mobileNavOpen: boolean } | undefined>(undefined);
+  const previousLayout = useRef<{ sidebarCollapsed: boolean; mobileNavOpen: boolean; activeWorkspaceTab: "chat" | "translator"; mobilePanelExpanded: boolean } | undefined>(undefined);
   const previousFocus = useRef<HTMLElement | null>(null);
   const wasOpen = useRef(false);
 
@@ -135,11 +135,12 @@ export function Tutorial() {
 
   useEffect(() => {
     if (tutorialOpen && !wasOpen.current) {
-      previousLayout.current = { sidebarCollapsed, mobileNavOpen };
+      const state = useUiStore.getState();
+      previousLayout.current = { sidebarCollapsed, mobileNavOpen, activeWorkspaceTab: state.activeWorkspaceTab, mobilePanelExpanded: state.mobilePanelExpanded };
       setStep(0);
       setUi({
-        chatPanelOpen: false,
-        translatorPanelOpen: false,
+        activeWorkspaceTab: "chat",
+        mobilePanelExpanded: true,
         sidebarCollapsed: false,
       });
     }
@@ -220,6 +221,8 @@ export function Tutorial() {
       ...(restore ? {
         sidebarCollapsed: restore.sidebarCollapsed,
         mobileNavOpen: restore.mobileNavOpen,
+        activeWorkspaceTab: restore.activeWorkspaceTab,
+        mobilePanelExpanded: restore.mobilePanelExpanded,
       } : {}),
     });
     previousLayout.current = undefined;

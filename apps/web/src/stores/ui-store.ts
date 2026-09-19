@@ -4,9 +4,8 @@ interface UiState {
   sidebarCollapsed: boolean;
   mobileNavOpen: boolean;
   selectedBossId: string | null;
-  chatPanelOpen: boolean;
-  translatorPanelOpen: boolean;
-  lastOpenedPanel: "chat" | "translator";
+  activeWorkspaceTab: "chat" | "translator";
+  mobilePanelExpanded: boolean;
   tutorialOpen: boolean;
   settingsOpen: boolean;
   set: (patch: Partial<UiState>) => void;
@@ -16,9 +15,8 @@ export const useUiStore = create<UiState>((set) => ({
   sidebarCollapsed: false,
   mobileNavOpen: false,
   selectedBossId: null,
-  chatPanelOpen: false,
-  translatorPanelOpen: false,
-  lastOpenedPanel: "chat",
+  activeWorkspaceTab: "chat",
+  mobilePanelExpanded: true,
   tutorialOpen: false,
   settingsOpen: false,
   set,

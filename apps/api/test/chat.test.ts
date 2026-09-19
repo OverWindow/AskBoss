@@ -43,6 +43,24 @@ describe("chat SSE", () => {
     expect(history.json().messages.map((message: any) => message.role)).toEqual(["user"]);
   });
 
+  it("streams and stores AI replies as plain text even when the provider returns Markdown", async () => {
+    vi.spyOn(ai, "streamChatWithBoss").mockImplementation(async function* () {
+      yield "## 결론\n";
+      yield "- **오늘 오후**까지 공유해요.";
+    });
+    const session = await app.inject({ method: "POST", url: "/api/session" });
+    const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
+    const bossId = "00000000-0000-4000-8000-000000000001";
+
+    const stream = await app.inject({ method: "POST", url: `/api/bosses/${bossId}/chat`, headers: { cookie, accept: "text/event-stream" }, payload: { message: "언제 공유할까요?" } });
+    expect(stream.body).toContain("결론");
+    expect(stream.body).toContain("오늘 오후까지 공유해요.");
+    expect(stream.body).not.toMatch(/##|\*\*|^- /m);
+
+    const history = await app.inject({ method: "GET", url: `/api/bosses/${bossId}/chat`, headers: { cookie } });
+    expect(history.json().messages.at(-1).content).toBe("결론\n오늘 오후까지 공유해요.");
+  });
+
   it("streams a translated reply simulation without creating chat history", async () => {
     const session = await app.inject({ method: "POST", url: "/api/session" });
     const cookie = String(session.headers["set-cookie"]).split(";")[0]!;

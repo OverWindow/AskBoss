@@ -7,6 +7,7 @@ import { ai } from "../services/ai/index.js";
 import { track } from "../services/analytics.js";
 import { HttpError } from "../utils/http.js";
 import { parse } from "../utils/validation.js";
+import { PlainTextStream, toPlainText } from "../utils/plain-text.js";
 
 const FIRST_DELTA_TIMEOUT_MS = 30_000;
 const DELTA_IDLE_TIMEOUT_MS = 25_000;
@@ -80,13 +81,23 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
 
     try {
       let content = "";
+      const plainStream = new PlainTextStream();
       for await (const chunk of ai.streamSimulatedBossReaction({ profile, boss, basePrompt, inputText: translation.inputText, reply: selectedReply.text, channel: translation.channel }, controller.signal)) {
         if (!chunk) continue;
-        content += chunk;
-        writeEvent(reply.raw, "delta", { text: chunk });
+        const safeChunk = plainStream.push(chunk);
+        if (safeChunk) {
+          content += safeChunk;
+          writeEvent(reply.raw, "delta", { text: safeChunk });
+        }
         resetProgressTimer(DELTA_IDLE_TIMEOUT_MS, "AI_IDLE_TIMEOUT", "반응 생성이 중간에 지연되고 있습니다. 잠시 후 다시 시도해 주세요.");
       }
+      const finalChunk = plainStream.flush();
+      if (finalChunk) {
+        content += finalChunk;
+        writeEvent(reply.raw, "delta", { text: finalChunk });
+      }
       clearTimeout(progressTimer);
+      content = toPlainText(content);
       if (!content.trim()) throw new Error("AI returned an empty response");
       writeEvent(reply.raw, "done", { content });
       finished = true;
@@ -161,13 +172,23 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
 
     try {
       let content = "";
+      const plainStream = new PlainTextStream();
       for await (const chunk of ai.streamChatWithBoss({ profile, boss, basePrompt, summary: thread.conversationSummary, messages: previousMessages, message: body.message }, controller.signal)) {
         if (!chunk) continue;
-        content += chunk;
-        writeEvent(reply.raw, "delta", { text: chunk });
+        const safeChunk = plainStream.push(chunk);
+        if (safeChunk) {
+          content += safeChunk;
+          writeEvent(reply.raw, "delta", { text: safeChunk });
+        }
         resetProgressTimer(DELTA_IDLE_TIMEOUT_MS, "AI_IDLE_TIMEOUT", "답변이 중간에 지연되고 있습니다. 잠시 후 다시 시도해 주세요.");
       }
+      const finalChunk = plainStream.flush();
+      if (finalChunk) {
+        content += finalChunk;
+        writeEvent(reply.raw, "delta", { text: finalChunk });
+      }
       clearTimeout(progressTimer);
+      content = toPlainText(content);
       if (!content.trim()) throw new Error("AI returned an empty response");
 
       const saved = await store.addChatMessage(thread.id, "assistant", content);

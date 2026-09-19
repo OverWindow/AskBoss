@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Languages, RefreshCw, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { Languages, RefreshCw, ThumbsDown, ThumbsUp } from "lucide-react";
 import type { Boss, TranslationResult } from "@askboss/shared";
 import { CHANNELS } from "@askboss/shared";
 import { api } from "../../services/api-client";
@@ -7,13 +7,12 @@ import type { ChatSimulationRequest } from "../chat/simulation-types";
 
 interface TranslatorPanelProps {
   boss: Boss;
-  open: boolean;
-  onClose: () => void;
+  active: boolean;
   onSourceMessage: (message: string) => void;
   onSimulate: (request: ChatSimulationRequest) => void;
 }
 
-export function TranslatorPanel({ boss, open, onClose, onSourceMessage, onSimulate }: TranslatorPanelProps) {
+export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: TranslatorPanelProps) {
   const [text, setText] = useState("");
   const [channel, setChannel] = useState<string>(CHANNELS[0]);
   const [result, setResult] = useState<TranslationResult | null>(null);
@@ -27,8 +26,8 @@ export function TranslatorPanel({ boss, open, onClose, onSourceMessage, onSimula
   const requestController = useRef<AbortController | undefined>(undefined);
 
   useEffect(() => {
-    if (open) window.requestAnimationFrame(() => textareaRef.current?.focus({ preventScroll: true }));
-  }, [open]);
+    if (active) window.requestAnimationFrame(() => textareaRef.current?.focus({ preventScroll: true }));
+  }, [active]);
 
   useEffect(() => {
     setText(""); setResult(null); setTranslationId(undefined); setTranslatedInputText(""); setFeedback(undefined); setSelectedReplyIndex(undefined); setError(undefined);
@@ -81,11 +80,8 @@ export function TranslatorPanel({ boss, open, onClose, onSourceMessage, onSimula
     onSimulate({ id: crypto.randomUUID(), translationId, replyIndex, inputText: translatedInputText, reply: reply.text });
   };
 
-  return <section id="translator-panel" className={`workspace-panel translator-panel ${open ? "is-open" : ""}`} aria-label="상사의 말 번역" aria-hidden={!open} aria-busy={loading}>
-    <header className="workspace-panel-header">
-      <div><h2><Languages size={18}/>상사의 말 번역</h2></div>
-      <button className="panel-close-button" type="button" onClick={onClose} aria-label="번역 패널 닫기"><X size={18}/></button>
-    </header>
+  return <section id="translator-panel" className="workspace-tab-panel" role="tabpanel" aria-labelledby="workspace-tab-translator" aria-label="상사의 말 번역" hidden={!active} aria-busy={loading}>
+    <div className="workspace-panel-title"><span className="panel-kicker">TRANSLATOR</span><h2><Languages size={18}/>상사의 말 번역</h2></div>
     <div className="translator-scroll">
       <div className="field"><label htmlFor="boss-message">상사가 뭐라고 했나요?</label><textarea ref={textareaRef} id="boss-message" className="textarea" value={text} onChange={(event) => setText(event.target.value)} placeholder="받은 메시지나 들은 말을 그대로 적어주세요."/></div>
       <div className="field"><label htmlFor="channel">어떤 상황인가요?</label><select id="channel" className="select" value={channel} onChange={(event) => setChannel(event.target.value)}>{CHANNELS.map((item) => <option key={item}>{item}</option>)}</select></div>

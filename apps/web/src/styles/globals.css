@@ -114,3 +114,61 @@
 .tutorial-skip,.tutorial-next{min-height:40px;border-radius:10px;padding:8px 13px;font-weight:750}
 .tutorial-skip{border:0;background:transparent;color:white;opacity:.72}
 .tutorial-next{border:1px solid white;background:white;color:#263a45}
+
+/* Persistent conversation and translation workspace */
+.onboarding-step h1{font-size:clamp(1.45rem,3vw,2.05rem);letter-spacing:-.045em;line-height:1.28}
+.interaction-workspace{grid-template-columns:minmax(0,1fr) clamp(340px,31vw,400px);gap:14px;padding:18px;place-items:stretch}
+.interaction-workspace .boss-stage{width:100%;max-width:none;justify-content:center}
+.avatar-button{border:0;background:transparent;padding:0;cursor:pointer;border-radius:24px}
+.avatar-button:focus-visible{outline:3px solid rgba(78,141,124,.45);outline-offset:5px}
+.workspace-dock{z-index:10;min-width:0;height:100%;border:1px solid var(--hr-border);border-radius:18px;background:#fff;box-shadow:0 22px 60px rgba(38,58,69,.12);display:flex;flex-direction:column;overflow:hidden}
+.workspace-tabs-header{min-height:62px;display:flex;align-items:stretch;justify-content:space-between;border-bottom:1px solid var(--hr-border);background:#fbfcfd}
+.workspace-tabs{display:grid;grid-template-columns:repeat(2,minmax(92px,1fr));flex:1}
+.workspace-tabs button{position:relative;border:0;background:transparent;color:var(--hr-muted);font-weight:800;font-size:.95rem}
+.workspace-tabs button[aria-selected="true"]{color:var(--hr-primary);background:#fff}
+.workspace-tabs button[aria-selected="true"]::after{content:"";position:absolute;left:18px;right:18px;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--hr-accent)}
+.mobile-panel-toggle{display:none;border:0;border-left:1px solid var(--hr-border);background:transparent;color:var(--hr-primary);padding:0 14px;align-items:center;gap:6px;font-weight:750}
+.workspace-dock-body{min-height:0;flex:1;position:relative}
+.workspace-tab-panel{height:100%;min-height:0;display:flex;flex-direction:column}
+.workspace-tab-panel[hidden]{display:none}
+.workspace-panel-title{padding:16px 18px 12px;border-bottom:1px solid rgba(38,58,69,.08)}
+.workspace-panel-title h2{display:flex;align-items:center;gap:8px;margin:3px 0 0;font-size:1.05rem;letter-spacing:-.025em}
+.workspace-tab-panel .chat-list{min-height:0;flex:1;overflow:auto;padding:18px}
+.workspace-tab-panel .chat-composer{padding:14px 16px 16px;background:#fff}
+
+@media(max-width:1199px){
+  .interaction-workspace{grid-template-columns:minmax(0,1fr) minmax(330px,38vw)}
+  .interaction-workspace .boss-stage{width:100%}
+}
+
+@media(max-width:767px){
+  .interaction-workspace{display:block;min-height:100vh;min-height:100dvh;padding:62px 14px 14px}
+  .workspace-dock{position:absolute;left:10px;right:10px;bottom:10px;height:min(54vh,560px);min-height:360px;border-radius:17px;transition:height .22s ease,min-height .22s ease}
+  .workspace-tabs-header{min-height:58px}
+  .mobile-panel-toggle{display:flex}
+  .mobile-panel-toggle span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .workspace-panel-title{padding:12px 16px 10px}
+  .workspace-tab-panel .chat-list{padding:14px}
+  .interaction-workspace.is-mobile-panel-collapsed .workspace-dock{height:58px;min-height:58px}
+  .interaction-workspace.is-mobile-panel-collapsed .workspace-dock-body{display:none}
+  .onboarding-step h1{font-size:1.4rem}
+}
+
+/* Personal boss deletion */
+.boss-nav-row{position:relative;display:flex;align-items:center;border-radius:10px}
+.boss-nav-row .boss-nav-item{min-width:0;flex:1;padding-right:38px}
+.boss-nav-row:hover,.boss-nav-row:focus-within{background:rgba(53,87,107,.07)}
+.boss-nav-row.is-active{background:rgba(78,141,124,.12);color:#244c43}
+.boss-nav-row .boss-nav-item:hover{background:transparent}
+.boss-delete-button{position:absolute;right:7px;width:27px;height:27px;border:0;border-radius:50%;display:grid;place-items:center;background:transparent;color:var(--hr-muted);opacity:0;pointer-events:none;transition:opacity .16s ease,background .16s ease,color .16s ease}
+.boss-nav-row:hover .boss-delete-button,.boss-nav-row:focus-within .boss-delete-button{opacity:1;pointer-events:auto}
+.boss-delete-button:hover{background:#fff0f0;color:var(--hr-danger)}
+.app-shell.is-collapsed .boss-nav-row .boss-nav-item{justify-content:center;padding-inline:0}
+.app-shell.is-collapsed .boss-delete-button{right:-7px;top:1px;width:22px;height:22px;background:#fff;border:1px solid var(--hr-border)}
+.dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
+.danger-confirm-button{background:var(--hr-danger);border-color:var(--hr-danger)}
+.danger-confirm-button:hover{background:#7f3e3e;border-color:#7f3e3e}
+
+@media(hover:none),(max-width:767px){
+  .boss-nav-row.is-active .boss-delete-button{opacity:1;pointer-events:auto}
+}

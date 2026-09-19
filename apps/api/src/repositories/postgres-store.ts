@@ -79,6 +79,14 @@ export class PostgresStore implements Store {
   async createUploadIntent(i: Omit<UploadIntentRecord, "id" | "completedAt">) { const [r] = await this.sql`insert into upload_intents(session_id,boss_id,storage_path,original_name,content_type,size_bytes,expires_at) values(${i.sessionId},${i.bossId},${i.storagePath},${i.originalName},${i.contentType},${i.sizeBytes},${i.expiresAt}) returning *`; return { id:r!.id,sessionId:r!.session_id,bossId:r!.boss_id,storagePath:r!.storage_path,originalName:r!.original_name,contentType:r!.content_type,sizeBytes:r!.size_bytes,completedAt:null,expiresAt:r!.expires_at.toISOString() }; }
   async getUploadIntent(sessionId: string, id: string) { const [r] = await this.sql`select * from upload_intents where id=${id} and session_id=${sessionId} and expires_at>now()`; return r ? { id:r.id,sessionId:r.session_id,bossId:r.boss_id,storagePath:r.storage_path,originalName:r.original_name,contentType:r.content_type,sizeBytes:r.size_bytes,completedAt:r.completed_at?.toISOString() ?? null,expiresAt:r.expires_at.toISOString() } : null; }
   async completeUploadIntent(sessionId: string, id: string) { await this.sql`update upload_intents set completed_at=now() where id=${id} and session_id=${sessionId}`; }
+  async listBossStoragePaths(sessionId: string, bossId: string) {
+    const rows = await this.sql`
+      select storage_path from upload_intents where session_id=${sessionId} and boss_id=${bossId}
+      union
+      select storage_path from boss_evidence where session_id=${sessionId} and boss_id=${bossId} and storage_path is not null
+    `;
+    return rows.map((row:any) => row.storage_path as string);
+  }
   async createGlobalUploadIntent(i:Omit<GlobalUploadIntentRecord,"id"|"completedAt">){const [r]=await this.sql`insert into global_boss_upload_intents(boss_id,storage_path,original_name,content_type,size_bytes,expires_at) values(${i.bossId},${i.storagePath},${i.originalName},${i.contentType},${i.sizeBytes},${i.expiresAt}) returning *`;return {id:r!.id,bossId:r!.boss_id,storagePath:r!.storage_path,originalName:r!.original_name,contentType:r!.content_type,sizeBytes:r!.size_bytes,completedAt:null,expiresAt:r!.expires_at.toISOString()};}
   async getGlobalUploadIntent(id:string){const [r]=await this.sql`select * from global_boss_upload_intents where id=${id} and expires_at>now()`;return r?{id:r.id,bossId:r.boss_id,storagePath:r.storage_path,originalName:r.original_name,contentType:r.content_type,sizeBytes:r.size_bytes,completedAt:r.completed_at?.toISOString()??null,expiresAt:r.expires_at.toISOString()}:null;}
   async completeGlobalUploadIntent(id:string){await this.sql`update global_boss_upload_intents set completed_at=now() where id=${id}`;}
@@ -127,19 +135,21 @@ export class PostgresStore implements Store {
   async addMonologue(sessionId:string,bossId:string,content:string) { await this.sql`insert into monologue_history(session_id,boss_id,content) values(${sessionId},${bossId},${content})`; }
   async trackAnalytics(subjectHash:string,i:AnalyticsEventInput) { await this.sql`insert into analytics_events(anonymous_subject_hash,event_type,feature,user_age_band,boss_age_band,rank_gap_bucket,age_gap_bucket,topic_keywords,persona_confidence_bucket,is_demo,expires_at) values(${subjectHash},${i.eventType},${i.feature},${i.userAgeBand??null},${i.bossAgeBand??null},${i.rankGapBucket??null},${i.ageGapBucket??null},${i.topicKeywords??[]},${i.personaConfidenceBucket??null},${i.isDemo??false},now()+interval '31 days')`; }
   async getHrDashboard() {
-    const [total] = await this.sql`select count(*)::int value,count(distinct anonymous_subject_hash)::int subjects from analytics_events where expires_at>now()`;
+    const [total] = await this.sql`select count(*)::int value,count(distinct anonymous_subject_hash)::int subjects,coalesce(bool_or(is_demo),false) includes_demo from analytics_events where expires_at>now()`;
     if (!total?.value) return this.demo.getHrDashboard();
-    const rank=await this.sql`select rank_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() group by rank_gap_bucket having count(distinct anonymous_subject_hash)>=5 order by label`;
-    const age=await this.sql`select age_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() group by age_gap_bucket having count(distinct anonymous_subject_hash)>=5 order by label`;
-    const time=await this.sql`select extract(hour from occurred_at)::int label,count(*)::int value from analytics_events where expires_at>now() group by 1 having count(distinct anonymous_subject_hash)>=5 order by 1`;
-    const topics=await this.sql`select keyword text,count(*)::int value from analytics_events cross join unnest(topic_keywords) keyword where expires_at>now() group by keyword having count(distinct anonymous_subject_hash)>=5 order by value desc limit 30`;
-    return {includesDemo:false,overview:{totalUses:total.value,activeSubjects:total.subjects,topFeature:"TRANSLATE",summary:"최근 31일간 재식별할 수 없는 집계만 표시합니다."},topics,rankGap:rank,ageGap:age,byTime:time.map((r:any)=>({label:`${r.label}시`,value:r.value}))};
+    const rank=await this.sql`select rank_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and rank_gap_bucket is not null group by rank_gap_bucket order by label`;
+    const age=await this.sql`select age_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and age_gap_bucket is not null group by age_gap_bucket order by label`;
+    const time=await this.sql`select extract(hour from occurred_at)::int label,count(*)::int value from analytics_events where expires_at>now() group by 1 order by 1`;
+    const topics=await this.sql`select keyword text,count(*)::int value from analytics_events cross join unnest(topic_keywords) keyword where expires_at>now() group by keyword order by value desc limit 30`;
+    const [feature]=await this.sql`select feature,count(*)::int value from analytics_events where expires_at>now() group by feature order by value desc,feature limit 1`;
+    const hourly=new Map(time.map((row:any)=>[Number(row.label),Number(row.value)]));
+    return {includesDemo:Boolean(total.includes_demo),overview:{totalUses:total.value,activeSubjects:total.subjects,topFeature:feature?.feature??"-",summary:"최근 31일간의 익명 집계입니다. 5명 미만의 소표본 구간도 포함됩니다."},topics,rankGap:rank,ageGap:age,byTime:Array.from({length:24},(_,hour)=>({label:`${hour}시`,value:hourly.get(hour)??0}))};
   }
   async rollupAnalytics(){
     const dimensions=[
-      this.sql`select occurred_at::date aggregate_date,'rank_gap' dimension,coalesce(rank_gap_bucket,'UNKNOWN') dimension_value,feature,count(*)::int event_count,count(distinct anonymous_subject_hash)::int distinct_subject_count,is_demo from analytics_events where occurred_at<date_trunc('day',now()) group by 1,3,4,7 having count(distinct anonymous_subject_hash)>=5`,
-      this.sql`select occurred_at::date aggregate_date,'age_gap' dimension,coalesce(age_gap_bucket,'UNKNOWN') dimension_value,feature,count(*)::int event_count,count(distinct anonymous_subject_hash)::int distinct_subject_count,is_demo from analytics_events where occurred_at<date_trunc('day',now()) group by 1,3,4,7 having count(distinct anonymous_subject_hash)>=5`,
-      this.sql`select occurred_at::date aggregate_date,'hour' dimension,extract(hour from occurred_at)::text dimension_value,feature,count(*)::int event_count,count(distinct anonymous_subject_hash)::int distinct_subject_count,is_demo from analytics_events where occurred_at<date_trunc('day',now()) group by 1,3,4,7 having count(distinct anonymous_subject_hash)>=5`,
+      this.sql`select occurred_at::date aggregate_date,'rank_gap' dimension,coalesce(rank_gap_bucket,'UNKNOWN') dimension_value,feature,count(*)::int event_count,count(distinct anonymous_subject_hash)::int distinct_subject_count,is_demo from analytics_events where occurred_at<date_trunc('day',now()) group by 1,3,4,7`,
+      this.sql`select occurred_at::date aggregate_date,'age_gap' dimension,coalesce(age_gap_bucket,'UNKNOWN') dimension_value,feature,count(*)::int event_count,count(distinct anonymous_subject_hash)::int distinct_subject_count,is_demo from analytics_events where occurred_at<date_trunc('day',now()) group by 1,3,4,7`,
+      this.sql`select occurred_at::date aggregate_date,'hour' dimension,extract(hour from occurred_at)::text dimension_value,feature,count(*)::int event_count,count(distinct anonymous_subject_hash)::int distinct_subject_count,is_demo from analytics_events where occurred_at<date_trunc('day',now()) group by 1,3,4,7`,
     ];
     let count=0;for(const query of dimensions){const rows=await query;for(const r of rows){await this.sql`insert into analytics_daily_aggregates(aggregate_date,dimension,dimension_value,feature,event_count,distinct_subject_count,is_demo) values(${r.aggregate_date},${r.dimension},${r.dimension_value},${r.feature},${r.event_count},${r.distinct_subject_count},${r.is_demo}) on conflict(aggregate_date,dimension,dimension_value,feature,is_demo) do update set event_count=excluded.event_count,distinct_subject_count=excluded.distinct_subject_count`;count++;}}return count;
   }

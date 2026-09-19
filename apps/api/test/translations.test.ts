@@ -51,4 +51,13 @@ describe("translation API", () => {
       await store.updatePersonalBossDefaults(DEFAULT_PERSONAL_BOSS_BASE_PROMPT);
     }
   });
+
+  it("normalizes Markdown from every user-visible translation field", async () => {
+    vi.spyOn(ai, "translateBossMessage").mockResolvedValueOnce({ plainMeaning: "**현재 상황** 공유 요청", likelyIntent: ["- 일정 확인"], tone: "`간결함`", caution: "[단정 금지](https://example.com)", confidence: 0.7, replies: [{ text: "**오늘** 공유하겠습니다.", style: "무난하게", reason: "- 일정 명시" }, { text: "오후에 공유하겠습니다.", style: "간결하게", reason: "시점 명시" }, { text: "정리해서 공유드리겠습니다.", style: "부드럽게", reason: "예의 유지" }] });
+    const session = await app.inject({ method: "POST", url: "/api/session" });
+    const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
+    const response = await app.inject({ method: "POST", url: "/api/bosses/00000000-0000-4000-8000-000000000001/translate", headers: { cookie }, payload: { inputText: "언제 되나?", channel: "사내 메신저" } });
+    expect(response.json().result).toMatchObject({ plainMeaning: "현재 상황 공유 요청", tone: "간결함", caution: "단정 금지" });
+    expect(JSON.stringify(response.json().result)).not.toMatch(/\*\*|`|https:\/\//);
+  });
 });
