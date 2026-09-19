@@ -1,4 +1,4 @@
-import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionPage, ChatMessageKind, HrDashboard, TranslationArchiveDetail, TranslationArchiveSummary } from "../shared.js";
+import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminPersonalBossPage, AdminSessionPage, ChatMessageKind, HrDashboard, TranslationArchiveDetail, TranslationArchiveSummary } from "../shared.js";
 import type { AdminAiPromptSettings, AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalBossDefaults, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, PersonalBossDefaults, SessionRecord, SurveyAnswerRecord, TranslationExamplesSettings, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { ArchiveCursor } from "../utils/archive-cursor.js";
 
@@ -17,6 +17,18 @@ export interface UpdateGlobalBossInput {
   ageBand?: number | null;
   hierarchyScore?: number | null;
   companyResearch?: CompanyResearch | null;
+}
+
+export interface AdminPersonalBossPromptContext {
+  boss: BossRecord;
+  profile: UserProfile | null;
+  sessionId: string;
+  chatMessageCount: number;
+  thread: {
+    conversationSummary: string | null;
+    previousMessages: ChatMessageRecord[];
+    latestQuestion: ChatMessageRecord;
+  } | null;
 }
 
 export interface Store {
@@ -101,6 +113,8 @@ export interface Store {
   clearAdminLoginFailures(ipHash: string): Promise<void>;
   getAdminDashboard(): Promise<AdminDashboard>;
   listAdminSessions(page?: number, limit?: number): Promise<AdminSessionPage>;
+  listAdminPersonalBosses(page?: number, limit?: number): Promise<AdminPersonalBossPage>;
+  getAdminPersonalBossPromptContext(bossId: string): Promise<AdminPersonalBossPromptContext | null>;
   pruneMeaninglessSessions(): Promise<{ deleted: number; storagePaths: string[] }>;
   listAdminJobs(status?: string, cursor?: string, limit?: number): Promise<{ items: AdminJobSummary[]; nextCursor: string | null }>;
   getPersonalBossDefaults(): Promise<PersonalBossDefaults>;

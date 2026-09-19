@@ -25,7 +25,7 @@ openssl rand -hex 32    # ADMIN_SESSION_SECRET
 
 ## 데이터베이스
 
-`supabase/migrations`의 `0001`부터 `0007`까지 순서대로 적용하고 `boss-evidence` Bucket이 private인지 확인합니다. `0005_admin_operations.sql`은 관리자 세션·로그인 시도·운영 작업 기록과 Job 재시도 연결을, `0006_global_boss_admin.sql`은 모두의 상사 관찰 자료·설문·업로드 저장소를, `0007_personal_boss_defaults.sql`은 개인 상사 공통 AI 기본 성격을 추가합니다. HR 데모 데이터는 `pnpm seed:hr`로 생성합니다.
+`supabase/migrations`의 모든 SQL 파일을 번호 순서대로 적용하고 `boss-evidence` Bucket이 private인지 확인합니다. 신규 배포뿐 아니라 기존 환경도 저장소의 마지막 마이그레이션까지 적용해야 합니다. 특히 `0016_admin_personal_boss_prompt_view.sql`은 관리자 개인 상사 프롬프트 조회 감사 유형을 추가합니다. HR 데모 데이터는 `pnpm seed:hr`로 생성합니다.
 
 ## 배포
 

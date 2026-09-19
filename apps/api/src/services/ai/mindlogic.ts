@@ -4,7 +4,7 @@ import { bossPersonaSchema,companyResearchSchema,extractedEvidenceSchema,surveyQ
 import { env } from "../../config/env.js";
 import { companyPrompt } from "../../prompts/company.js";
 import { evidencePrompt } from "../../prompts/evidence.js";
-import { personaPrompt } from "../../prompts/persona.js";
+import { buildPersonaMessages } from "../../prompts/persona.js";
 import { surveyPrompt } from "../../prompts/survey.js";
 import { buildBossChatMessages } from "../../prompts/chat.js";
 import { translatorPrompt } from "../../prompts/translator.js";
@@ -28,7 +28,7 @@ export class MindlogicAiService implements AiService {
     const response=await this.client.chat.completions.create({model:env.AI_PRIMARY_MODEL,temperature:.2,messages:[{role:"user",content:[{type:"text",text:evidencePrompt("첨부 이미지의 대화 내용을 분석하라.",input.promptInstruction)},{type:"image_url",image_url:{url}}]}]});
     return this.validateOrRepair(env.AI_PRIMARY_MODEL,response.choices[0]?.message.content??"",extractedEvidenceSchema);
   }
-  buildPersona(input:any){const {basePrompt,globalBoss,promptInstruction,...context}=input;return this.structured(env.AI_PRIMARY_MODEL,personaPrompt(context,promptInstruction),bossPersonaSchema,undefined,bossSystemPrompt(input.boss.scope,basePrompt,input.boss.scope==="SESSION"?globalBoss?.persona:undefined));}
+  buildPersona(input:any){const [system,user]=buildPersonaMessages(input);return this.structured(env.AI_PRIMARY_MODEL,user.content,bossPersonaSchema,undefined,system.content);}
   generateSurvey(boss:any,promptInstruction?:string){return this.structured(env.AI_PRIMARY_MODEL,surveyPrompt(boss,promptInstruction),surveyQuestionsSchema);}
   async *streamChatWithBoss(input:BossChatInput,signal?:AbortSignal){
     const stream=await this.client.chat.completions.create({model:env.AI_PRIMARY_MODEL,messages:[...buildBossChatMessages(input)],temperature:.4,stream:true},{signal});

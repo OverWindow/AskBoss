@@ -12,10 +12,20 @@ export interface BossChatInput {
   message: string;
 }
 
+export interface PersonaBuildInput {
+  profile: UserProfile | null;
+  boss: Boss;
+  evidence: Array<EvidenceRecord | GlobalEvidenceRecord>;
+  survey: SurveyAnswerRecord[];
+  basePrompt?: string;
+  globalBoss?: Boss;
+  promptInstruction?: string;
+}
+
 export interface AiService {
   researchCompany(name: string, promptInstruction?: string): Promise<CompanyResearch>;
   extractEvidence(input: { content: string; kind: string; promptInstruction?: string }): Promise<{ observations: any[] }>;
-  buildPersona(input: { profile: UserProfile | null; boss: Boss; evidence: Array<EvidenceRecord | GlobalEvidenceRecord>; survey: SurveyAnswerRecord[]; basePrompt?: string; globalBoss?: Boss; promptInstruction?: string }): Promise<BossPersona>;
+  buildPersona(input: PersonaBuildInput): Promise<BossPersona>;
   generateSurvey(boss: Boss, promptInstruction?: string): Promise<BossSurveyQuestion[]>;
   streamChatWithBoss(input: BossChatInput, signal?: AbortSignal): AsyncIterable<string>;
   streamSimulatedBossReaction(input: { profile: UserProfile | null; boss: Boss; inputText: string; reply: string; channel: string; basePrompt?: string; globalBoss?: Boss; sessionCalibration?: unknown[] }, signal?: AbortSignal): AsyncIterable<string>;

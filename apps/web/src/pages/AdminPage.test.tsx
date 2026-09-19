@@ -145,6 +145,38 @@ describe("AdminPage", () => {
     expect(examples).toEqual(["새 예시 문장", "기존 예시 2", "기존 예시 3"]);
   });
 
+  it("reveals personal boss prompts only after an explicit sensitive-data action and switches prompt tabs", async () => {
+    const bossId = "11111111-1111-4111-8111-111111111111";
+    mockedApi.mockImplementation(async (path: string) => {
+      if (path === "/admin/auth") return { authenticated: true, expiresAt: "2026-09-19T10:00:00Z" } as any;
+      if (path === "/admin/personal-bosses?page=1") return { items: [{ id: bossId, ownerHandle: "실사용자", alias: "김팀장", avatarKey: "boss-male-01", status: "READY", personaVersion: 3, pkiScore: 72, chatMessageCount: 8, lastActivityAt: "2026-09-19T09:00:00Z", expiresAt: "2026-10-19T09:00:00Z" }], page: 1, pageSize: 20, total: 1, totalPages: 1 } as any;
+      if (path === `/admin/personal-bosses/${bossId}/prompt-preview`) return {
+        reconstructedAt: "2026-09-19T09:10:00Z",
+        reconstructionMode: "CURRENT_STATE",
+        profile: { handle: "실사용자", ageBand: 30, yearsOfServiceBand: "3~4년", rank: "대리", jobFunction: "개발", entryPath: "신입", weaknesses: ["보고가 김"] },
+        boss: { id: bossId, scope: "SESSION", status: "READY", alias: "김팀장", avatarKey: "boss-male-01", jobFunction: "개발", yearsOfServiceBand: "10~14년", rank: "팀장", companyName: "테스트 회사", ageBand: 40, hierarchyScore: 70, companyResearch: null, persona: { summary: "결론 우선형", communication: { tone: "간결", messageLength: "짧음", directness: 70, formality: 60 }, reporting: { preferredLength: "짧게", preferredStructure: [], frequentChecks: [] }, decisionMaking: { speed: "빠름", riskTolerance: "낮음", autonomyPreference: "중간" }, management: { hierarchyPreference: "중간", feedbackStyle: "직접적", deadlineSensitivity: "높음" }, recurringPatterns: [], recurringPhrases: [], humorStyle: null, uncertainty: [], traits: [] }, pki: null, personaVersion: 3 },
+        personaGeneration: { messages: [{ role: "system", content: "생성 SYSTEM 원문" }, { role: "user", content: "생성 USER 원문" }], sources: [{ role: "user", component: "사용자 프로필", origin: "사용자 저장 프로필", description: "실제 프로필", containsPersonalData: true }], evidenceCount: 2, surveyAnswerCount: 1 },
+        chat: { status: "AVAILABLE", messages: [{ role: "system", content: "대화 SYSTEM 원문" }, { role: "user", content: "대화 USER 원문" }], sources: [{ role: "user", component: "최근 대화 이력", origin: "현재 활성 대화", description: "최근 19개", containsPersonalData: true }], lastQuestionAt: "2026-09-19T09:00:00Z", historyMessageCount: 7, includedMessageCount: 8, totalMessageCount: 8 },
+      } as any;
+      return {} as any;
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderAdmin(client, "/admin/personal-bosses");
+    expect(await screen.findByRole("heading", { name: "사용자 상사·프롬프트" })).toBeInTheDocument();
+    expect(screen.getByText(/실제 사용자 프로필과 대화 원문/)).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "선택" }));
+    expect(screen.getByRole("button", { name: "민감정보 포함 원문 보기" })).toBeInTheDocument();
+    expect(mockedApi.mock.calls.some(([path]) => path === `/admin/personal-bosses/${bossId}/prompt-preview`)).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "민감정보 포함 원문 보기" }));
+    expect(await screen.findByText("생성 SYSTEM 원문")).toBeInTheDocument();
+    expect(screen.getByText(/과거 호출 당시를 저장한 스냅샷이 아닙니다/)).toBeInTheDocument();
+    expect(screen.getByText("사용자 저장 프로필")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "상사 대화" }));
+    expect(await screen.findByText("대화 SYSTEM 원문")).toBeInTheDocument();
+    expect(screen.getByText("대화 USER 원문")).toBeInTheDocument();
+    expect(screen.getByText("최근 19개")).toBeInTheDocument();
+  });
+
   it("shows a recoverable error when the global boss detail cannot be loaded", async () => {
     mockedApi.mockImplementation(async (path: string) => {
       if (path === "/admin/auth") return { authenticated: true, expiresAt: "2026-09-19T10:00:00Z" } as any;

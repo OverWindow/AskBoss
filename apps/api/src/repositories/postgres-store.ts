@@ -1,7 +1,7 @@
 import postgres, { type Sql } from "postgres";
-import type { AdminAiPromptSettings, AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionPage, AdminSessionSummary, Boss, ChatMessageKind, CompanyResearch, HrDashboard, TranslationArchiveBranch, TranslationArchiveDetail, TranslationArchiveSummary, TranslationExamples, UserProfile } from "../shared.js";
+import type { AdminAiPromptSettings, AdminDashboard, AdminJobSummary, AdminOperation, AdminPersonalBossPage, AdminSessionPage, AdminSessionSummary, Boss, ChatMessageKind, CompanyResearch, HrDashboard, TranslationArchiveBranch, TranslationArchiveDetail, TranslationArchiveSummary, TranslationExamples, UserProfile } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord } from "../types.js";
-import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
+import type { AdminPersonalBossPromptContext, CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 import { toIsoTimestamp } from "../utils/database.js";
 import { computeSurfaceActualGap } from "../utils/hr-aggregation.js";
@@ -161,7 +161,7 @@ export class PostgresStore implements Store {
     let r:any; if (threadId) [r] = await this.sql`select * from chat_threads where id=${threadId} and session_id=${sessionId} and boss_id=${bossId} and expires_at>now()`;
     if (!r) [r] = await this.sql`select * from chat_threads where session_id=${sessionId} and boss_id=${bossId} and expires_at>now()`;
     if (!r) [r] = await this.sql`insert into chat_threads(session_id,boss_id,expires_at) values(${sessionId},${bossId},${expiresAt}) on conflict (session_id,boss_id) do update set expires_at=excluded.expires_at returning *`;
-    const messages = await this.sql`select * from chat_messages where thread_id=${r.id} order by created_at desc limit 20`;
+    const messages = await this.sql`select * from chat_messages where thread_id=${r.id} order by created_at desc,id desc limit 20`;
     return { id:r.id,sessionId:r.session_id,bossId:r.boss_id,conversationSummary:r.conversation_summary,messages:messages.reverse().map(camelChatMessage),archiveId:r.archive_id,archiveBranchId:r.archive_branch_id,createdAt:r.created_at.toISOString(),expiresAt:r.expires_at.toISOString() } as ChatThreadRecord;
   }
   async replaceChatWithSimulation(sessionId: string, bossId: string, archiveId: string, replyIndex: number, source: string, reply: string, expiresAt: string) { return this.sql.begin(async (sql) => {
@@ -185,7 +185,7 @@ export class PostgresStore implements Store {
   async addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string, kind: ChatMessageKind = "CHAT") { return this.sql.begin(async (sql) => { const [thread] = await sql`select * from chat_threads where id=${threadId}`; if (!thread) throw new Error("대화를 찾을 수 없습니다."); const [r] = await sql`insert into chat_messages(thread_id,role,content,kind) values(${threadId},${role},${content},${kind}) returning *`; if (thread.archive_branch_id) { const [position] = await sql`select count(*)::int value from translation_archive_messages where branch_id=${thread.archive_branch_id}`; await sql`insert into translation_archive_messages(branch_id,role,content,kind,position,created_at) values(${thread.archive_branch_id},${role},${content},${kind},${position!.value},${r!.created_at})`; await sql`update translation_archive_branches set updated_at=now() where id=${thread.archive_branch_id}`; await sql`update translation_archives set updated_at=now() where id=${thread.archive_id}`; } return camelChatMessage(r); }); }
   async listChatMessages(sessionId: string, bossId: string, cursor?: string, limit=50) {
     const [thread] = await this.sql`select * from chat_threads where session_id=${sessionId} and boss_id=${bossId} order by created_at desc limit 1`; if (!thread) return { threadId:null,archiveId:null,messages:[],nextCursor:null };
-    const rows = cursor ? await this.sql`select * from chat_messages where thread_id=${thread.id} and created_at<${cursor} order by created_at desc limit ${limit+1}` : await this.sql`select * from chat_messages where thread_id=${thread.id} order by created_at desc limit ${limit+1}`;
+    const rows = cursor ? await this.sql`select * from chat_messages where thread_id=${thread.id} and created_at<${cursor} order by created_at desc,id desc limit ${limit+1}` : await this.sql`select * from chat_messages where thread_id=${thread.id} order by created_at desc,id desc limit ${limit+1}`;
     const hasMore=rows.length>limit; const messages=rows.slice(0,limit).reverse().map(camelChatMessage); return {threadId:thread.id,archiveId:thread.archive_id,messages,nextCursor:hasMore ? messages[0]?.createdAt ?? null:null};
   }
   async updateThreadSummary(threadId: string, summary: string) { await this.sql`update chat_threads set conversation_summary=${summary},summarized_through=now() where id=${threadId}`; }
@@ -309,6 +309,60 @@ export class PostgresStore implements Store {
       translationCount: Number(row.translationCount ?? row.translation_count ?? 0),
     }));
     const total=Number(count?.total??0);return {items,page,pageSize:limit,total,totalPages:Math.max(1,Math.ceil(total/limit))};
+  }
+  async listAdminPersonalBosses(page = 1, limit = 20): Promise<AdminPersonalBossPage> {
+    const [count] = await this.sql`select count(*)::int total from bosses b join sessions s on s.id=b.session_id where b.scope='SESSION' and b.expires_at>now() and s.expires_at>now()`;
+    const rows = await this.sql`
+      select b.id,b.alias,b.avatar_key,b.status,b.persona_version,b.pki_score,b.expires_at,p.handle,
+        count(m.id)::int chat_message_count,
+        greatest(b.updated_at,coalesce(max(m.created_at),b.updated_at)) last_activity_at
+      from bosses b
+      join sessions s on s.id=b.session_id and s.expires_at>now()
+      left join user_profiles p on p.session_id=b.session_id
+      left join chat_threads t on t.session_id=b.session_id and t.boss_id=b.id and t.expires_at>now()
+      left join chat_messages m on m.thread_id=t.id
+      where b.scope='SESSION' and b.expires_at>now()
+      group by b.id,p.handle
+      order by last_activity_at desc,b.id desc
+      limit ${limit} offset ${(page-1)*limit}
+    `;
+    const items = rows.map((row:any) => ({
+      id: row.id,
+      ownerHandle: row.handle ?? null,
+      alias: row.alias,
+      avatarKey: row.avatar_key,
+      status: row.status,
+      personaVersion: Number(row.persona_version ?? 0),
+      pkiScore: row.pki_score === null ? null : Number(row.pki_score),
+      chatMessageCount: Number(row.chat_message_count ?? 0),
+      lastActivityAt: toIsoTimestamp(row.last_activity_at, "bosses.last_activity_at"),
+      expiresAt: toIsoTimestamp(row.expires_at, "bosses.expires_at"),
+    }));
+    const total = Number(count?.total ?? 0);
+    return { items, page, pageSize: limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) };
+  }
+  async getAdminPersonalBossPromptContext(bossId: string): Promise<AdminPersonalBossPromptContext | null> {
+    const [row] = await this.sql`select b.* from bosses b join sessions s on s.id=b.session_id where b.id=${bossId} and b.scope='SESSION' and b.expires_at>now() and s.expires_at>now()`;
+    if (!row?.session_id) return null;
+    const boss = camelBoss(row);
+    const profile = await this.getProfile(row.session_id);
+    const [thread] = await this.sql`select * from chat_threads where session_id=${row.session_id} and boss_id=${bossId} and expires_at>now() limit 1`;
+    if (!thread) return { boss, profile, sessionId: row.session_id, chatMessageCount: 0, thread: null };
+    const [count] = await this.sql`select count(*)::int total from chat_messages where thread_id=${thread.id}`;
+    const [latestQuestion] = await this.sql`select * from chat_messages where thread_id=${thread.id} and role='user' and kind='CHAT' order by created_at desc,id desc limit 1`;
+    if (!latestQuestion) return { boss, profile, sessionId: row.session_id, chatMessageCount: Number(count?.total ?? 0), thread: null };
+    const previous = await this.sql`select * from chat_messages where thread_id=${thread.id} and (created_at<${latestQuestion.created_at} or (created_at=${latestQuestion.created_at} and id<${latestQuestion.id})) order by created_at desc,id desc limit 19`;
+    return {
+      boss,
+      profile,
+      sessionId: row.session_id,
+      chatMessageCount: Number(count?.total ?? 0),
+      thread: {
+        conversationSummary: thread.conversation_summary,
+        previousMessages: previous.reverse().map(camelChatMessage),
+        latestQuestion: camelChatMessage(latestQuestion),
+      },
+    };
   }
   async pruneMeaninglessSessions() {
     const rows = await this.sql`select s.id from sessions s where s.expires_at>now() and s.last_seen_at<now()-interval '24 hours' and not exists (select 1 from user_profiles p where p.session_id=s.id) and not exists (select 1 from bosses b where b.session_id=s.id) and not exists (select 1 from chat_threads t join chat_messages m on m.thread_id=t.id where t.session_id=s.id) and not exists (select 1 from translation_requests tr where tr.session_id=s.id)`;

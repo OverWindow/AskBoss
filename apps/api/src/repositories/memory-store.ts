@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionPage, type AdminSessionSummary, type BossPersona, type ChatMessageKind, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationArchiveDetail, type TranslationExamplesSettings } from "../shared.js";
+import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminPersonalBossPage, type AdminSessionPage, type AdminSessionSummary, type BossPersona, type ChatMessageKind, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationArchiveDetail, type TranslationExamplesSettings } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationArchiveRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
-import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
+import type { AdminPersonalBossPromptContext, CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 import { computeTopRepeatedPhrases } from "../utils/hr-aggregation.js";
 import { buildActualResponseEvidence } from "../utils/actual-response.js";
@@ -97,7 +97,7 @@ export class MemoryStore implements Store {
     this.bosses.set(row.id, row); return row;
   }
   async updateBoss(sessionId: string, bossId: string, patch: Partial<CreateBossInput> & Record<string, unknown>) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); Object.assign(row, patch); return row; }
-  async setBossPersona(sessionId: string, bossId: string, persona: any, pki: any) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); Object.assign(row, { persona, pki, status: "READY", personaError: null }); }
+  async setBossPersona(sessionId: string, bossId: string, persona: any, pki: any) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); Object.assign(row, { persona, pki, status: "READY", personaError: null, personaVersion: (row.personaVersion ?? 0) + 1 }); }
   async setBossStatus(sessionId: string, bossId: string, status: BossRecord["status"], error: string | null = null) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); row.status = status; row.personaError = error; }
   async deleteBoss(sessionId: string, bossId: string) {
     const row = await this.getBoss(sessionId, bossId);
@@ -237,6 +237,53 @@ export class MemoryStore implements Store {
     const pageRows = rows.slice((page - 1) * limit, page * limit);
     const items: AdminSessionSummary[] = pageRows.map((row) => ({ id: row.id, createdAt: row.createdAt, lastSeenAt: row.lastSeenAt, expiresAt: row.expiresAt, bossCount: [...this.bosses.values()].filter((boss) => boss.sessionId === row.id).length, chatMessageCount: [...this.threads.values()].filter((thread) => thread.sessionId === row.id).reduce((sum,thread) => sum + thread.messages.length,0), translationCount: [...this.translations.values()].filter((translation) => translation.sessionId === row.id).length }));
     return { items, page, pageSize: limit, total: rows.length, totalPages: Math.max(1, Math.ceil(rows.length / limit)) };
+  }
+  async listAdminPersonalBosses(page = 1, limit = 20): Promise<AdminPersonalBossPage> {
+    const now = Date.now();
+    const rows = [...this.bosses.values()].flatMap((boss) => {
+      if (boss.scope !== "SESSION" || !boss.sessionId || !boss.expiresAt || Date.parse(boss.expiresAt) <= now) return [];
+      const session = [...this.sessions.values()].find((item) => item.id === boss.sessionId && Date.parse(item.expiresAt) > now);
+      if (!session) return [];
+      const thread = [...this.threads.values()].find((item) => item.sessionId === boss.sessionId && item.bossId === boss.id && Date.parse(item.expiresAt) > now);
+      const lastActivityAt = thread?.messages.at(-1)?.createdAt ?? session.lastSeenAt;
+      return [{
+        id: boss.id,
+        ownerHandle: this.profiles.get(boss.sessionId)?.handle ?? null,
+        alias: boss.alias,
+        avatarKey: boss.avatarKey,
+        status: boss.status,
+        personaVersion: boss.personaVersion ?? 0,
+        pkiScore: boss.pki?.score ?? null,
+        chatMessageCount: thread?.messages.length ?? 0,
+        lastActivityAt,
+        expiresAt: boss.expiresAt,
+      }];
+    }).sort((left, right) => right.lastActivityAt.localeCompare(left.lastActivityAt) || right.id.localeCompare(left.id));
+    return {
+      items: rows.slice((page - 1) * limit, page * limit),
+      page,
+      pageSize: limit,
+      total: rows.length,
+      totalPages: Math.max(1, Math.ceil(rows.length / limit)),
+    };
+  }
+  async getAdminPersonalBossPromptContext(bossId: string): Promise<AdminPersonalBossPromptContext | null> {
+    const boss = this.bosses.get(bossId);
+    if (!boss || boss.scope !== "SESSION" || !boss.sessionId || !boss.expiresAt || Date.parse(boss.expiresAt) <= Date.now()) return null;
+    const session = [...this.sessions.values()].find((item) => item.id === boss.sessionId && Date.parse(item.expiresAt) > Date.now());
+    if (!session) return null;
+    const activeThread = [...this.threads.values()].find((item) => item.sessionId === boss.sessionId && item.bossId === boss.id && Date.parse(item.expiresAt) > Date.now());
+    let latestQuestionIndex = -1;
+    if (activeThread) for (let index = activeThread.messages.length - 1; index >= 0; index -= 1) {
+      const message = activeThread.messages[index];
+      if (message?.role === "user" && message.kind === "CHAT") { latestQuestionIndex = index; break; }
+    }
+    const thread = activeThread && latestQuestionIndex >= 0 ? {
+      conversationSummary: activeThread.conversationSummary,
+      previousMessages: structuredClone(activeThread.messages.slice(Math.max(0, latestQuestionIndex - 19), latestQuestionIndex)),
+      latestQuestion: structuredClone(activeThread.messages[latestQuestionIndex]!),
+    } : null;
+    return { boss: structuredClone(boss), profile: structuredClone(this.profiles.get(boss.sessionId) ?? null), sessionId: boss.sessionId, chatMessageCount: activeThread?.messages.length ?? 0, thread };
   }
   async pruneMeaninglessSessions() {
     const meaningless = [...this.sessions.values()].filter((row) => {

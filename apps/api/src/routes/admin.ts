@@ -11,6 +11,8 @@ import { storage } from "../services/storage.js";
 import { HttpError } from "../utils/http.js";
 import { parse } from "../utils/validation.js";
 import { buildGlobalBossPromptPreview } from "../services/global-boss-prompt-preview.js";
+import { buildPersonalBossPromptPreview } from "../services/personal-boss-prompt-preview.js";
+import { getBossPromptContext } from "../services/boss-prompt-context.js";
 
 const maskId = (id: string | null) => id ? `${id.slice(0, 8)}…${id.slice(-4)}` : null;
 const cursor = (value: unknown) => typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : undefined;
@@ -19,6 +21,25 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 const companyResearchInputSchema = z.object({ companyName: z.string().trim().min(1).max(120) });
 const adminSessionPageSchema = z.coerce.number().int().min(1).max(100_000).default(1);
 const requireAdminMutation = async (request: Parameters<typeof assertAdminOrigin>[0]) => { assertAdminOrigin(request); await requireAdmin(request); };
+
+function isLegacyAdminOperationConstraint(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const databaseError = error as { code?: unknown; constraint_name?: unknown };
+  return databaseError.code === "23514" && databaseError.constraint_name === "admin_operations_type_check";
+}
+
+async function recordPersonalBossPromptView(detail: Record<string, number | string | boolean | null>) {
+  try {
+    await store.recordAdminOperation("PERSONAL_BOSS_PROMPT_VIEW", "SUCCEEDED", detail);
+  } catch (error) {
+    if (!isLegacyAdminOperationConstraint(error)) throw error;
+    await store.recordAdminOperation("PERSONAL_BOSS_DEFAULTS_UPDATE", "SUCCEEDED", {
+      ...detail,
+      action: "PERSONAL_BOSS_PROMPT_VIEW",
+      compatibilityAudit: true,
+    });
+  }
+}
 
 export const adminRoutes: FastifyPluginAsync = async (app) => {
   app.get("/admin/auth", async (request) => {
@@ -41,6 +62,42 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
 
   app.get("/admin/dashboard", async (request) => { await requireAdmin(request); return store.getAdminDashboard(); });
   app.get("/admin/credits", async (request) => { await requireAdmin(request); return getAdminCredits(); });
+  app.get("/admin/personal-bosses", async (request, reply) => {
+    await requireAdmin(request);
+    const query = request.query as Record<string, unknown>;
+    const page = parse(adminSessionPageSchema, query.page);
+    reply.header("cache-control", "no-store");
+    return store.listAdminPersonalBosses(page, 20);
+  });
+  app.get("/admin/personal-bosses/:id/prompt-preview", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request, reply) => {
+    await requireAdmin(request);
+    const { id } = parse(idParamSchema, request.params);
+    const context = await store.getAdminPersonalBossPromptContext(id);
+    if (!context) throw new HttpError(404, "개인 상사를 찾을 수 없습니다.", "BOSS_NOT_FOUND");
+    const [evidence, survey, promptContext, prompts] = await Promise.all([
+      store.listEvidence(context.sessionId, context.boss.id),
+      store.listSurveyAnswers(context.sessionId, context.boss.id),
+      getBossPromptContext(context.boss, context.sessionId),
+      store.getAiPromptSettings(),
+    ]);
+    if (!promptContext.globalBoss) throw new HttpError(500, "모두의 상사 프롬프트 기반을 찾을 수 없습니다.", "PROMPT_CONTEXT_MISSING");
+    const preview = buildPersonalBossPromptPreview({
+      context,
+      evidence,
+      survey,
+      basePrompt: promptContext.basePrompt,
+      globalBoss: promptContext.globalBoss,
+      personaInstruction: prompts.onboarding.personaGeneration,
+    });
+    await recordPersonalBossPromptView({
+      bossId: maskId(context.boss.id)!,
+      personaVersion: context.boss.personaVersion ?? 0,
+      chatMessageCount: context.chatMessageCount,
+      hasChatPrompt: preview.chat.status === "AVAILABLE",
+    });
+    reply.header("cache-control", "no-store");
+    return preview;
+  });
   app.get("/admin/personal-boss-defaults", async (request) => {
     await requireAdmin(request);
     return store.getPersonalBossDefaults();

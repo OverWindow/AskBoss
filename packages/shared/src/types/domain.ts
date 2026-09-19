@@ -200,9 +200,73 @@ export interface GlobalBossPromptPreview {
   usesMockUserData: true;
 }
 
+export interface AdminPromptMessage {
+  role: "system" | "user";
+  content: string;
+}
+
+export interface AdminPersonalBossPromptSource {
+  role: "system" | "user";
+  component: string;
+  origin: string;
+  description: string;
+  containsPersonalData: boolean;
+}
+
+export interface AdminPersonalBossSummary {
+  id: string;
+  ownerHandle: string | null;
+  alias: string;
+  avatarKey: string;
+  status: BossStatus;
+  personaVersion: number;
+  pkiScore: number | null;
+  chatMessageCount: number;
+  lastActivityAt: string;
+  expiresAt: string;
+}
+
+export interface AdminPersonalBossPage {
+  items: AdminPersonalBossSummary[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface AdminPersonaGenerationPromptPreview {
+  messages: [AdminPromptMessage, AdminPromptMessage];
+  sources: AdminPersonalBossPromptSource[];
+  evidenceCount: number;
+  surveyAnswerCount: number;
+}
+
+export type AdminBossChatPromptPreview = {
+  status: "AVAILABLE";
+  messages: [AdminPromptMessage, AdminPromptMessage];
+  sources: AdminPersonalBossPromptSource[];
+  lastQuestionAt: string;
+  historyMessageCount: number;
+  includedMessageCount: number;
+  totalMessageCount: number;
+} | {
+  status: "NO_CHAT_HISTORY";
+  reason: string;
+  totalMessageCount: number;
+};
+
+export interface AdminPersonalBossPromptPreview {
+  reconstructedAt: string;
+  reconstructionMode: "CURRENT_STATE";
+  profile: UserProfile | null;
+  boss: Boss;
+  personaGeneration: AdminPersonaGenerationPromptPreview;
+  chat: AdminBossChatPromptPreview;
+}
+
 export interface AdminOperation {
   id: string;
-  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD" | "PERSONAL_BOSS_DEFAULTS_UPDATE" | "GLOBAL_BOSS_DEFAULTS_UPDATE" | "TRANSLATION_EXAMPLES_UPDATE" | "AI_PROMPT_SETTINGS_UPDATE" | "MEANINGLESS_SESSIONS_PRUNE";
+  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD" | "PERSONAL_BOSS_DEFAULTS_UPDATE" | "GLOBAL_BOSS_DEFAULTS_UPDATE" | "TRANSLATION_EXAMPLES_UPDATE" | "AI_PROMPT_SETTINGS_UPDATE" | "MEANINGLESS_SESSIONS_PRUNE" | "PERSONAL_BOSS_PROMPT_VIEW";
   status: "SUCCEEDED" | "FAILED";
   detail: Record<string, number | string | boolean | null>;
   createdAt: string;
