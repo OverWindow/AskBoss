@@ -152,7 +152,7 @@ export function ChatPanel({ boss, open, simulationRequest, onClose, onActivity }
 
   return <section id="chat-panel" className={`workspace-panel chat-panel ${open ? "is-open" : ""}`} aria-label={`${boss.alias}와 대화`} aria-hidden={!open} aria-busy={streaming || simulationLoading}>
     <header className="workspace-panel-header">
-      <div><span className="panel-kicker">CONVERSATION</span><h2><MessageCircle size={18}/>{boss.alias}와 대화</h2></div>
+      <div><h2><MessageCircle size={18}/>{boss.alias}와 대화</h2></div>
       <button className="panel-close-button" type="button" onClick={onClose} aria-label="대화 패널 닫기"><X size={18}/></button>
     </header>
     <p className="panel-hint">가상 시뮬레이션이며 실제 인물의 생각을 단정하지 않습니다.</p>

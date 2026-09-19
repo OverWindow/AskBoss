@@ -106,7 +106,7 @@ export function MainPage() {
         <div className="speech-bubble" aria-live="polite">“{speech}”</div>
         <div className="avatar-frame">
           <img className="boss-avatar" src={`/avatars/${boss.avatarKey}.png`} alt={`${boss.alias} 픽셀 아바타`}/>
-          <span className={`avatar-blink avatar-blink--${boss.avatarKey}`} aria-hidden="true"><i><b/></i><i><b/></i></span>
+          <img className="boss-avatar boss-avatar--closed" src={`/avatars/${boss.avatarKey}-closed.png`} alt="" aria-hidden="true"/>
           <span className="thinking-indicator" aria-hidden="true"><i/><i/><i/></span>
         </div>
         <h1 id="boss-alias" className="boss-alias">{boss.alias}</h1>

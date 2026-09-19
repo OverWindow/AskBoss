@@ -83,7 +83,7 @@ export function TranslatorPanel({ boss, open, onClose, onSourceMessage, onSimula
 
   return <section id="translator-panel" className={`workspace-panel translator-panel ${open ? "is-open" : ""}`} aria-label="상사의 말 번역" aria-hidden={!open} aria-busy={loading}>
     <header className="workspace-panel-header">
-      <div><span className="panel-kicker">TRANSLATOR</span><h2><Languages size={18}/>상사의 말 번역</h2></div>
+      <div><h2><Languages size={18}/>상사의 말 번역</h2></div>
       <button className="panel-close-button" type="button" onClick={onClose} aria-label="번역 패널 닫기"><X size={18}/></button>
     </header>
     <div className="translator-scroll">
