@@ -1,11 +1,13 @@
 import postgres, { type Sql } from "postgres";
-import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, Boss, CompanyResearch, HrDashboard, TranslationExamples, UserProfile } from "../shared.js";
+import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, Boss, ChatMessageKind, CompanyResearch, HrDashboard, TranslationArchiveBranch, TranslationArchiveDetail, TranslationArchiveSummary, TranslationExamples, UserProfile } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord } from "../types.js";
 import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { MemoryStore } from "./memory-store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 import { toIsoTimestamp } from "../utils/database.js";
 import { computeSurfaceActualGap } from "../utils/hr-aggregation.js";
+import { buildActualResponseEvidence } from "../utils/actual-response.js";
+import { encodeArchiveCursor, type ArchiveCursor } from "../utils/archive-cursor.js";
 
 const camelSession = (r: any): SessionRecord => ({ id: r.id, tokenHash: r.token_hash, createdAt: r.created_at.toISOString(), lastSeenAt: r.last_seen_at.toISOString(), expiresAt: r.expires_at.toISOString() });
 const camelBoss = (r: any): BossRecord => ({
@@ -15,10 +17,28 @@ const camelBoss = (r: any): BossRecord => ({
   personaError: r.persona_error, expiresAt: r.expires_at?.toISOString() ?? null,
   personaVersion: Number(r.persona_version ?? 0),
 });
-const camelEvidence = (r: any): EvidenceRecord => ({ id: r.id, bossId: r.boss_id, sessionId: r.session_id, type: r.type, status: r.status, rawText: r.raw_text, storagePath: r.storage_path, parsedData: r.parsed_data, observedAt: r.observed_at?.toISOString() ?? null, createdAt: r.created_at.toISOString(), expiresAt: r.expires_at.toISOString(), errorMessage: r.error_message });
+const camelEvidence = (r: any): EvidenceRecord => ({ id: r.id, bossId: r.boss_id, sessionId: r.session_id, type: r.type, status: r.status, rawText: r.raw_text, storagePath: r.storage_path, parsedData: r.parsed_data, observedAt: r.observed_at?.toISOString() ?? null, createdAt: r.created_at.toISOString(), updatedAt: (r.updated_at ?? r.created_at).toISOString(), expiresAt: r.expires_at.toISOString(), errorMessage: r.error_message, sourceArchiveId: r.source_archive_id ?? null });
+const camelChatMessage = (r: any): ChatMessageRecord => ({
+  id: r.id,
+  role: r.role,
+  content: r.content,
+  kind: r.kind ?? "CHAT",
+  createdAt: r.created_at.toISOString(),
+});
 const camelGlobalEvidence = (r: any): GlobalEvidenceRecord => ({ id:r.id,bossId:r.boss_id,type:r.type,status:r.status,sourceName:r.source_name,rawText:r.raw_text,storagePath:r.storage_path,parsedData:r.parsed_data,observedAt:r.observed_at?.toISOString()??null,createdAt:r.created_at.toISOString(),errorMessage:r.error_message??null });
 const camelJob = (r: any): JobRecord => ({ id: r.id, sessionId: r.session_id, bossId: r.boss_id, type: r.type, status: r.status, payload: r.payload, result: r.result, errorMessage: r.error_message, attempts: r.attempts, maxAttempts: r.max_attempts, leaseUntil: r.lease_until?.toISOString() ?? null, retryOf: r.retry_of ?? null, createdAt: r.created_at.toISOString(), updatedAt: r.updated_at.toISOString() });
 const camelAdminSession = (r: any): AdminSessionRecord => ({ id: r.id, tokenHash: r.token_hash, ipHash: r.ip_hash, createdAt: toIsoTimestamp(r.created_at ?? r.createdAt, "admin_sessions.created_at"), lastSeenAt: toIsoTimestamp(r.last_seen_at ?? r.lastSeenAt, "admin_sessions.last_seen_at"), expiresAt: toIsoTimestamp(r.expires_at ?? r.expiresAt, "admin_sessions.expires_at") });
+const camelArchiveSummary = (r: any): TranslationArchiveSummary => ({
+  id: r.id,
+  boss: r.boss_snapshot,
+  inputText: r.input_text,
+  channel: r.channel,
+  lastCopiedReplyIndex: r.last_copied_reply_index === null ? null : Number(r.last_copied_reply_index),
+  actualResponse: r.actual_response ? { content: r.actual_response, replyIndex: r.actual_reply_index === null ? null : Number(r.actual_reply_index), replyText: r.actual_reply_text, updatedAt: r.actual_response_updated_at.toISOString() } : null,
+  branchCount: Number(r.branch_count ?? 0),
+  createdAt: r.created_at.toISOString(),
+  updatedAt: r.updated_at.toISOString(),
+});
 
 export class PostgresStore implements Store {
   private sql: Sql;
@@ -37,10 +57,29 @@ export class PostgresStore implements Store {
     });
   }
 
+  private async loadArchive(sql: any, row: any): Promise<TranslationArchiveDetail> {
+    const branches = await sql`select * from translation_archive_branches where archive_id=${row.id} order by created_at desc`;
+    const messages = branches.length ? await sql`select m.* from translation_archive_messages m where m.branch_id in ${sql(branches.map((branch: any) => branch.id))} order by m.position` : [];
+    const detail = camelArchiveSummary({ ...row, branch_count: branches.length });
+    return {
+      ...detail,
+      result: row.result,
+      branches: branches.map((branch: any): TranslationArchiveBranch => ({
+        id: branch.id,
+        kind: branch.kind,
+        status: branch.status,
+        replyIndex: Number(branch.reply_index),
+        messages: messages.filter((message: any) => message.branch_id === branch.id).map(camelChatMessage),
+        createdAt: branch.created_at.toISOString(),
+        updatedAt: branch.updated_at.toISOString(),
+      })),
+    };
+  }
+
   async createSession(tokenHash: string, expiresAt: string) { const [r] = await this.sql`insert into sessions (token_hash, expires_at) values (${tokenHash}, ${expiresAt}) returning *`; return camelSession(r!); }
   async findSession(tokenHash: string) { const [r] = await this.sql`select * from sessions where token_hash=${tokenHash} and expires_at > now()`; return r ? camelSession(r) : null; }
   async touchSession(id: string) { await this.sql`update sessions set last_seen_at=now() where id=${id} and last_seen_at<now()-interval '1 minute'`; }
-  async deleteSession(id: string) { await this.sql`delete from sessions where id=${id}`; }
+  async deleteSession(id: string) { await this.sql.begin(async (sql) => { await sql`update translation_archive_branches b set status='SUPERSEDED',updated_at=now() from chat_threads t where t.archive_branch_id=b.id and t.session_id=${id} and b.status='ACTIVE'`; await sql`delete from sessions where id=${id}`; }); }
   async getProfile(sessionId: string) { const [r] = await this.sql`select * from user_profiles where session_id=${sessionId}`; return r ? { handle: r.handle, ageBand: r.age_band, yearsOfServiceBand: r.years_of_service_band, rank: r.rank, jobFunction: r.job_function ?? "", entryPath: r.entry_path, weaknesses: r.weaknesses } : null; }
   async isHandleAvailable(handle: string, sessionId?: string) { const [r] = sessionId ? await this.sql`select count(*)::int as count from user_profiles where lower(handle)=lower(${handle}) and session_id<>${sessionId}` : await this.sql`select count(*)::int as count from user_profiles where lower(handle)=lower(${handle})`; return r!.count === 0; }
   async upsertProfile(sessionId: string, p: UserProfile) {
@@ -66,7 +105,7 @@ export class PostgresStore implements Store {
   }
   async setBossPersona(sessionId: string, bossId: string, persona: unknown, pki: any) { await this.sql`update bosses set persona_profile=${this.sql.json(persona as any)},pki_score=${pki.score},pki_breakdown=${this.sql.json(pki)},status='READY',persona_error=null,persona_built_at=now(),persona_version=persona_version+1,updated_at=now() where id=${bossId} and session_id=${sessionId}`; }
   async setBossStatus(sessionId: string, bossId: string, status: Boss["status"], error: string | null = null) { await this.sql`update bosses set status=${status},persona_error=${error},updated_at=now() where id=${bossId} and session_id=${sessionId}`; }
-  async deleteBoss(sessionId: string, bossId: string) { await this.sql`delete from bosses where id=${bossId} and session_id=${sessionId} and scope='SESSION'`; }
+  async deleteBoss(sessionId: string, bossId: string) { await this.sql.begin(async (sql) => { await sql`delete from translation_archives where source_boss_id=${bossId}`; await sql`delete from bosses where id=${bossId} and session_id=${sessionId} and scope='SESSION'`; }); }
   async getGlobalBoss() { const [r]=await this.sql`select * from bosses where scope='GLOBAL' order by created_at limit 1`; if(!r)throw new Error("공통 상사를 찾을 수 없습니다."); return camelBoss(r); }
   async updateGlobalBoss(patch: UpdateGlobalBossInput) {
     const values:Record<string,unknown>={}; const map:Record<string,string>={alias:"alias",avatarKey:"avatar_key",jobFunction:"job_function",yearsOfServiceBand:"years_of_service_band",rank:"rank",companyName:"company_name",ageBand:"age_band",hierarchyScore:"hierarchy_score",companyResearch:"company_research"};
@@ -91,13 +130,13 @@ export class PostgresStore implements Store {
   async createGlobalUploadIntent(i:Omit<GlobalUploadIntentRecord,"id"|"completedAt">){const [r]=await this.sql`insert into global_boss_upload_intents(boss_id,storage_path,original_name,content_type,size_bytes,expires_at) values(${i.bossId},${i.storagePath},${i.originalName},${i.contentType},${i.sizeBytes},${i.expiresAt}) returning *`;return {id:r!.id,bossId:r!.boss_id,storagePath:r!.storage_path,originalName:r!.original_name,contentType:r!.content_type,sizeBytes:r!.size_bytes,completedAt:null,expiresAt:r!.expires_at.toISOString()};}
   async getGlobalUploadIntent(id:string){const [r]=await this.sql`select * from global_boss_upload_intents where id=${id} and expires_at>now()`;return r?{id:r.id,bossId:r.boss_id,storagePath:r.storage_path,originalName:r.original_name,contentType:r.content_type,sizeBytes:r.size_bytes,completedAt:r.completed_at?.toISOString()??null,expiresAt:r.expires_at.toISOString()}:null;}
   async completeGlobalUploadIntent(id:string){await this.sql`update global_boss_upload_intents set completed_at=now() where id=${id}`;}
-  async createEvidence(i: Omit<EvidenceRecord, "id" | "createdAt">) { const [r] = await this.sql`insert into boss_evidence(boss_id,session_id,type,status,raw_text,storage_path,parsed_data,observed_at,expires_at) values(${i.bossId},${i.sessionId},${i.type},${i.status},${i.rawText},${i.storagePath},${this.sql.json(i.parsedData)},${i.observedAt},${i.expiresAt}) returning *`; return camelEvidence(r); }
+  async createEvidence(i: Omit<EvidenceRecord, "id" | "createdAt">) { const [r] = await this.sql`insert into boss_evidence(boss_id,session_id,type,status,raw_text,storage_path,parsed_data,observed_at,expires_at,source_archive_id) values(${i.bossId},${i.sessionId},${i.type},${i.status},${i.rawText},${i.storagePath},${this.sql.json(i.parsedData)},${i.observedAt},${i.expiresAt},${i.sourceArchiveId ?? null}) returning *`; return camelEvidence(r); }
   async getEvidence(sessionId: string, id: string) { const [r] = await this.sql`select * from boss_evidence where id=${id} and session_id=${sessionId}`; return r ? camelEvidence(r) : null; }
   async listEvidence(sessionId: string, bossId: string) { const rows = await this.sql`select * from boss_evidence where session_id=${sessionId} and boss_id=${bossId} order by created_at`; return rows.map(camelEvidence); }
   async updateEvidence(sessionId: string, id: string, patch: Partial<EvidenceRecord>) {
     const values: Record<string, unknown> = {}; const map: Record<string,string> = { status:"status",rawText:"raw_text",storagePath:"storage_path",parsedData:"parsed_data",observedAt:"observed_at",errorMessage:"error_message" };
     for (const [key,column] of Object.entries(map)) if (key in patch) values[column] = key === "parsedData" ? this.sql.json((patch as any)[key]) : (patch as any)[key];
-    if (Object.keys(values).length) await this.sql`update boss_evidence set ${this.sql(values)} where id=${id} and session_id=${sessionId}`;
+    if (Object.keys(values).length) { values.updated_at = new Date(); await this.sql`update boss_evidence set ${this.sql(values)} where id=${id} and session_id=${sessionId}`; }
   }
   async createGlobalEvidence(i:Omit<GlobalEvidenceRecord,"id"|"createdAt">){const [r]=await this.sql`insert into global_boss_evidence(boss_id,type,status,source_name,raw_text,storage_path,parsed_data,error_message,observed_at) values(${i.bossId},${i.type},${i.status},${i.sourceName},${i.rawText},${i.storagePath},${this.sql.json(i.parsedData)},${i.errorMessage},${i.observedAt}) returning *`;return camelGlobalEvidence(r);}
   async getGlobalEvidence(id:string){const [r]=await this.sql`select * from global_boss_evidence where id=${id}`;return r?camelGlobalEvidence(r):null;}
@@ -118,19 +157,56 @@ export class PostgresStore implements Store {
   async retryJob(id: string) { const [original] = await this.sql`select * from ai_jobs where id=${id} and status='FAILED'`; if (!original) return null; const [r] = await this.sql`insert into ai_jobs(session_id,boss_id,type,payload,retry_of) values(${original.session_id},${original.boss_id},${original.type},${this.sql.json(original.payload)},${original.id}) returning *`; return camelJob(r); }
   async getOrCreateThread(sessionId: string, bossId: string, threadId: string | undefined, expiresAt: string) {
     let r:any; if (threadId) [r] = await this.sql`select * from chat_threads where id=${threadId} and session_id=${sessionId} and boss_id=${bossId} and expires_at>now()`;
-    if (!r) [r] = await this.sql`insert into chat_threads(session_id,boss_id,expires_at) values(${sessionId},${bossId},${expiresAt}) returning *`;
+    if (!r) [r] = await this.sql`select * from chat_threads where session_id=${sessionId} and boss_id=${bossId} and expires_at>now()`;
+    if (!r) [r] = await this.sql`insert into chat_threads(session_id,boss_id,expires_at) values(${sessionId},${bossId},${expiresAt}) on conflict (session_id,boss_id) do update set expires_at=excluded.expires_at returning *`;
     const messages = await this.sql`select * from chat_messages where thread_id=${r.id} order by created_at desc limit 20`;
-    return { id:r.id,sessionId:r.session_id,bossId:r.boss_id,conversationSummary:r.conversation_summary,messages:messages.reverse().map((m:any)=>({id:m.id,role:m.role,content:m.content,createdAt:m.created_at.toISOString()})),createdAt:r.created_at.toISOString(),expiresAt:r.expires_at.toISOString() } as ChatThreadRecord;
+    return { id:r.id,sessionId:r.session_id,bossId:r.boss_id,conversationSummary:r.conversation_summary,messages:messages.reverse().map(camelChatMessage),archiveId:r.archive_id,archiveBranchId:r.archive_branch_id,createdAt:r.created_at.toISOString(),expiresAt:r.expires_at.toISOString() } as ChatThreadRecord;
   }
-  async addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string) { const [r] = await this.sql`insert into chat_messages(thread_id,role,content) values(${threadId},${role},${content}) returning *`; return { id:r!.id,role:r!.role,content:r!.content,createdAt:r!.created_at.toISOString() }; }
+  async replaceChatWithSimulation(sessionId: string, bossId: string, archiveId: string, replyIndex: number, source: string, reply: string, expiresAt: string) { return this.sql.begin(async (sql) => {
+    const [archive] = await sql`select * from translation_archives where id=${archiveId} and source_session_id=${sessionId} for update`; if (!archive) throw new Error("아카이브를 찾을 수 없습니다.");
+    await sql`update translation_archive_branches b set status='SUPERSEDED',updated_at=now() from chat_threads t where t.archive_branch_id=b.id and t.session_id=${sessionId} and t.boss_id=${bossId} and b.status='ACTIVE'`;
+    await sql`delete from chat_threads where session_id=${sessionId} and boss_id=${bossId}`;
+    await sql`update translation_archives set updated_at=now() where id=${archiveId}`;
+    const usesActualResponse = archive.actual_response && Number(archive.actual_reply_index) === replyIndex;
+    const [branch] = await sql`insert into translation_archive_branches(archive_id,kind,status,reply_index) values(${archiveId},${usesActualResponse ? "ACTUAL" : "PREDICTED"},'ACTIVE',${replyIndex}) returning *`;
+    const [thread] = await sql`insert into chat_threads(session_id,boss_id,archive_id,archive_branch_id,expires_at) values(${sessionId},${bossId},${archiveId},${branch!.id},${expiresAt}) returning *`;
+    const seeds = [
+      { role: "assistant" as const, content: source, kind: "SIMULATION_SOURCE" as const },
+      { role: "user" as const, content: reply, kind: "SIMULATION_REPLY" as const },
+      ...(usesActualResponse ? [{ role: "assistant" as const, content: String(archive.actual_response), kind: "ACTUAL_RESPONSE" as const }] : []),
+    ];
+    const messages: ChatMessageRecord[] = [];
+    for (let position = 0; position < seeds.length; position += 1) { const seed = seeds[position]!; const [message] = await sql`insert into chat_messages(thread_id,role,content,kind) values(${thread!.id},${seed.role},${seed.content},${seed.kind}) returning *`; await sql`insert into translation_archive_messages(branch_id,role,content,kind,position,created_at) values(${branch!.id},${seed.role},${seed.content},${seed.kind},${position},${message!.created_at})`; messages.push(camelChatMessage(message)); }
+    return { threadId: thread!.id, archiveId, messages, usesActualResponse: Boolean(usesActualResponse) };
+  }); }
+  async resetChat(sessionId: string, bossId: string) { await this.sql.begin(async (sql) => { await sql`update translation_archive_branches b set status='SUPERSEDED',updated_at=now() from chat_threads t where t.archive_branch_id=b.id and t.session_id=${sessionId} and t.boss_id=${bossId} and b.status='ACTIVE'`; await sql`delete from chat_threads where session_id=${sessionId} and boss_id=${bossId}`; }); }
+  async addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string, kind: ChatMessageKind = "CHAT") { return this.sql.begin(async (sql) => { const [thread] = await sql`select * from chat_threads where id=${threadId}`; if (!thread) throw new Error("대화를 찾을 수 없습니다."); const [r] = await sql`insert into chat_messages(thread_id,role,content,kind) values(${threadId},${role},${content},${kind}) returning *`; if (thread.archive_branch_id) { const [position] = await sql`select count(*)::int value from translation_archive_messages where branch_id=${thread.archive_branch_id}`; await sql`insert into translation_archive_messages(branch_id,role,content,kind,position,created_at) values(${thread.archive_branch_id},${role},${content},${kind},${position!.value},${r!.created_at})`; await sql`update translation_archive_branches set updated_at=now() where id=${thread.archive_branch_id}`; await sql`update translation_archives set updated_at=now() where id=${thread.archive_id}`; } return camelChatMessage(r); }); }
   async listChatMessages(sessionId: string, bossId: string, cursor?: string, limit=50) {
-    const [thread] = await this.sql`select * from chat_threads where session_id=${sessionId} and boss_id=${bossId} order by created_at desc limit 1`; if (!thread) return { threadId:null,messages:[],nextCursor:null };
+    const [thread] = await this.sql`select * from chat_threads where session_id=${sessionId} and boss_id=${bossId} order by created_at desc limit 1`; if (!thread) return { threadId:null,archiveId:null,messages:[],nextCursor:null };
     const rows = cursor ? await this.sql`select * from chat_messages where thread_id=${thread.id} and created_at<${cursor} order by created_at desc limit ${limit+1}` : await this.sql`select * from chat_messages where thread_id=${thread.id} order by created_at desc limit ${limit+1}`;
-    const hasMore=rows.length>limit; const messages=rows.slice(0,limit).reverse().map((r:any)=>({id:r.id,role:r.role,content:r.content,createdAt:r.created_at.toISOString()})); return {threadId:thread.id,messages,nextCursor:hasMore ? messages[0]?.createdAt ?? null:null};
+    const hasMore=rows.length>limit; const messages=rows.slice(0,limit).reverse().map(camelChatMessage); return {threadId:thread.id,archiveId:thread.archive_id,messages,nextCursor:hasMore ? messages[0]?.createdAt ?? null:null};
   }
   async updateThreadSummary(threadId: string, summary: string) { await this.sql`update chat_threads set conversation_summary=${summary},summarized_through=now() where id=${threadId}`; }
   async createTranslation(i: Omit<TranslationRecord,"id"|"createdAt"|"feedback"|"simulationCount">) { const [r]=await this.sql`insert into translation_requests(session_id,boss_id,input_text,channel,result,expires_at) values(${i.sessionId},${i.bossId},${i.inputText},${i.channel},${this.sql.json(i.result as any)},${i.expiresAt}) returning *`; return {id:r!.id,sessionId:r!.session_id,bossId:r!.boss_id,inputText:r!.input_text,channel:r!.channel,result:r!.result,feedback:r!.feedback,simulationCount:r!.simulation_count??0,createdAt:r!.created_at.toISOString(),expiresAt:r!.expires_at.toISOString()}; }
+  async createTranslationWithArchive(i: Omit<TranslationRecord,"id"|"createdAt"|"feedback"|"simulationCount">, ownerHash: string, boss: BossRecord) { return this.sql.begin(async (sql) => { const [translationRow]=await sql`insert into translation_requests(session_id,boss_id,input_text,channel,result,expires_at) values(${i.sessionId},${i.bossId},${i.inputText},${i.channel},${sql.json(i.result as any)},${i.expiresAt}) returning *`; const [archiveRow]=await sql`insert into translation_archives(owner_hash,translation_request_id,source_session_id,source_boss_id,boss_snapshot,input_text,channel,result) values(${ownerHash},${translationRow!.id},${i.sessionId},${i.bossId},${sql.json({id:boss.id,alias:boss.alias,avatarKey:boss.avatarKey,scope:boss.scope})},${i.inputText},${i.channel},${sql.json(i.result as any)}) returning *`; const translation={id:translationRow!.id,sessionId:translationRow!.session_id,bossId:translationRow!.boss_id,inputText:translationRow!.input_text,channel:translationRow!.channel,result:translationRow!.result,feedback:translationRow!.feedback,simulationCount:translationRow!.simulation_count??0,createdAt:translationRow!.created_at.toISOString(),expiresAt:translationRow!.expires_at.toISOString()} as TranslationRecord; return { translation, archive: await this.loadArchive(sql, archiveRow) }; }); }
   async getTranslation(sessionId:string,id:string){const [r]=await this.sql`select * from translation_requests where id=${id} and session_id=${sessionId} and expires_at>now()`;return r?{id:r.id,sessionId:r.session_id,bossId:r.boss_id,inputText:r.input_text,channel:r.channel,result:r.result,feedback:r.feedback,simulationCount:r.simulation_count??0,createdAt:r.created_at.toISOString(),expiresAt:r.expires_at.toISOString()} as TranslationRecord:null;}
+  async getArchiveByTranslation(sessionId: string, translationId: string) { const [row] = await this.sql`select * from translation_archives where translation_request_id=${translationId} and source_session_id=${sessionId}`; return row ? this.loadArchive(this.sql, row) : null; }
+  async listArchives(ownerHash: string, cursor?: ArchiveCursor, limit=20) { const rows = await this.sql`select a.*,(select count(*)::int from translation_archive_branches b where b.archive_id=a.id) branch_count from translation_archives a where a.owner_hash=${ownerHash} and (${cursor?.id ?? null}::uuid is null or exists(select 1 from translation_archives c where c.id=${cursor?.id ?? null}::uuid and c.owner_hash=${ownerHash} and (a.created_at<c.created_at or (a.created_at=c.created_at and a.id<c.id)))) order by a.created_at desc,a.id desc limit ${limit+1}`; const page=rows.slice(0,limit); return {items:page.map(camelArchiveSummary),nextCursor:rows.length>limit&&page.length?encodeArchiveCursor({id:page.at(-1)!.id}):null}; }
+  async getArchive(ownerHash: string, archiveId: string) { const [row] = await this.sql`select * from translation_archives where id=${archiveId} and owner_hash=${ownerHash}`; return row ? this.loadArchive(this.sql, row) : null; }
+  async setArchiveSelectedReply(ownerHash: string, archiveId: string, replyIndex: number) { const [row] = await this.sql`update translation_archives set last_copied_reply_index=${replyIndex},updated_at=now() where id=${archiveId} and owner_hash=${ownerHash} returning *`; return row ? this.loadArchive(this.sql, row) : null; }
+  async upsertArchiveActualResponse(ownerHash: string, sessionId: string, archiveId: string, content: string, expiresAt: string) { return this.sql.begin(async (sql) => {
+    const [archive] = await sql`select * from translation_archives where id=${archiveId} and owner_hash=${ownerHash} for update`; if (!archive) return null;
+    const replyIndex = archive.actual_response ? archive.actual_reply_index : archive.last_copied_reply_index;
+    const replyText = archive.actual_response ? archive.actual_reply_text : replyIndex === null ? null : archive.result.replies[Number(replyIndex)]?.text ?? null;
+    const [updatedArchive] = await sql`update translation_archives set actual_response=${content},actual_reply_index=${replyIndex},actual_reply_text=${replyText},actual_response_updated_at=now(),updated_at=now() where id=${archiveId} returning *`;
+    const [boss] = await sql`select * from bosses where id=${archive.source_boss_id} and (scope='GLOBAL' or (session_id=${sessionId} and expires_at>now()))`;
+    let application: "NEXT_PERSONA_REBUILD" | "SESSION_CALIBRATION" | "ARCHIVE_ONLY" = "ARCHIVE_ONLY";
+    if (boss) { application = boss.scope === "GLOBAL" ? "SESSION_CALIBRATION" : "NEXT_PERSONA_REBUILD"; const [existing] = await sql`select * from boss_evidence where session_id=${sessionId} and source_archive_id=${archiveId} and type='FEEDBACK'`; const observedAt=existing?.observed_at?.toISOString()??new Date().toISOString(); const built=buildActualResponseEvidence(archive.input_text,replyText,content,observedAt); if(existing) await sql`update boss_evidence set raw_text=${built.rawText},parsed_data=${sql.json(built.parsedData)},status='READY',error_message=null,updated_at=now() where id=${existing.id}`; else await sql`insert into boss_evidence(boss_id,session_id,type,status,raw_text,storage_path,parsed_data,observed_at,expires_at,source_archive_id) values(${boss.id},${sessionId},'FEEDBACK','READY',${built.rawText},null,${sql.json(built.parsedData)},${observedAt},${expiresAt},${archiveId})`; }
+    const [active] = await sql`select * from chat_threads where session_id=${sessionId} and archive_id=${archiveId}`; let activeChat: {threadId:string;archiveId:string;messages:ChatMessageRecord[]}|null=null;
+    if(active){const [oldBranch]=await sql`select * from translation_archive_branches where id=${active.archive_branch_id}`; const activeReplyIndex=replyIndex===null?Number(oldBranch?.reply_index??0):Number(replyIndex); await sql`update translation_archive_branches set status='SUPERSEDED',updated_at=now() where id=${active.archive_branch_id}`; await sql`delete from chat_threads where id=${active.id}`; const [branch]=await sql`insert into translation_archive_branches(archive_id,kind,status,reply_index) values(${archiveId},'ACTUAL','ACTIVE',${activeReplyIndex}) returning *`; const [thread]=await sql`insert into chat_threads(session_id,boss_id,archive_id,archive_branch_id,expires_at) values(${sessionId},${active.boss_id},${archiveId},${branch!.id},${expiresAt}) returning *`; const seeds=[{role:"assistant",content:archive.input_text,kind:"SIMULATION_SOURCE"},{role:"user",content:archive.result.replies[activeReplyIndex].text,kind:"SIMULATION_REPLY"},{role:"assistant",content,kind:"ACTUAL_RESPONSE"}]; const messages:ChatMessageRecord[]=[]; for(let position=0;position<seeds.length;position+=1){const seed=seeds[position]!;const [message]=await sql`insert into chat_messages(thread_id,role,content,kind) values(${thread!.id},${seed.role},${seed.content},${seed.kind}) returning *`;await sql`insert into translation_archive_messages(branch_id,role,content,kind,position,created_at) values(${branch!.id},${seed.role},${seed.content},${seed.kind},${position},${message!.created_at})`;messages.push(camelChatMessage(message));} activeChat={threadId:thread!.id,archiveId,messages};}
+    return {archive:await this.loadArchive(sql,updatedArchive),activeChat,application};
+  }); }
+  async deleteArchivesForBoss(bossId: string) { await this.sql`delete from translation_archives where source_boss_id=${bossId}`; }
   async setTranslationFeedback(sessionId: string,id:string,feedback:"GOOD"|"BAD") { await this.sql`update translation_requests set feedback=${feedback} where id=${id} and session_id=${sessionId}`; }
   async incrementTranslationSimulation(sessionId:string,id:string) { await this.sql`update translation_requests set simulation_count=simulation_count+1 where id=${id} and session_id=${sessionId} and expires_at>now()`; }
   async listMonologues(sessionId:string,bossId:string,limit:number) { const rows=await this.sql`select content from monologue_history where session_id=${sessionId} and boss_id=${bossId} order by created_at desc limit ${limit}`; return rows.map((r:any)=>r.content); }
@@ -187,6 +263,7 @@ export class PostgresStore implements Store {
   }
   async cleanupExpired() {
     const uploads=await this.sql`select storage_path from upload_intents where expires_at<=now() and completed_at is null union select storage_path from global_boss_upload_intents where expires_at<=now() and completed_at is null union select e.storage_path from boss_evidence e join sessions s on s.id=e.session_id where s.expires_at<=now() and e.storage_path is not null`;
+    await this.sql`update translation_archive_branches b set status='SUPERSEDED',updated_at=now() from chat_threads t join sessions s on s.id=t.session_id where t.archive_branch_id=b.id and s.expires_at<=now() and b.status='ACTIVE'`;
     const sessions=await this.sql`delete from sessions where expires_at<=now() returning id`;
     await this.sql`delete from upload_intents where expires_at<=now()`; await this.sql`delete from global_boss_upload_intents where expires_at<=now()`; await this.sql`delete from analytics_events where expires_at<=now()`; await this.sql`delete from company_research_cache where expires_at<=now()`; await this.sql`delete from admin_sessions where expires_at<=now()`; await this.sql`delete from admin_login_attempts where updated_at<now()-interval '24 hours'`;
     return {sessions:sessions.length,uploads:uploads.map((r:any)=>r.storage_path)};
@@ -234,6 +311,7 @@ export class PostgresStore implements Store {
     if (!rows.length) return { deleted: 0, storagePaths: [] };
     const ids = rows.map((r: any) => r.id);
     const paths = await this.sql`select storage_path from boss_evidence where session_id in ${this.sql(ids)} and storage_path is not null`;
+    await this.sql`update translation_archive_branches b set status='SUPERSEDED',updated_at=now() from chat_threads t where t.archive_branch_id=b.id and t.session_id in ${this.sql(ids)} and b.status='ACTIVE'`;
     await this.sql`delete from sessions where id in ${this.sql(ids)}`;
     return { deleted: ids.length, storagePaths: paths.map((r: any) => r.storage_path) };
   }

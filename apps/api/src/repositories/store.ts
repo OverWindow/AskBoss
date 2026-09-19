@@ -1,5 +1,6 @@
-import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, HrDashboard } from "../shared.js";
+import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, ChatMessageKind, HrDashboard, TranslationArchiveDetail, TranslationArchiveSummary } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalBossDefaults, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, PersonalBossDefaults, SessionRecord, SurveyAnswerRecord, TranslationExamplesSettings, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
+import type { ArchiveCursor } from "../utils/archive-cursor.js";
 
 export interface CreateBossInput {
   alias: string; avatarKey: string; jobFunction: string; yearsOfServiceBand: string; rank: string; companyName: string;
@@ -67,11 +68,20 @@ export interface Store {
   failJob(id: string, error: string, retry: boolean): Promise<void>;
   retryJob(id: string): Promise<JobRecord | null>;
   getOrCreateThread(sessionId: string, bossId: string, threadId: string | undefined, expiresAt: string): Promise<ChatThreadRecord>;
-  addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string): Promise<ChatMessageRecord>;
-  listChatMessages(sessionId: string, bossId: string, cursor?: string, limit?: number): Promise<{ threadId: string | null; messages: ChatMessageRecord[]; nextCursor: string | null }>;
+  replaceChatWithSimulation(sessionId: string, bossId: string, archiveId: string, replyIndex: number, source: string, reply: string, expiresAt: string): Promise<{ threadId: string; archiveId: string; messages: ChatMessageRecord[]; usesActualResponse: boolean }>;
+  resetChat(sessionId: string, bossId: string): Promise<void>;
+  addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string, kind?: ChatMessageKind): Promise<ChatMessageRecord>;
+  listChatMessages(sessionId: string, bossId: string, cursor?: string, limit?: number): Promise<{ threadId: string | null; archiveId: string | null; messages: ChatMessageRecord[]; nextCursor: string | null }>;
   updateThreadSummary(threadId: string, summary: string): Promise<void>;
   createTranslation(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback" | "simulationCount">): Promise<TranslationRecord>;
+  createTranslationWithArchive(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback" | "simulationCount">, ownerHash: string, boss: BossRecord): Promise<{ translation: TranslationRecord; archive: TranslationArchiveDetail }>;
   getTranslation(sessionId: string, id: string): Promise<TranslationRecord | null>;
+  getArchiveByTranslation(sessionId: string, translationId: string): Promise<TranslationArchiveDetail | null>;
+  listArchives(ownerHash: string, cursor?: ArchiveCursor, limit?: number): Promise<{ items: TranslationArchiveSummary[]; nextCursor: string | null }>;
+  getArchive(ownerHash: string, archiveId: string): Promise<TranslationArchiveDetail | null>;
+  setArchiveSelectedReply(ownerHash: string, archiveId: string, replyIndex: number): Promise<TranslationArchiveDetail | null>;
+  upsertArchiveActualResponse(ownerHash: string, sessionId: string, archiveId: string, content: string, expiresAt: string): Promise<{ archive: TranslationArchiveDetail; activeChat: { threadId: string; archiveId: string; messages: ChatMessageRecord[] } | null; application: "NEXT_PERSONA_REBUILD" | "SESSION_CALIBRATION" | "ARCHIVE_ONLY" } | null>;
+  deleteArchivesForBoss(bossId: string): Promise<void>;
   setTranslationFeedback(sessionId: string, id: string, feedback: "GOOD" | "BAD"): Promise<void>;
   incrementTranslationSimulation(sessionId: string, id: string): Promise<void>;
   listMonologues(sessionId: string, bossId: string, limit: number): Promise<string[]>;

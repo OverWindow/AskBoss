@@ -9,11 +9,11 @@ vi.mock("../features/session/useSession", () => ({ useSession: () => ({ isSucces
 vi.mock("../features/boss/useBosses", () => ({ useBosses: () => ({ isLoading: false, isError: false, data: [{ id: "00000000-0000-4000-8000-000000000001", scope: "GLOBAL", status: "READY", alias: "모두의 상사", avatarKey: "boss-male-01", jobFunction: null, yearsOfServiceBand: null, rank: "팀장", companyName: null, ageBand: 40, hierarchyScore: 55, companyResearch: null, persona: null, pki: null }] }) }));
 vi.mock("../features/profile/useProfile", () => ({ useProfile: () => ({ data: { handle: "수민" } }) }));
 vi.mock("../features/translator/useTranslationExamples", () => ({ useTranslationExamples: () => ({ data: { examples: ["예시 1", "예시 2", "예시 3"] } }) }));
-vi.mock("../features/chat/ChatPanel", () => ({ ChatPanel: ({ active, simulationRequest }: { active: boolean; simulationRequest?: { inputText: string } }) => <section aria-label="모두의 상사와 대화" hidden={!active}>대화 패널{simulationRequest?.inputText}</section> }));
+vi.mock("../features/chat/ChatPanel", () => ({ ChatPanel: ({ active, simulationRequest, onConversationStateChange }: { active: boolean; simulationRequest?: { inputText: string }; onConversationStateChange: (state: { hasContent: boolean; hasUnsavedActualResponse: boolean; busy: boolean }) => void }) => <section aria-label="모두의 상사와 대화" hidden={!active}>대화 패널{simulationRequest?.inputText}<button onClick={() => onConversationStateChange({ hasContent: true, hasUnsavedActualResponse: false, busy: false })}>대화 있음</button></section> }));
 vi.mock("../features/translator/TranslatorPanel", () => ({ TranslatorPanel: ({ active, onSimulate }: { active: boolean; onSimulate: (request: any) => void }) => <section aria-label="상사의 말 번역" hidden={!active}>번역 패널<button onClick={() => onSimulate({ id: "simulation-1", translationId: "translation-1", replyIndex: 0, inputText: "이거 언제 되나?", reply: "곧 공유하겠습니다." })}>추천 답변 시뮬레이션</button></section> }));
 
 describe("MainPage workspace", () => {
-  afterEach(() => cleanup());
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
   beforeEach(() => useUiStore.setState({ selectedBossId: null, activeWorkspaceTab: "chat", mobilePanelExpanded: true }));
 
   it("대화 탭이 선택된 우측 통합 패널을 기본으로 표시한다", () => {
@@ -47,6 +47,21 @@ describe("MainPage workspace", () => {
   it("번역 추천 시뮬레이션을 대화 탭으로 이동시킨다", () => {
     render(<MainPage/>);
     fireEvent.click(screen.getByRole("tab", { name: "번역" }));
+    fireEvent.click(screen.getByRole("button", { name: "추천 답변 시뮬레이션" }));
+    expect(screen.getByRole("tab", { name: "대화" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("모두의 상사와 대화")).toHaveTextContent("이거 언제 되나?");
+  });
+
+  it("기존 대화가 있으면 새 시뮬레이션 교체를 확인하고 취소 시 유지한다", () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
+    render(<MainPage/>);
+    fireEvent.click(screen.getByRole("button", { name: "대화 있음" }));
+    fireEvent.click(screen.getByRole("tab", { name: "번역" }));
+    fireEvent.click(screen.getByRole("button", { name: "추천 답변 시뮬레이션" }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("tab", { name: "번역" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("모두의 상사와 대화")).not.toHaveTextContent("이거 언제 되나?");
+
     fireEvent.click(screen.getByRole("button", { name: "추천 답변 시뮬레이션" }));
     expect(screen.getByRole("tab", { name: "대화" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByLabelText("모두의 상사와 대화")).toHaveTextContent("이거 언제 되나?");

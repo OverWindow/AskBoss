@@ -26,7 +26,9 @@ describe("personal boss deletion", () => {
     await store.upsertSurveyAnswers(boss.sessionId, boss.id, [{ questionId: "q1", questionSnapshot: {}, selectedOption: "A", freeText: null }]);
     const thread = await store.getOrCreateThread(boss.sessionId, boss.id, undefined, expiresAt);
     await store.addChatMessage(thread.id, "user", "테스트 대화");
-    const translation = await store.createTranslation({
+    const bossRecord = await store.getBoss(boss.sessionId, boss.id);
+    expect(bossRecord).not.toBeNull();
+    const { translation, archive } = await store.createTranslationWithArchive({
       sessionId: boss.sessionId,
       bossId: boss.id,
       inputText: "확인했나?",
@@ -45,7 +47,7 @@ describe("personal boss deletion", () => {
         ],
       },
       expiresAt,
-    });
+    }, "deletion-owner", bossRecord!);
     await store.addMonologue(boss.sessionId, boss.id, "진행 상황은 어떤가?");
     const job = await store.createJob({ sessionId: boss.sessionId, bossId: boss.id, type: "CHAT_SUMMARIZE", payload: {} });
     const remove = vi.spyOn(storage, "remove").mockResolvedValueOnce();
@@ -59,6 +61,7 @@ describe("personal boss deletion", () => {
     expect(await store.listSurveyAnswers(boss.sessionId, boss.id)).toEqual([]);
     expect(await store.listChatMessages(boss.sessionId, boss.id)).toMatchObject({ threadId: null, messages: [] });
     expect(await store.getTranslation(boss.sessionId, translation.id)).toBeNull();
+    expect(await store.getArchive("deletion-owner", archive.id)).toBeNull();
     expect(await store.listMonologues(boss.sessionId, boss.id, 10)).toEqual([]);
     expect(await store.getJobById(job.id)).toBeNull();
   });

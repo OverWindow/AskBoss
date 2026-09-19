@@ -1,57 +1,55 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, MessageCircle, RefreshCw, Send } from "lucide-react";
-import type { Boss } from "@askboss/shared";
-import { useQuery } from "@tanstack/react-query";
+import { Check, Copy, MessageCircle, RefreshCw, RotateCcw, Send } from "lucide-react";
+import type { Boss, ChatMessage, TranslationArchiveDetail } from "@askboss/shared";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../services/api-client";
 import { streamBossChat, streamBossSimulation } from "../../services/sse-client";
 import type { ChatSimulationRequest } from "./simulation-types";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  createdAt: string;
-}
+import { ActualResponseDialog } from "../archive/ActualResponseDialog";
 
 interface ChatPanelProps {
   boss: Boss;
   active: boolean;
   simulationRequest: ChatSimulationRequest | null;
   onActivity: (state: { thinking: boolean; speech?: string }) => void;
+  onConversationStateChange?: (state: { hasContent: boolean; hasUnsavedActualResponse: boolean; busy: boolean }) => void;
+  onReset?: () => void;
+  externalChatUpdate?: { threadId: string; archiveId: string; messages: ChatMessage[] } | null;
 }
 
-interface SimulationPreview {
-  request: ChatSimulationRequest;
-  inputText: string;
-  reply: string;
-  reaction: string;
-  loading: boolean;
-  error?: string;
-}
-
-export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatPanelProps) {
+export function ChatPanel({ boss, active, simulationRequest, onActivity, onConversationStateChange, onReset, externalChatUpdate }: ChatPanelProps) {
+  const cache = useQueryClient();
   const [text, setText] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [threadId, setThreadId] = useState<string>();
+  const [archiveId, setArchiveId] = useState<string>();
   const [streaming, setStreaming] = useState(false);
   const [simulationLoading, setSimulationLoading] = useState(false);
-  const [simulationPreview, setSimulationPreview] = useState<SimulationPreview | null>(null);
+  const [resetting, setResetting] = useState(false);
   const [error, setError] = useState<string>();
   const [failedMessage, setFailedMessage] = useState<string>();
+  const [simulationError, setSimulationError] = useState<string>();
+  const [failedSimulation, setFailedSimulation] = useState<ChatSimulationRequest>();
   const [copiedMessageId, setCopiedMessageId] = useState<string>();
+  const [actualMessage, setActualMessage] = useState<ChatMessage>();
+  const [actualSaving, setActualSaving] = useState(false);
+  const [actualError, setActualError] = useState<string>();
   const chatListRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const requestController = useRef<AbortController | undefined>(undefined);
   const simulationController = useRef<AbortController | undefined>(undefined);
+  const handledSimulationId = useRef<string | undefined>(undefined);
+  const simulationStarted = useRef(false);
   const history = useQuery({
     queryKey: ["chat", boss.id],
-    queryFn: () => api<{ threadId: string | null; messages: Message[] }>(`/bosses/${boss.id}/chat`),
+    queryFn: () => api<{ threadId: string | null; archiveId: string | null; messages: ChatMessage[] }>(`/bosses/${boss.id}/chat`),
   });
 
   useEffect(() => {
-    if (history.data) {
+    if (history.data && !simulationStarted.current) {
       setMessages(history.data.messages);
       setThreadId(history.data.threadId ?? undefined);
+      setArchiveId(history.data.archiveId ?? undefined);
     }
   }, [history.data]);
 
@@ -65,39 +63,81 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
       const chatList = chatListRef.current;
       if (chatList) chatList.scrollTop = chatList.scrollHeight;
     });
-  }, [messages, active, simulationPreview?.reaction, simulationPreview?.loading]);
+  }, [messages, active, simulationLoading, actualMessage]);
 
   useEffect(() => {
-    setSimulationPreview(null);
+    requestController.current?.abort();
+    simulationController.current?.abort();
+    handledSimulationId.current = undefined;
+    simulationStarted.current = false;
+    setMessages([]);
+    setThreadId(undefined);
+    setArchiveId(undefined);
+    setText("");
+    setError(undefined);
+    setSimulationError(undefined);
+    setFailedSimulation(undefined);
+    setActualMessage(undefined);
+    setActualError(undefined);
     return () => { requestController.current?.abort(); simulationController.current?.abort(); };
   }, [boss.id]);
+
+  useEffect(() => {
+    if (!externalChatUpdate) return;
+    simulationStarted.current = true;
+    setThreadId(externalChatUpdate.threadId);
+    setArchiveId(externalChatUpdate.archiveId);
+    setMessages(externalChatUpdate.messages);
+    setActualMessage(undefined);
+    cache.setQueryData(["chat", boss.id], { threadId: externalChatUpdate.threadId, archiveId: externalChatUpdate.archiveId, messages: externalChatUpdate.messages, nextCursor: null });
+  }, [externalChatUpdate?.threadId]);
+
+  const hasUnsavedActualResponse = Boolean(actualMessage);
+  const busy = history.isLoading || streaming || simulationLoading || actualSaving || resetting;
+  useEffect(() => {
+    onConversationStateChange?.({ hasContent: messages.length > 0 || Boolean(text.trim()), hasUnsavedActualResponse, busy });
+  }, [messages.length, text, hasUnsavedActualResponse, busy, onConversationStateChange]);
 
   const runSimulation = async (request: ChatSimulationRequest) => {
     simulationController.current?.abort();
     const controller = new AbortController();
     simulationController.current = controller;
+    simulationStarted.current = true;
     setSimulationLoading(true);
-    setSimulationPreview({ request, inputText: request.inputText, reply: request.reply, reaction: "", loading: true });
+    setSimulationError(undefined);
+    setFailedSimulation(request);
+    setError(undefined);
+    setFailedMessage(undefined);
+    setMessages([]);
+    setThreadId(undefined);
+    setActualMessage(undefined);
+    setActualError(undefined);
     onActivity({ thinking: true, speech: "상사의 반응을 시뮬레이션하고 있습니다…" });
     try {
       let reaction = "";
       await streamBossSimulation(boss.id, { translationId: request.translationId, replyIndex: request.replyIndex }, (event, data) => {
-        if (event === "meta") setSimulationPreview((current) => current?.request.id === request.id ? { ...current, inputText: data.inputText, reply: data.reply } : current);
+        if (event === "meta") {
+          setThreadId(data.threadId);
+          setArchiveId(data.archiveId);
+          setMessages([...data.messages, { id: "simulation-stream", role: "assistant", content: "", kind: data.usesActualResponse ? "ACTUAL_RESPONSE" : "SIMULATION_REACTION", createdAt: new Date().toISOString() }]);
+        }
         if (event === "delta") {
           reaction += data.text;
-          setSimulationPreview((current) => current?.request.id === request.id ? { ...current, reaction } : current);
+          setMessages((old) => old.map((item) => item.id === "simulation-stream" ? { ...item, content: reaction } : item));
           onActivity({ thinking: true, speech: reaction });
         }
         if (event === "done") {
-          reaction = data.content;
-          setSimulationPreview((current) => current?.request.id === request.id ? { ...current, reaction, loading: false, error: undefined } : current);
+          reaction = data.message.content;
+          setMessages((old) => old.map((item) => item.id === "simulation-stream" ? data.message : item));
+          setFailedSimulation(undefined);
           onActivity({ thinking: false, speech: reaction });
         }
       }, { signal: controller.signal });
     } catch (cause) {
       if (controller.signal.aborted) return;
       const message = cause instanceof Error ? cause.message : "상사의 반응을 만들지 못했습니다.";
-      setSimulationPreview((current) => current?.request.id === request.id ? { ...current, loading: false, error: message } : current);
+      setMessages((old) => old.filter((item) => item.id !== "simulation-stream"));
+      setSimulationError(message);
       onActivity({ thinking: false, speech: message });
     } finally {
       if (simulationController.current === controller) {
@@ -108,7 +148,9 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
   };
 
   useEffect(() => {
-    if (simulationRequest) void runSimulation(simulationRequest);
+    if (!simulationRequest || handledSimulationId.current === simulationRequest.id) return;
+    handledSimulationId.current = simulationRequest.id;
+    void runSimulation(simulationRequest);
   }, [simulationRequest?.id]);
 
   const copyMessage = async (id: string, content: string) => {
@@ -122,14 +164,30 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
     }
   };
 
-  const renderMessage = (id: string, role: Message["role"], content: string) => <div key={id} className={`chat-message-row ${role}`}>
-    <div className={`chat-message ${role}`}>{content || "…"}</div>
-    {role === "user" && content && <button className="message-copy-button" type="button" aria-label={copiedMessageId === id ? "복사됨" : "메시지 복사"} onClick={() => void copyMessage(id, content)}>{copiedMessageId === id ? <Check size={14}/> : <Copy size={14}/>}</button>}
-  </div>;
+  const saveActualResponse = async (content: string) => {
+    if (!archiveId || actualSaving) return;
+    setActualSaving(true);
+    setActualError(undefined);
+    try {
+      const result = await api<{ archive: TranslationArchiveDetail; activeChat: { threadId: string; archiveId: string; messages: ChatMessage[] } | null }>(`/archives/${archiveId}/actual-response`, { method: "PUT", body: JSON.stringify({ content }) });
+      if (result.activeChat) {
+        setThreadId(result.activeChat.threadId);
+        setArchiveId(result.activeChat.archiveId);
+        setMessages(result.activeChat.messages);
+        cache.setQueryData(["chat", boss.id], { ...result.activeChat, nextCursor: null });
+      }
+      setActualMessage(undefined);
+      onActivity({ thinking: false, speech: content });
+    } catch (cause) {
+      setActualError(cause instanceof Error ? cause.message : "실제 상사 답변을 저장하지 못했습니다.");
+    } finally {
+      setActualSaving(false);
+    }
+  };
 
   const send = async (retryMessage?: string) => {
     const message = (retryMessage ?? text).trim();
-    if (!message || streaming || simulationLoading) return;
+    if (!message || streaming || simulationLoading || actualSaving || resetting) return;
     setText("");
     window.requestAnimationFrame(() => {
       if (inputRef.current) inputRef.current.style.height = "auto";
@@ -138,8 +196,8 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
     setFailedMessage(undefined);
     setMessages((old) => [
       ...old.filter((item) => item.id !== "stream"),
-      { id: crypto.randomUUID(), role: "user", content: message, createdAt: new Date().toISOString() },
-      { id: "stream", role: "assistant", content: "", createdAt: new Date().toISOString() },
+      { id: crypto.randomUUID(), role: "user", content: message, kind: "CHAT", createdAt: new Date().toISOString() },
+      { id: "stream", role: "assistant", content: "", kind: "CHAT", createdAt: new Date().toISOString() },
     ]);
     setStreaming(true);
     onActivity({ thinking: true, speech: "생각을 정리하고 있습니다…" });
@@ -161,6 +219,7 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
         }
       }, { signal: controller.signal });
     } catch (cause) {
+      if (controller.signal.aborted) return;
       const messageText = cause instanceof Error ? cause.message : "답변을 만들지 못했습니다.";
       setMessages((old) => old.filter((item) => item.id !== "stream"));
       setError(messageText);
@@ -173,20 +232,58 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
     }
   };
 
-  return <section id="chat-panel" className="workspace-tab-panel" role="tabpanel" aria-labelledby="workspace-tab-chat" aria-label={`${boss.alias}와 대화`} hidden={!active} aria-busy={streaming || simulationLoading}>
-    <div className="workspace-panel-title"><h2><MessageCircle size={18}/>{boss.alias}와 대화</h2></div>
+  const resetChat = async () => {
+    if (streaming || simulationLoading || actualSaving || resetting) return;
+    const hasLocalContent = messages.length > 0 || Boolean(text.trim()) || hasUnsavedActualResponse;
+    if (hasLocalContent && !window.confirm("현재 라이브 대화를 초기화할까요? 번역 아카이브와 저장된 실제 상사 답변은 유지됩니다.")) return;
+    setResetting(true);
+    setError(undefined);
+    try {
+      await api(`/bosses/${boss.id}/chat`, { method: "DELETE" });
+      simulationStarted.current = true;
+      setMessages([]);
+      setThreadId(undefined);
+      setText("");
+      setSimulationError(undefined);
+      setFailedSimulation(undefined);
+      setActualMessage(undefined);
+      setActualError(undefined);
+      cache.setQueryData(["chat", boss.id], { threadId: null, archiveId: null, messages: [] });
+      onActivity({ thinking: false });
+      onReset?.();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "대화를 초기화하지 못했습니다.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const renderMessage = (message: ChatMessage) => {
+    const canCollectActual = (message.kind === "SIMULATION_REACTION" || message.kind === "ACTUAL_RESPONSE") && message.id !== "simulation-stream" && Boolean(message.content) && Boolean(archiveId);
+    return <div className={`chat-message-block ${message.role}`} key={message.id}>
+      {message.kind === "ACTUAL_RESPONSE" && <span className="actual-response-label">실제 답변</span>}
+      <div className={`chat-message-row ${message.role}`}>
+        <div className={`chat-message ${message.role}`}>{message.content || "…"}</div>
+        {message.role === "user" && message.content && <button className="message-copy-button" type="button" aria-label={copiedMessageId === message.id ? "복사됨" : "메시지 복사"} onClick={() => void copyMessage(message.id, message.content)}>{copiedMessageId === message.id ? <Check size={14}/> : <Copy size={14}/>}</button>}
+      </div>
+      {canCollectActual && <button className="actual-response-trigger" type="button" disabled={actualSaving || simulationLoading} onClick={() => { setActualMessage(message); setActualError(undefined); }}>{message.kind === "ACTUAL_RESPONSE" ? "실제 답변 수정" : "실제로 답변은 달랐어요"}</button>}
+    </div>;
+  };
+
+  return <section id="chat-panel" className="workspace-tab-panel" role="tabpanel" aria-labelledby="workspace-tab-chat" aria-label={`${boss.alias}와 대화`} hidden={!active} aria-busy={busy}>
+    <div className="workspace-panel-title chat-panel-title"><h2><MessageCircle size={18}/>{boss.alias}와 대화</h2><button className="chat-reset-button" type="button" disabled={busy} onClick={() => void resetChat()} aria-label="대화 초기화" title="대화 초기화"><RotateCcw size={17}/></button></div>
     <p className="panel-hint">가상 시뮬레이션이며 실제 인물의 생각을 단정하지 않습니다.</p>
     <div ref={chatListRef} className="chat-list" aria-live="polite">
-      {history.isLoading && <p className="hint">이전 대화를 불러오는 중입니다.</p>}
+      {history.isLoading && !simulationStarted.current && <p className="hint">이전 대화를 불러오는 중입니다.</p>}
       {history.isError && <p className="error-text" role="alert">이전 대화를 불러오지 못했습니다.</p>}
-      {!history.isLoading && messages.length === 0 && !simulationPreview && <div className="panel-empty"><MessageCircle size={22}/><p>하고 싶은 말을 적어보세요.</p></div>}
-      {messages.map((message) => renderMessage(message.id, message.role, message.content))}
-      {simulationPreview && <section className="simulation-preview" aria-label="임시 답변 시뮬레이션"><div className="simulation-preview-label"><strong>임시 시뮬레이션</strong><span>기록되지 않음</span></div>{renderMessage(`${simulationPreview.request.id}-input`, "assistant", simulationPreview.inputText)}{renderMessage(`${simulationPreview.request.id}-reply`, "user", simulationPreview.reply)}{renderMessage(`${simulationPreview.request.id}-reaction`, "assistant", simulationPreview.reaction)}{simulationPreview.error && <div className="chat-stream-error" role="alert"><span>{simulationPreview.error}</span><button className="small-button" type="button" disabled={simulationLoading} onClick={() => void runSimulation(simulationPreview.request)}><RefreshCw size={14}/>다시 시도</button></div>}</section>}
+      {!history.isLoading && messages.length === 0 && !simulationLoading && <div className="panel-empty"><MessageCircle size={22}/><p>하고 싶은 말을 적어보세요.</p></div>}
+      {messages.map(renderMessage)}
+      {simulationError && <div className="chat-stream-error" role="alert"><span>{simulationError}</span>{failedSimulation && <button className="small-button" type="button" disabled={simulationLoading} onClick={() => void runSimulation(failedSimulation)}><RefreshCw size={14}/>다시 시도</button>}</div>}
       {error && <div className="chat-stream-error" role="alert"><span>{error}</span>{failedMessage && <button className="small-button" type="button" disabled={streaming} onClick={() => void send(failedMessage)}><RefreshCw size={14}/>다시 시도</button>}</div>}
     </div>
     <div className="chat-composer">
       <textarea ref={inputRef} className="input chat-input" rows={1} value={text} onChange={(event) => { setText(event.target.value); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 120)}px`; }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} placeholder="할 말을 입력하세요" aria-label="대화 입력"/>
-      <button className="primary-button" type="button" disabled={!text.trim() || streaming || simulationLoading} onClick={() => void send()} aria-label="보내기"><Send size={18}/></button>
-    </div>
+      <button className="primary-button" type="button" disabled={!text.trim() || busy} onClick={() => void send()} aria-label="보내기"><Send size={18}/></button>
+    </div><ActualResponseDialog open={Boolean(actualMessage)} initialValue={actualMessage?.kind === "ACTUAL_RESPONSE" ? actualMessage.content : ""} saving={actualSaving} error={actualError} onClose={() => { setActualMessage(undefined); setActualError(undefined); }} onSubmit={(content) => void saveActualResponse(content)}/>
   </section>;
 }

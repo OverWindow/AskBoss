@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionSummary, type BossPersona, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationExamplesSettings } from "../shared.js";
-import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
+import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionSummary, type BossPersona, type ChatMessageKind, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationArchiveDetail, type TranslationExamplesSettings } from "../shared.js";
+import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationArchiveRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 import { computeTopRepeatedPhrases } from "../utils/hr-aggregation.js";
+import { buildActualResponseEvidence } from "../utils/actual-response.js";
+import { encodeArchiveCursor, type ArchiveCursor } from "../utils/archive-cursor.js";
 
 const globalPersona: BossPersona = {
   summary: "한국 회사에서 흔히 볼 수 있는 중간관리자형의 가상 공통 페르소나입니다.",
@@ -22,6 +24,22 @@ const globalBoss: BossRecord = {
   personaVersion: 1,
 };
 
+function publicArchive(row: TranslationArchiveRecord): TranslationArchiveDetail {
+  return structuredClone({
+    id: row.id,
+    boss: row.boss,
+    inputText: row.inputText,
+    channel: row.channel,
+    result: row.result,
+    lastCopiedReplyIndex: row.lastCopiedReplyIndex,
+    actualResponse: row.actualResponse,
+    branchCount: row.branches.length,
+    branches: row.branches,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
+}
+
 export class MemoryStore implements Store {
   sessions = new Map<string, SessionRecord>();
   profiles = new Map<string, UserProfile>();
@@ -36,6 +54,7 @@ export class MemoryStore implements Store {
   jobs = new Map<string, JobRecord>();
   threads = new Map<string, ChatThreadRecord>();
   translations = new Map<string, TranslationRecord>();
+  archives = new Map<string, TranslationArchiveRecord>();
   monologues = new Map<string, string[]>();
   analytics: Array<AnalyticsEventInput & { subjectHash: string; occurredAt: string }> = [];
   adminSessions = new Map<string, AdminSessionRecord>();
@@ -54,7 +73,13 @@ export class MemoryStore implements Store {
     const bossIds=[...this.bosses.values()].filter((row)=>row.sessionId===id).map((row)=>row.id);
     for (const bossId of bossIds) { this.bosses.delete(bossId); this.surveys.delete(bossId); }
     for (const [key, row] of this.evidence) if (row.sessionId === id) this.evidence.delete(key);
-    for (const [key, row] of this.threads) if (row.sessionId === id) this.threads.delete(key);
+    for (const [key, row] of this.threads) if (row.sessionId === id) {
+      const archive = row.archiveId ? this.archives.get(row.archiveId) : null;
+      const branch = archive?.branches.find((item) => item.id === row.archiveBranchId);
+      if (branch?.status === "ACTIVE") { branch.status = "SUPERSEDED"; branch.updatedAt = new Date().toISOString(); }
+      this.threads.delete(key);
+    }
+    for (const archive of this.archives.values()) if (archive.sourceSessionId === id) { archive.sourceSessionId = null; archive.translationId = null; }
     for (const [key,row] of this.translations) if (row.sessionId===id) this.translations.delete(key);
     for (const [key,row] of this.uploads) if (row.sessionId===id) this.uploads.delete(key);
     for (const [key,row] of this.jobs) if (row.sessionId===id) this.jobs.delete(key);
@@ -82,6 +107,7 @@ export class MemoryStore implements Store {
     for (const [key, job] of this.jobs) if (job.sessionId === sessionId && job.bossId === bossId) this.jobs.delete(key);
     for (const [key, thread] of this.threads) if (thread.sessionId === sessionId && thread.bossId === bossId) this.threads.delete(key);
     for (const [key, translation] of this.translations) if (translation.sessionId === sessionId && translation.bossId === bossId) this.translations.delete(key);
+    await this.deleteArchivesForBoss(bossId);
     this.monologues.delete(`${sessionId}:${bossId}`);
   }
   async getGlobalBoss() { return this.bosses.get(globalBoss.id)!; }
@@ -101,7 +127,7 @@ export class MemoryStore implements Store {
   async createGlobalUploadIntent(input: Omit<GlobalUploadIntentRecord, "id" | "completedAt">) { const row = { ...input, id: randomUUID(), completedAt: null }; this.globalUploads.set(row.id, row); return row; }
   async getGlobalUploadIntent(id: string) { const row = this.globalUploads.get(id); return row && Date.parse(row.expiresAt) > Date.now() ? row : null; }
   async completeGlobalUploadIntent(id: string) { const row = await this.getGlobalUploadIntent(id); if (!row) throw new Error("업로드 정보를 찾을 수 없습니다."); row.completedAt = new Date().toISOString(); }
-  async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) { const row = { ...input, id: randomUUID(), createdAt: new Date().toISOString() }; this.evidence.set(row.id, row); return row; }
+  async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) { const now = new Date().toISOString(); const row = { ...input, id: randomUUID(), createdAt: now, updatedAt: input.updatedAt ?? now, sourceArchiveId: input.sourceArchiveId ?? null }; this.evidence.set(row.id, row); return row; }
   async getEvidence(sessionId: string, id: string) { const row = this.evidence.get(id); return row?.sessionId === sessionId ? row : null; }
   async listEvidence(sessionId: string, bossId: string) { return [...this.evidence.values()].filter((row) => row.sessionId === sessionId && row.bossId === bossId); }
   async updateEvidence(sessionId: string, id: string, patch: Partial<EvidenceRecord>) { const row = await this.getEvidence(sessionId, id); if (!row) throw new Error("근거를 찾을 수 없습니다."); Object.assign(row, patch); }
@@ -122,12 +148,23 @@ export class MemoryStore implements Store {
   async completeJob(id: string, result: unknown) { const row = this.jobs.get(id); if (row) Object.assign(row, { status: "SUCCEEDED", result, errorMessage: null, leaseUntil: null, updatedAt: new Date().toISOString() }); }
   async failJob(id: string, error: string, retry: boolean) { const row = this.jobs.get(id); if (row) Object.assign(row, { status: retry && row.attempts < row.maxAttempts ? "PENDING" : "FAILED", errorMessage: error, leaseUntil: null, updatedAt: new Date().toISOString() }); }
   async retryJob(id: string) { const original = this.jobs.get(id); if (!original || original.status !== "FAILED") return null; const job = await this.createJob({ sessionId: original.sessionId, bossId: original.bossId, type: original.type, payload: structuredClone(original.payload) }); job.retryOf = original.id; return job; }
-  async getOrCreateThread(sessionId: string, bossId: string, threadId: string | undefined, expiresAt: string) { if (threadId) { const hit = this.threads.get(threadId); if (hit?.sessionId === sessionId && hit.bossId === bossId) return hit; } const row: ChatThreadRecord = { id: randomUUID(), sessionId, bossId, conversationSummary: null, messages: [], createdAt: new Date().toISOString(), expiresAt }; this.threads.set(row.id, row); return row; }
-  async addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string) { const row: ChatMessageRecord = { id: randomUUID(), role, content, createdAt: new Date().toISOString() }; const thread = this.threads.get(threadId); if (!thread) throw new Error("대화를 찾을 수 없습니다."); thread.messages.push(row); return row; }
-  async listChatMessages(sessionId: string, bossId: string, cursor?: string, limit = 50) { const thread = [...this.threads.values()].filter((row) => row.sessionId === sessionId && row.bossId === bossId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]; if (!thread) return { threadId: null, messages: [], nextCursor: null }; const filtered = cursor ? thread.messages.filter((message) => message.createdAt < cursor) : thread.messages; const messages = filtered.slice(-limit); return { threadId: thread.id, messages, nextCursor: filtered.length > limit ? messages[0]?.createdAt ?? null : null }; }
+  async getOrCreateThread(sessionId: string, bossId: string, threadId: string | undefined, expiresAt: string) { if (threadId) { const hit = this.threads.get(threadId); if (hit?.sessionId === sessionId && hit.bossId === bossId) return hit; } const active = [...this.threads.values()].find((row) => row.sessionId === sessionId && row.bossId === bossId); if (active) return active; const row: ChatThreadRecord = { id: randomUUID(), sessionId, bossId, conversationSummary: null, messages: [], archiveId: null, archiveBranchId: null, createdAt: new Date().toISOString(), expiresAt }; this.threads.set(row.id, row); return row; }
+  async replaceChatWithSimulation(sessionId: string, bossId: string, archiveId: string, replyIndex: number, source: string, reply: string, expiresAt: string) { const archive = this.archives.get(archiveId); if (!archive || archive.sourceSessionId !== sessionId) throw new Error("아카이브를 찾을 수 없습니다."); await this.resetChat(sessionId, bossId); archive.updatedAt = new Date().toISOString(); const usesActualResponse = archive.actualResponse?.replyIndex === replyIndex; const now = new Date().toISOString(); const branch = { id: randomUUID(), kind: usesActualResponse ? "ACTUAL" as const : "PREDICTED" as const, status: "ACTIVE" as const, replyIndex, messages: [] as ChatMessageRecord[], createdAt: now, updatedAt: now }; archive.branches.unshift(branch); const thread: ChatThreadRecord = { id: randomUUID(), sessionId, bossId, conversationSummary: null, messages: [], archiveId, archiveBranchId: branch.id, createdAt: now, expiresAt }; this.threads.set(thread.id, thread); const sourceMessage = await this.addChatMessage(thread.id, "assistant", source, "SIMULATION_SOURCE"); const replyMessage = await this.addChatMessage(thread.id, "user", reply, "SIMULATION_REPLY"); const messages = [sourceMessage, replyMessage]; if (usesActualResponse) messages.push(await this.addChatMessage(thread.id, "assistant", archive.actualResponse!.content, "ACTUAL_RESPONSE")); return { threadId: thread.id, archiveId, messages, usesActualResponse }; }
+  async resetChat(sessionId: string, bossId: string) { for (const [id, thread] of this.threads) if (thread.sessionId === sessionId && thread.bossId === bossId) { const archive = thread.archiveId ? this.archives.get(thread.archiveId) : null; const branch = archive?.branches.find((item) => item.id === thread.archiveBranchId); if (branch && branch.status === "ACTIVE") { branch.status = "SUPERSEDED"; branch.updatedAt = new Date().toISOString(); } this.threads.delete(id); } }
+  async addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string, kind: ChatMessageKind = "CHAT") { const row: ChatMessageRecord = { id: randomUUID(), role, content, kind, createdAt: new Date().toISOString() }; const thread = this.threads.get(threadId); if (!thread) throw new Error("대화를 찾을 수 없습니다."); thread.messages.push(row); const archive = thread.archiveId ? this.archives.get(thread.archiveId) : null; const branch = archive?.branches.find((item) => item.id === thread.archiveBranchId); if (branch) { branch.messages.push(structuredClone(row)); branch.updatedAt = row.createdAt; archive!.updatedAt = row.createdAt; } return row; }
+  async listChatMessages(sessionId: string, bossId: string, cursor?: string, limit = 50) { const thread = [...this.threads.values()].find((row) => row.sessionId === sessionId && row.bossId === bossId); if (!thread) return { threadId: null, archiveId: null, messages: [], nextCursor: null }; const filtered = cursor ? thread.messages.filter((message) => message.createdAt < cursor) : thread.messages; const messages = filtered.slice(-limit); return { threadId: thread.id, archiveId: thread.archiveId ?? null, messages, nextCursor: filtered.length > limit ? messages[0]?.createdAt ?? null : null }; }
   async updateThreadSummary(threadId: string, summary: string) { const row = this.threads.get(threadId); if (row) row.conversationSummary = summary; }
   async createTranslation(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback" | "simulationCount">) { const row: TranslationRecord = { ...input, id: randomUUID(), feedback: null, simulationCount: 0, createdAt: new Date().toISOString() }; this.translations.set(row.id, row); return row; }
+  async createTranslationWithArchive(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback" | "simulationCount">, ownerHash: string, boss: BossRecord) { const translation = await this.createTranslation(input); const now = translation.createdAt; const archive: TranslationArchiveRecord = { id: randomUUID(), ownerHash, translationId: translation.id, sourceSessionId: input.sessionId, boss: { id: boss.id, alias: boss.alias, avatarKey: boss.avatarKey, scope: boss.scope }, inputText: input.inputText, channel: input.channel, result: structuredClone(input.result), lastCopiedReplyIndex: null, actualResponse: null, branchCount: 0, branches: [], createdAt: now, updatedAt: now }; this.archives.set(archive.id, archive); return { translation, archive: publicArchive(archive) }; }
   async getTranslation(sessionId: string, id: string) { const row = this.translations.get(id); return row?.sessionId === sessionId && Date.parse(row.expiresAt) > Date.now() ? row : null; }
+  async getArchiveByTranslation(sessionId: string, translationId: string) { const row = [...this.archives.values()].find((item) => item.translationId === translationId && item.sourceSessionId === sessionId); return row ? publicArchive(row) : null; }
+  async listArchives(ownerHash: string, cursor?: ArchiveCursor, limit = 20) { const cursorRow = cursor ? this.archives.get(cursor.id) : undefined; const rows = [...this.archives.values()].filter((item) => item.ownerHash === ownerHash && (!cursor || (cursorRow?.ownerHash === ownerHash && (item.createdAt < cursorRow.createdAt || (item.createdAt === cursorRow.createdAt && item.id < cursorRow.id))))).sort((a,b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)); const page = rows.slice(0, limit); return { items: page.map(({ branches, ownerHash: _ownerHash, translationId: _translationId, sourceSessionId: _sourceSessionId, result: _result, ...item }) => ({ ...structuredClone(item), branchCount: branches.length })), nextCursor: rows.length > limit && page.length ? encodeArchiveCursor({ id: page.at(-1)!.id }) : null }; }
+  async getArchive(ownerHash: string, archiveId: string) { const row = this.archives.get(archiveId); return row?.ownerHash === ownerHash ? publicArchive(row) : null; }
+  async setArchiveSelectedReply(ownerHash: string, archiveId: string, replyIndex: number) { const row = this.archives.get(archiveId); if (!row || row.ownerHash !== ownerHash || !row.result.replies[replyIndex]) return null; row.lastCopiedReplyIndex = replyIndex; row.updatedAt = new Date().toISOString(); return publicArchive(row); }
+  async upsertArchiveActualResponse(ownerHash: string, sessionId: string, archiveId: string, content: string, expiresAt: string) { const archive = this.archives.get(archiveId); if (!archive || archive.ownerHash !== ownerHash) return null; const now = new Date().toISOString(); const replyIndex = archive.actualResponse?.replyIndex ?? archive.lastCopiedReplyIndex; const replyText = archive.actualResponse?.replyText ?? (replyIndex === null ? null : archive.result.replies[replyIndex]?.text ?? null); archive.actualResponse = { content, replyIndex, replyText, updatedAt: now }; archive.updatedAt = now; const boss = await this.getBoss(sessionId, archive.boss.id); let application: "NEXT_PERSONA_REBUILD" | "SESSION_CALIBRATION" | "ARCHIVE_ONLY" = "ARCHIVE_ONLY"; if (boss) { application = boss.scope === "GLOBAL" ? "SESSION_CALIBRATION" : "NEXT_PERSONA_REBUILD"; const existing = [...this.evidence.values()].find((item) => item.sessionId === sessionId && item.sourceArchiveId === archiveId && item.type === "FEEDBACK"); const observedAt = existing?.observedAt ?? now; const built = buildActualResponseEvidence(archive.inputText, replyText, content, observedAt); if (existing) Object.assign(existing, built, { updatedAt: now, status: "READY" }); else await this.createEvidence({ bossId: boss.id, sessionId, type: "FEEDBACK", status: "READY", rawText: built.rawText, storagePath: null, parsedData: built.parsedData, observedAt, expiresAt, errorMessage: null, sourceArchiveId: archiveId }); }
+    const active = [...this.threads.values()].find((thread) => thread.sessionId === sessionId && thread.archiveId === archiveId); let activeChat: { threadId: string; archiveId: string; messages: ChatMessageRecord[] } | null = null; if (active) { const oldBranch = archive.branches.find((item) => item.id === active.archiveBranchId); const activeReplyIndex = replyIndex ?? oldBranch?.replyIndex ?? 0; await this.resetChat(sessionId, active.bossId); const branch = { id: randomUUID(), kind: "ACTUAL" as const, status: "ACTIVE" as const, replyIndex: activeReplyIndex, messages: [] as ChatMessageRecord[], createdAt: now, updatedAt: now }; archive.branches.unshift(branch); const thread: ChatThreadRecord = { id: randomUUID(), sessionId, bossId: active.bossId, conversationSummary: null, messages: [], archiveId, archiveBranchId: branch.id, createdAt: now, expiresAt }; this.threads.set(thread.id, thread); await this.addChatMessage(thread.id, "assistant", archive.inputText, "SIMULATION_SOURCE"); await this.addChatMessage(thread.id, "user", archive.result.replies[activeReplyIndex]!.text, "SIMULATION_REPLY"); await this.addChatMessage(thread.id, "assistant", content, "ACTUAL_RESPONSE"); activeChat = { threadId: thread.id, archiveId, messages: structuredClone(thread.messages) }; }
+    archive.branchCount = archive.branches.length; return { archive: publicArchive(archive), activeChat, application }; }
+  async deleteArchivesForBoss(bossId: string) { for (const [id, archive] of this.archives) if (archive.boss.id === bossId) this.archives.delete(id); }
   async setTranslationFeedback(sessionId: string, id: string, feedback: "GOOD" | "BAD") { const row = this.translations.get(id); if (!row || row.sessionId !== sessionId) throw new Error("번역 결과를 찾을 수 없습니다."); row.feedback = feedback; }
   async incrementTranslationSimulation(sessionId: string, id: string) { const row = await this.getTranslation(sessionId,id); if (!row) throw new Error("번역 결과를 찾을 수 없습니다."); row.simulationCount += 1; }
   async listMonologues(sessionId: string, bossId: string, limit: number) { return (this.monologues.get(`${sessionId}:${bossId}`) ?? []).slice(-limit); }

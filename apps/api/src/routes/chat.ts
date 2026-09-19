@@ -25,8 +25,17 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
   app.get("/bosses/:bossId/chat", async (request) => {
     const session = await requireSession(request);
     const bossId = (request.params as { bossId: string }).bossId;
+    if (!(await store.getBoss(session.id, bossId))) throw new HttpError(404, "상사를 찾을 수 없습니다.");
     const query = request.query as { cursor?: string; limit?: string };
     return store.listChatMessages(session.id, bossId, query.cursor, Math.min(Number(query.limit) || 50, 100));
+  });
+
+  app.delete("/bosses/:bossId/chat", async (request, reply) => {
+    const session = await requireSession(request);
+    const bossId = (request.params as { bossId: string }).bossId;
+    if (!(await store.getBoss(session.id, bossId))) throw new HttpError(404, "상사를 찾을 수 없습니다.");
+    await store.resetChat(session.id, bossId);
+    return reply.code(204).send();
   });
 
   app.post("/bosses/:bossId/chat/simulate", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
@@ -42,7 +51,10 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     if (!translation || translation.bossId !== bossId) throw new HttpError(404, "번역 결과를 찾을 수 없습니다.", "TRANSLATION_NOT_FOUND");
     const selectedReply = translation.result.replies[body.replyIndex];
     if (!selectedReply) throw new HttpError(400, "추천 답변을 찾을 수 없습니다.", "REPLY_NOT_FOUND");
-    const { basePrompt, globalBoss } = await getBossPromptContext(boss);
+    const archive = await store.getArchiveByTranslation(session.id, translation.id);
+    if (!archive) throw new HttpError(404, "번역 아카이브를 찾을 수 없습니다.", "ARCHIVE_NOT_FOUND");
+    const { basePrompt, globalBoss, sessionCalibration } = await getBossPromptContext(boss, session.id);
+    const conversation = await store.replaceChatWithSimulation(session.id, bossId, archive.id, body.replyIndex, translation.inputText, selectedReply.text, sessionExpiry());
 
     reply.hijack();
     reply.raw.statusCode = 200;
@@ -51,7 +63,14 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     reply.raw.setHeader("connection", "keep-alive");
     reply.raw.setHeader("x-accel-buffering", "no");
     reply.raw.flushHeaders();
-    writeEvent(reply.raw, "meta", { inputText: translation.inputText, reply: selectedReply.text });
+    writeEvent(reply.raw, "meta", { threadId: conversation.threadId, archiveId: conversation.archiveId, messages: conversation.messages.slice(0, 2), usesActualResponse: conversation.usesActualResponse });
+    if (conversation.usesActualResponse) {
+      const actualMessage = conversation.messages.at(-1)!;
+      await store.incrementTranslationSimulation(session.id, translation.id);
+      writeEvent(reply.raw, "done", { message: actualMessage });
+      reply.raw.end();
+      return;
+    }
 
     const controller = new AbortController();
     let timeoutCode: "AI_FIRST_DELTA_TIMEOUT" | "AI_IDLE_TIMEOUT" | "AI_TIMEOUT" | null = null;
@@ -83,7 +102,7 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     try {
       let content = "";
       const plainStream = new PlainTextStream();
-      for await (const chunk of ai.streamSimulatedBossReaction({ profile, boss, basePrompt, globalBoss: boss.scope === "SESSION" ? globalBoss : undefined, inputText: translation.inputText, reply: selectedReply.text, channel: translation.channel }, controller.signal)) {
+      for await (const chunk of ai.streamSimulatedBossReaction({ profile, boss, basePrompt, globalBoss: boss.scope === "SESSION" ? globalBoss : undefined, sessionCalibration, inputText: translation.inputText, reply: selectedReply.text, channel: translation.channel }, controller.signal)) {
         if (!chunk) continue;
         const safeChunk = plainStream.push(chunk);
         if (safeChunk) {
@@ -100,8 +119,9 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
       clearTimeout(progressTimer);
       content = toPlainText(content);
       if (!content.trim()) throw new Error("AI returned an empty response");
+      const saved = await store.addChatMessage(conversation.threadId, "assistant", content, "SIMULATION_REACTION");
       await store.incrementTranslationSimulation(session.id, translation.id);
-      writeEvent(reply.raw, "done", { content });
+      writeEvent(reply.raw, "done", { message: saved });
       finished = true;
       reply.raw.end();
       void track(session.id, "SIMULATE", profile, boss, { topicKeywords: keywords(translation.inputText) }).catch((error) => request.log.warn(error, "simulation analytics failed"));
@@ -128,7 +148,7 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     const body = parse(chatInputSchema, request.body);
     const [boss, profile] = await Promise.all([store.getBoss(session.id, bossId), store.getProfile(session.id)]);
     if (!boss) throw new HttpError(404, "상사를 찾을 수 없습니다.");
-    const { basePrompt, globalBoss } = await getBossPromptContext(boss);
+    const { basePrompt, globalBoss, sessionCalibration } = await getBossPromptContext(boss, session.id);
 
     const thread = await store.getOrCreateThread(session.id, bossId, body.threadId, sessionExpiry());
     // Capture history before adding the current message so the prompt contains it exactly once.
@@ -142,7 +162,7 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     reply.raw.setHeader("connection", "keep-alive");
     reply.raw.setHeader("x-accel-buffering", "no");
     reply.raw.flushHeaders();
-    writeEvent(reply.raw, "meta", { threadId: thread.id, messageId: userMessage.id });
+    writeEvent(reply.raw, "meta", { threadId: thread.id, archiveId: thread.archiveId ?? null, messageId: userMessage.id });
 
     const controller = new AbortController();
     let timeoutCode: "AI_FIRST_DELTA_TIMEOUT" | "AI_IDLE_TIMEOUT" | "AI_TIMEOUT" | null = null;
@@ -175,7 +195,7 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     try {
       let content = "";
       const plainStream = new PlainTextStream();
-      for await (const chunk of ai.streamChatWithBoss({ profile, boss, basePrompt, globalPersona: boss.scope === "SESSION" ? globalBoss?.persona : undefined, summary: thread.conversationSummary, messages: previousMessages, message: body.message }, controller.signal)) {
+      for await (const chunk of ai.streamChatWithBoss({ profile, boss, basePrompt, globalPersona: boss.scope === "SESSION" ? globalBoss?.persona : undefined, sessionCalibration, summary: thread.conversationSummary, messages: previousMessages, message: body.message }, controller.signal)) {
         if (!chunk) continue;
         const safeChunk = plainStream.push(chunk);
         if (safeChunk) {

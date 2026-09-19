@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { DEFAULT_TRANSLATION_EXAMPLES } from "@askboss/shared";
+import { DEFAULT_TRANSLATION_EXAMPLES, type ChatMessage } from "@askboss/shared";
 import { AppShell } from "../components/AppShell";
 import { useSession } from "../features/session/useSession";
 import { useBosses } from "../features/boss/useBosses";
@@ -34,6 +34,8 @@ export function MainPage() {
   const [thinking, setThinking] = useState(false);
   const [simulationRequest, setSimulationRequest] = useState<ChatSimulationRequest | null>(null);
   const [avatarSpeechIndex, setAvatarSpeechIndex] = useState(-1);
+  const [chatState, setChatState] = useState({ hasContent: false, hasUnsavedActualResponse: false, busy: false });
+  const [externalChatUpdate, setExternalChatUpdate] = useState<{ threadId: string; archiveId: string; messages: ChatMessage[] } | null>(null);
 
   useEffect(() => {
     if (boss && !ui.selectedBossId) ui.set({ selectedBossId: boss.id });
@@ -44,7 +46,18 @@ export function MainPage() {
     setSpeech(profile.data?.handle ? `${profile.data.handle}씨, 밥은 먹었나?` : "밥은 먹었나?");
     setThinking(false);
     setAvatarSpeechIndex(-1);
+    setChatState({ hasContent: false, hasUnsavedActualResponse: false, busy: false });
+    setExternalChatUpdate(null);
   }, [boss?.id, profile.data?.handle]);
+
+  const updateChatState = useCallback((next: { hasContent: boolean; hasUnsavedActualResponse: boolean; busy: boolean }) => {
+    setChatState((current) => current.hasContent === next.hasContent && current.hasUnsavedActualResponse === next.hasUnsavedActualResponse && current.busy === next.busy ? current : next);
+  }, []);
+
+  const resetBossSpeech = useCallback(() => {
+    setSpeech(profile.data?.handle ? `${profile.data.handle}씨, 밥은 먹었나?` : "밥은 먹었나?");
+    setThinking(false);
+  }, [profile.data?.handle]);
 
   const selectTab = (tab: PanelName) => ui.set({ activeWorkspaceTab: tab, mobilePanelExpanded: true });
 
@@ -93,8 +106,8 @@ export function MainPage() {
           </button>
         </header>
         <div id="workspace-dock-body" className="workspace-dock-body">
-          <ChatPanel boss={boss} active={ui.activeWorkspaceTab === "chat"} simulationRequest={simulationRequest} onActivity={({ thinking: nextThinking, speech: nextSpeech }) => { setThinking(nextThinking); if (nextSpeech) setSpeech(nextSpeech); }}/>
-          <TranslatorPanel boss={boss} active={ui.activeWorkspaceTab === "translator"} examples={translationExamples.data?.examples ?? DEFAULT_TRANSLATION_EXAMPLES} onSourceMessage={(message) => { setThinking(false); setSpeech(message); }} onSimulate={(request) => { setSimulationRequest(request); setSpeech(request.inputText); setThinking(true); selectTab("chat"); }}/>
+          <ChatPanel boss={boss} active={ui.activeWorkspaceTab === "chat"} simulationRequest={simulationRequest} externalChatUpdate={externalChatUpdate} onActivity={({ thinking: nextThinking, speech: nextSpeech }) => { setThinking(nextThinking); if (nextSpeech) setSpeech(nextSpeech); }} onConversationStateChange={updateChatState} onReset={resetBossSpeech}/>
+          <TranslatorPanel boss={boss} active={ui.activeWorkspaceTab === "translator"} examples={translationExamples.data?.examples ?? DEFAULT_TRANSLATION_EXAMPLES} simulationDisabled={chatState.busy} onSourceMessage={(message) => { setThinking(false); setSpeech(message); }} onActualResponseApplied={(chat) => { if (chat) setExternalChatUpdate(chat); }} onSimulate={(request) => { if (chatState.busy) return false; if ((chatState.hasContent || chatState.hasUnsavedActualResponse) && !window.confirm("현재 대화를 삭제하고 새 시뮬레이션을 시작할까요? 기존 대화는 아카이브에 유지됩니다.")) return false; setSimulationRequest(request); setSpeech(request.inputText); setThinking(true); selectTab("chat"); return true; }}/>
         </div>
       </aside>
     </div>

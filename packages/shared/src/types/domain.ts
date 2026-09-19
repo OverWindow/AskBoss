@@ -99,6 +99,57 @@ export interface TranslationResult {
   replies: [{ text: string; style: string; reason: string }, { text: string; style: string; reason: string }, { text: string; style: string; reason: string }];
 }
 
+export type ChatMessageKind = "CHAT" | "SIMULATION_SOURCE" | "SIMULATION_REPLY" | "SIMULATION_REACTION" | "ACTUAL_RESPONSE";
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  kind: ChatMessageKind;
+  createdAt: string;
+}
+
+export interface TranslationArchiveBoss {
+  id: string;
+  alias: string;
+  avatarKey: string;
+  scope: BossScope;
+}
+
+export interface TranslationArchiveActualResponse {
+  content: string;
+  replyIndex: number | null;
+  replyText: string | null;
+  updatedAt: string;
+}
+
+export interface TranslationArchiveBranch {
+  id: string;
+  kind: "PREDICTED" | "ACTUAL";
+  status: "ACTIVE" | "SUPERSEDED" | "FAILED";
+  replyIndex: number;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TranslationArchiveSummary {
+  id: string;
+  boss: TranslationArchiveBoss;
+  inputText: string;
+  channel: string;
+  lastCopiedReplyIndex: number | null;
+  actualResponse: TranslationArchiveActualResponse | null;
+  branchCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TranslationArchiveDetail extends TranslationArchiveSummary {
+  result: TranslationResult;
+  branches: TranslationArchiveBranch[];
+}
+
 export interface PersonalBossDefaults {
   prompt: string;
   updatedAt: string;

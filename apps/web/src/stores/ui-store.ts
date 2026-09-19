@@ -8,6 +8,7 @@ interface UiState {
   mobilePanelExpanded: boolean;
   tutorialOpen: boolean;
   settingsOpen: boolean;
+  archiveOpen: boolean;
   set: (patch: Partial<UiState>) => void;
 }
 
@@ -19,5 +20,6 @@ export const useUiStore = create<UiState>((set) => ({
   mobilePanelExpanded: true,
   tutorialOpen: false,
   settingsOpen: false,
+  archiveOpen: false,
   set,
 }));

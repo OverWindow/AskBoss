@@ -16,12 +16,14 @@ const MOCK_MESSAGES: ChatMessageRecord[] = [
   {
     id: "00000000-0000-4000-8000-000000000101",
     role: "user",
+    kind: "CHAT",
     content: "팀장님, 지난번 말씀하신 자료 초안 공유드립니다.",
     createdAt: "2026-01-02T09:00:00.000Z",
   },
   {
     id: "00000000-0000-4000-8000-000000000102",
     role: "assistant",
+    kind: "CHAT",
     content: "결론과 남은 일정부터 정리해서 다시 보내줘.",
     createdAt: "2026-01-02T09:01:00.000Z",
   },
