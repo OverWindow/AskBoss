@@ -20,7 +20,7 @@ function renderSidebar() {
 describe("Sidebar boss deletion", () => {
   beforeEach(() => {
     vi.mocked(api).mockImplementation(async (path) => path === "/profile" ? { profile: null } as any : undefined as any);
-    useUiStore.setState({ selectedBossId: "personal-boss", sidebarCollapsed: false, mobileNavOpen: false, activeWorkspaceTab: "translator", mobilePanelExpanded: false });
+    useUiStore.setState({ selectedBossId: "personal-boss", sidebarCollapsed: false, mobileNavOpen: false, settingsOpen: false, activeWorkspaceTab: "translator", mobilePanelExpanded: false });
   });
   afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
@@ -36,5 +36,15 @@ describe("Sidebar boss deletion", () => {
     fireEvent.click(screen.getByRole("button", { name: "모두 삭제" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/bosses/personal-boss", { method: "DELETE" }));
     expect(useUiStore.getState()).toMatchObject({ selectedBossId: "00000000-0000-4000-8000-000000000001", activeWorkspaceTab: "chat", mobilePanelExpanded: true });
+  });
+
+  it("keeps the profile menu mounted during its closing animation", async () => {
+    renderSidebar();
+    const trigger = screen.getByRole("button", { name: "사용자 설정" });
+    fireEvent.click(trigger);
+    expect(screen.getByText("내 정보 · 상사 관리")).toBeInTheDocument();
+    fireEvent.click(trigger);
+    expect(screen.getByText("내 정보 · 상사 관리")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("내 정보 · 상사 관리")).not.toBeInTheDocument());
   });
 });

@@ -123,10 +123,11 @@
 .avatar-button:focus-visible{outline:3px solid rgba(78,141,124,.45);outline-offset:5px}
 .workspace-dock{z-index:10;min-width:0;height:100%;border:1px solid var(--hr-border);border-radius:18px;background:#fff;box-shadow:0 22px 60px rgba(38,58,69,.12);display:flex;flex-direction:column;overflow:hidden}
 .workspace-tabs-header{min-height:62px;display:flex;align-items:stretch;justify-content:space-between;border-bottom:1px solid var(--hr-border);background:#fbfcfd}
-.workspace-tabs{display:grid;grid-template-columns:repeat(2,minmax(92px,1fr));flex:1}
-.workspace-tabs button{position:relative;border:0;background:transparent;color:var(--hr-muted);font-weight:800;font-size:.95rem}
+.workspace-tabs{position:relative;display:grid;grid-template-columns:repeat(2,minmax(92px,1fr));flex:1}
+.workspace-tabs button{position:relative;border:0;background:transparent;color:var(--hr-muted);font-weight:800;font-size:.95rem;transition:color .22s ease,background-color .22s ease}
 .workspace-tabs button[aria-selected="true"]{color:var(--hr-primary);background:#fff}
-.workspace-tabs button[aria-selected="true"]::after{content:"";position:absolute;left:18px;right:18px;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--hr-accent)}
+.workspace-tab-indicator{position:absolute;left:18px;bottom:-1px;width:calc(50% - 36px);height:3px;border-radius:3px 3px 0 0;background:var(--hr-accent);transform:translateX(0);transition:transform .32s cubic-bezier(.22,1,.36,1)}
+.workspace-tab-indicator.is-translator{transform:translateX(calc(100% + 36px))}
 .mobile-panel-toggle{display:none;border:0;border-left:1px solid var(--hr-border);background:transparent;color:var(--hr-primary);padding:0 14px;align-items:center;gap:6px;font-weight:750}
 .workspace-dock-body{min-height:0;flex:1;position:relative}
 .workspace-tab-panel{height:100%;min-height:0;display:flex;flex-direction:column}
@@ -147,6 +148,7 @@
 .translation-examples{display:flex;flex-wrap:wrap;gap:7px}
 .translation-examples button{border:1px solid var(--hr-border);border-radius:999px;background:#fff;padding:7px 10px;color:var(--hr-primary);font-size:.76rem;text-align:left}
 .translation-examples button:hover,.translation-examples button:focus-visible{border-color:var(--hr-accent);background:rgba(78,141,124,.06)}
+.profile-menu{transform-origin:left bottom}.avatar-transition{position:relative;display:block;width:100%;height:100%}
 .boss-loading{display:grid;justify-items:center;gap:12px}.loading-boss-avatar{width:150px;height:150px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 12px 14px rgba(38,58,69,.1));animation:loading-avatar-float 1.8s ease-in-out infinite}.boss-loading p{margin:2px 0 0}@keyframes loading-avatar-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
 
 @media(max-width:1199px){
@@ -168,10 +170,12 @@
 }
 
 /* Personal boss deletion */
-.boss-nav-row{position:relative;display:flex;align-items:center;border-radius:10px}
+.boss-nav-row{position:relative;display:flex;align-items:center;border-radius:10px;isolation:isolate}
+.boss-nav-row::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:rgba(78,141,124,.12);opacity:0;transform:translateX(-6px) scale(.98);transition:opacity .2s ease,transform .28s cubic-bezier(.22,1,.36,1)}
+.boss-nav-row.is-active::before{opacity:1;transform:translateX(0) scale(1)}
 .boss-nav-row .boss-nav-item{min-width:0;flex:1;padding-right:38px}
 .boss-nav-row:hover,.boss-nav-row:focus-within{background:rgba(53,87,107,.07)}
-.boss-nav-row.is-active{background:rgba(78,141,124,.12);color:#244c43}
+.boss-nav-row.is-active{color:#244c43}
 .boss-nav-row .boss-nav-item:hover{background:transparent}
 .boss-delete-button{position:absolute;right:7px;width:27px;height:27px;border:0;border-radius:50%;display:grid;place-items:center;background:transparent;color:var(--hr-muted);opacity:0;pointer-events:none;transition:opacity .16s ease,background .16s ease,color .16s ease}
 .boss-nav-row:hover .boss-delete-button,.boss-nav-row:focus-within .boss-delete-button{opacity:1;pointer-events:auto}

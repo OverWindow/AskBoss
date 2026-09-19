@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { AppShell } from "../components/AppShell";
 import { useSession } from "../features/session/useSession";
 import { useBosses } from "../features/boss/useBosses";
@@ -9,6 +10,7 @@ import type { ChatSimulationRequest } from "../features/chat/simulation-types";
 import { TranslatorPanel } from "../features/translator/TranslatorPanel";
 import { Tutorial } from "../features/tutorial/Tutorial";
 import { useUiStore } from "../stores/ui-store";
+import { useProfile } from "../features/profile/useProfile";
 
 type PanelName = "chat" | "translator";
 const AVATAR_SPEECHES = [
@@ -22,9 +24,10 @@ const AVATAR_SPEECHES = [
 export function MainPage() {
   const session = useSession();
   const bosses = useBosses(session.isSuccess);
+  const profile = useProfile(session.isSuccess);
   const ui = useUiStore();
   const boss = useMemo(() => bosses.data?.find((item) => item.id === ui.selectedBossId) ?? bosses.data?.[0], [bosses.data, ui.selectedBossId]);
-  const [speech, setSpeech] = useState("○○씨, 밥은 먹었나?");
+  const [speech, setSpeech] = useState("밥은 먹었나?");
   const [thinking, setThinking] = useState(false);
   const [simulationRequest, setSimulationRequest] = useState<ChatSimulationRequest | null>(null);
   const [avatarSpeechIndex, setAvatarSpeechIndex] = useState(-1);
@@ -35,10 +38,10 @@ export function MainPage() {
 
   useEffect(() => {
     setSimulationRequest(null);
-    setSpeech("○○씨, 밥은 먹었나?");
+    setSpeech(profile.data?.handle ? `${profile.data.handle}씨, 밥은 먹었나?` : "밥은 먹었나?");
     setThinking(false);
     setAvatarSpeechIndex(-1);
-  }, [boss?.id]);
+  }, [boss?.id, profile.data?.handle]);
 
   const selectTab = (tab: PanelName) => ui.set({ activeWorkspaceTab: tab, mobilePanelExpanded: true });
 
@@ -63,10 +66,9 @@ export function MainPage() {
   return <AppShell>
     <div className={`interaction-workspace ${ui.mobilePanelExpanded ? "" : "is-mobile-panel-collapsed"}`}>
       <section data-tutorial="workspace" className={`boss-stage ${thinking ? "is-thinking" : ""}`} aria-labelledby="boss-alias">
-        <div className="speech-bubble" aria-live="polite">“{speech}”</div>
+        <div className="speech-bubble" aria-live="polite">{speech}</div>
         <button className="avatar-frame avatar-button" type="button" onClick={changeAvatarSpeech} aria-label={`${boss.alias}의 한마디 바꾸기`}>
-          <img className="boss-avatar" src={`/avatars/${boss.avatarKey}.png`} alt={`${boss.alias} 픽셀 아바타`}/>
-          <img className="boss-avatar boss-avatar--closed" src={`/avatars/${boss.avatarKey}-closed.png`} alt="" aria-hidden="true"/>
+          <AnimatePresence mode="wait" initial={false}><motion.span key={boss.id} className="avatar-transition" initial={{ opacity: 0, scale: .96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.03 }} transition={{ duration: .24, ease: [0.22, 1, 0.36, 1] }}><img className="boss-avatar" src={`/avatars/${boss.avatarKey}.png`} alt={`${boss.alias} 픽셀 아바타`}/><img className="boss-avatar boss-avatar--closed" src={`/avatars/${boss.avatarKey}-closed.png`} alt="" aria-hidden="true"/></motion.span></AnimatePresence>
           <span className="thinking-indicator" aria-hidden="true"><i/><i/><i/></span>
         </button>
         <h1 id="boss-alias" className="boss-alias">{boss.alias}</h1>
@@ -79,6 +81,7 @@ export function MainPage() {
           <div className="workspace-tabs" role="tablist" aria-label="작업 선택">
             <button id="workspace-tab-chat" data-tutorial="chat" type="button" role="tab" aria-selected={ui.activeWorkspaceTab === "chat"} aria-controls="chat-panel" tabIndex={ui.activeWorkspaceTab === "chat" ? 0 : -1} onKeyDown={(event) => onTabKeyDown(event, "chat")} onClick={() => selectTab("chat")}>대화</button>
             <button id="workspace-tab-translator" data-tutorial="translate" type="button" role="tab" aria-selected={ui.activeWorkspaceTab === "translator"} aria-controls="translator-panel" tabIndex={ui.activeWorkspaceTab === "translator" ? 0 : -1} onKeyDown={(event) => onTabKeyDown(event, "translator")} onClick={() => selectTab("translator")}>번역</button>
+            <span className={`workspace-tab-indicator ${ui.activeWorkspaceTab === "translator" ? "is-translator" : ""}`} aria-hidden="true"/>
           </div>
           <button className="mobile-panel-toggle" type="button" aria-expanded={ui.mobilePanelExpanded} aria-controls="workspace-dock-body" onClick={() => ui.set({ mobilePanelExpanded: !ui.mobilePanelExpanded })}>
             {ui.mobilePanelExpanded ? <ChevronDown size={18}/> : <ChevronUp size={18}/>}

@@ -124,7 +124,7 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
 
   const renderMessage = (id: string, role: Message["role"], content: string) => <div key={id} className={`chat-message-row ${role}`}>
     <div className={`chat-message ${role}`}>{content || "…"}</div>
-    {content && <button className="message-copy-button" type="button" aria-label={copiedMessageId === id ? "복사됨" : "메시지 복사"} onClick={() => void copyMessage(id, content)}>{copiedMessageId === id ? <Check size={14}/> : <Copy size={14}/>}</button>}
+    {role === "user" && content && <button className="message-copy-button" type="button" aria-label={copiedMessageId === id ? "복사됨" : "메시지 복사"} onClick={() => void copyMessage(id, content)}>{copiedMessageId === id ? <Check size={14}/> : <Copy size={14}/>}</button>}
   </div>;
 
   const send = async (retryMessage?: string) => {

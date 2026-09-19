@@ -30,6 +30,7 @@ describe("ChatPanel simulations", () => {
     expect(screen.getByText("이거 언제 되나?")).toHaveClass("assistant");
     expect(screen.getByText("오늘 오후까지 공유드리겠습니다.")).toHaveClass("user");
     await waitFor(() => expect(screen.getByText("오후에는 꼭 결과로 공유해.")).toHaveClass("assistant"));
+    expect(screen.getAllByRole("button", { name: "메시지 복사" })).toHaveLength(1);
     expect(api).toHaveBeenCalledTimes(1);
     expect(api).toHaveBeenCalledWith(`/bosses/${boss.id}/chat`);
   });
@@ -37,7 +38,7 @@ describe("ChatPanel simulations", () => {
   it("uses speech-only copy and copies each message", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
-    vi.mocked(api).mockResolvedValue({ threadId: "thread-1", messages: [{ id: "message-1", role: "assistant", content: "확인해 볼게요.", createdAt: new Date().toISOString() }] } as any);
+    vi.mocked(api).mockResolvedValue({ threadId: "thread-1", messages: [{ id: "message-1", role: "user", content: "확인해 볼게요.", createdAt: new Date().toISOString() }] } as any);
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     render(<QueryClientProvider client={client}><ChatPanel boss={boss} active simulationRequest={null} onActivity={() => undefined}/></QueryClientProvider>);

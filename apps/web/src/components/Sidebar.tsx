@@ -1,21 +1,23 @@
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { BarChart3, ChevronLeft, ChevronRight, Plus, UserRound, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Boss, UserProfile } from "@askboss/shared";
+import { useQueryClient } from "@tanstack/react-query";
+import type { Boss } from "@askboss/shared";
 import { useBosses } from "../features/boss/useBosses";
 import { TUTORIAL_STORAGE_KEY } from "../features/tutorial/Tutorial";
 import { api } from "../services/api-client";
 import { useUiStore } from "../stores/ui-store";
 import { Dialog } from "./Dialog";
 import { SERVICE_NAME } from "../config/brand";
+import { useProfile } from "../features/profile/useProfile";
 
 export function Sidebar() {
   const ui = useUiStore();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: bosses = [] } = useBosses();
-  const { data: profile } = useQuery({ queryKey: ["profile"], queryFn: () => api<{ profile: UserProfile | null }>("/profile").then((response) => response.profile) });
+  const { data: profile } = useProfile();
   const [deleteTarget, setDeleteTarget] = useState<Boss | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
@@ -71,7 +73,7 @@ export function Sidebar() {
       <div className="sidebar-bottom">
         <Link className="nav-link" to="/hr-demo" title="HR Demo"><BarChart3 size={19}/><span className="hide-collapsed">HR Demo</span></Link>
         <button className="sidebar-user" onClick={() => ui.set({ settingsOpen: !ui.settingsOpen })} title={profile ? `@${profile.handle}` : "사용자 설정"}><UserRound size={19}/><span className="hide-collapsed">{profile ? `@${profile.handle}` : "사용자 설정"}</span></button>
-        {ui.settingsOpen && <div className="profile-menu"><Link to="/settings" onClick={() => ui.set({ settingsOpen: false })}>내 정보 · 상사 관리</Link><button onClick={() => { try { localStorage.removeItem(TUTORIAL_STORAGE_KEY); } catch { /* Storage may be unavailable. */ } ui.set({ tutorialOpen: true, settingsOpen: false }); navigate("/"); }}>Tutorial 다시 보기</button><button className="danger-button" onClick={reset}>Session 데이터 초기화</button></div>}
+        <AnimatePresence>{ui.settingsOpen && <motion.div className="profile-menu" initial={{ opacity: 0, y: 8, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: .97 }} transition={{ duration: .2, ease: [0.22, 1, 0.36, 1] }}><Link to="/settings" onClick={() => ui.set({ settingsOpen: false })}>내 정보 · 상사 관리</Link><button onClick={() => { try { localStorage.removeItem(TUTORIAL_STORAGE_KEY); } catch { /* Storage may be unavailable. */ } ui.set({ tutorialOpen: true, settingsOpen: false }); navigate("/"); }}>Tutorial 다시 보기</button><button className="danger-button" onClick={reset}>Session 데이터 초기화</button></motion.div>}</AnimatePresence>
       </div>
     </aside>
     <Dialog open={Boolean(deleteTarget)} title="상사 데이터 삭제" onClose={() => { if (!deleting) setDeleteTarget(null); }}>
