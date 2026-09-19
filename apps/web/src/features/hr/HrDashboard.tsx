@@ -74,11 +74,11 @@ export function HrDashboard() {
                   value: item.count,
                 }))}
               >
-                <CartesianGrid stroke="rgba(38,58,69,.1)" vertical={false} />
+                <CartesianGrid stroke="rgba(33,34,50,.1)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Bar dataKey="value" fill="#35576B" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="#375DF3" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -165,7 +165,7 @@ function TopicCloud({ words }: { words: { text: string; value: number }[] }) {
             cloudWords.map((word) => (
               <Text
                 key={word.text}
-                fill="#35576B"
+                fill="#375DF3"
                 textAnchor="middle"
                 transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
                 fontSize={word.size}
@@ -187,11 +187,11 @@ function Chart({ title, data }: { title: string; data: { label: string; value: n
       <h3>{title}</h3>
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={data}>
-          <CartesianGrid stroke="rgba(38,58,69,.1)" vertical={false} />
+          <CartesianGrid stroke="rgba(33,34,50,.1)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 12 }} />
           <YAxis tick={{ fontSize: 12 }} />
           <Tooltip />
-          <Bar dataKey="value" fill="#35576B" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="value" fill="#375DF3" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </section>
