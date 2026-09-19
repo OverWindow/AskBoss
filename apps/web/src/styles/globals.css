@@ -53,7 +53,7 @@
 .boss-stage.is-thinking .avatar-blink{animation:avatar-breathe 1.6s infinite ease-in-out}
 @keyframes thinking-dot{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-4px);opacity:1}}
 @keyframes avatar-breathe{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
-@keyframes boss-eye-blink{0%,43%,44.2%,45.2%,100%{opacity:0}43.4%,43.9%,44.5%,44.9%{opacity:1}}
+@keyframes boss-eye-blink{0%,42.6%,46.2%,100%{opacity:0}44.2%,45%{opacity:1}}
 
 @media(prefers-reduced-motion:reduce){.avatar-blink i{animation:none}}
 
