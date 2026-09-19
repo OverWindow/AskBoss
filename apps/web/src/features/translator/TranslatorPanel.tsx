@@ -12,6 +12,8 @@ interface TranslatorPanelProps {
   onSimulate: (request: ChatSimulationRequest) => void;
 }
 
+const TRANSLATION_EXAMPLES = ["이거 언제 되나?", "한번 검토해 볼게요.", "이 정도는 알아서 해주세요."];
+
 export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: TranslatorPanelProps) {
   const [text, setText] = useState("");
   const [channel, setChannel] = useState<string>(CHANNELS[0]);
@@ -81,16 +83,16 @@ export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: T
   };
 
   return <section id="translator-panel" className="workspace-tab-panel" role="tabpanel" aria-labelledby="workspace-tab-translator" aria-label="상사의 말 번역" hidden={!active} aria-busy={loading}>
-    <div className="workspace-panel-title"><span className="panel-kicker">TRANSLATOR</span><h2><Languages size={18}/>상사의 말 번역</h2></div>
+    <div className="workspace-panel-title"><h2><Languages size={18}/>상사의 말 번역</h2></div>
     <div className="translator-scroll">
-      <div className="field"><label htmlFor="boss-message">상사가 뭐라고 했나요?</label><textarea ref={textareaRef} id="boss-message" className="textarea" value={text} onChange={(event) => setText(event.target.value)} placeholder="받은 메시지나 들은 말을 그대로 적어주세요."/></div>
+      <div className="field"><label htmlFor="boss-message">상사가 뭐라고 했나요?</label><textarea ref={textareaRef} id="boss-message" className="textarea" value={text} onChange={(event) => setText(event.target.value)}/><div className="translation-examples" aria-label="예시 문장">{TRANSLATION_EXAMPLES.map((example) => <button key={example} type="button" onClick={() => { setText(example); textareaRef.current?.focus(); }}>{example}</button>)}</div></div>
       <div className="field"><label htmlFor="channel">어떤 상황인가요?</label><select id="channel" className="select" value={channel} onChange={(event) => setChannel(event.target.value)}>{CHANNELS.map((item) => <option key={item}>{item}</option>)}</select></div>
       <button className="primary-button panel-submit" type="button" disabled={!text.trim() || loading} onClick={() => void translate()}>{loading ? "해석하는 중…" : "해석하기"}</button>
       {error && <div className="translation-error" role="alert"><span>{error}</span><button className="small-button" type="button" disabled={loading || !text.trim()} onClick={() => void translate()}><RefreshCw size={14}/>다시 시도</button></div>}
       {result && <div className="translation-result">
-        <section className="result-section"><h3>쉽게 말하면</h3><p>{result.plainMeaning}</p><div className="hint">{result.tone}</div>{result.caution && <p className="hint">{result.caution}</p>}</section>
+        <section className="result-section"><h3>쉽게 말하면</h3><p>{result.plainMeaning}</p></section>
         <section className="result-section"><h3>가능성이 높은 의도</h3><ul>{result.likelyIntent.map((item) => <li key={item}>{item}</li>)}</ul></section>
-        <section className="result-section"><h3>답변 추천</h3>{result.replies.map((reply, index) => <div className="reply-option" key={reply.style}><div className="reply-style">{index + 1}안 · {reply.style}</div><p>{reply.text}</p><div className="hint">{reply.reason}</div><label className="reply-simulation"><input type="checkbox" checked={selectedReplyIndex === index} disabled={!translationId} onChange={(event) => { if (event.target.checked) simulate(index); else setSelectedReplyIndex(undefined); }}/><small>이 답변으로 대화를 시뮬레이션해 볼게요.</small></label>{index === 0 && <div className="feedback"><span>이 답변 괜찮나요?</span><button className="icon-button" type="button" aria-label="좋아요" disabled={Boolean(feedback)} onClick={() => void rate("GOOD")}><ThumbsUp size={17}/></button><button className="icon-button" type="button" aria-label="별로예요" disabled={Boolean(feedback)} onClick={() => void rate("BAD")}><ThumbsDown size={17}/></button>{feedback && <span>의견을 반영했어요.</span>}</div>}</div>)}</section>
+        <section className="result-section"><h3>답변 추천</h3>{result.replies.map((reply, index) => <div className="reply-option" key={reply.style}><div className="reply-style">{index + 1}안 · {reply.style}</div><p>{reply.text}</p><label className="reply-simulation"><input type="checkbox" checked={selectedReplyIndex === index} disabled={!translationId} onChange={(event) => { if (event.target.checked) simulate(index); else setSelectedReplyIndex(undefined); }}/><small>이 답변으로 대화를 시뮬레이션해 볼게요.</small></label>{index === 0 && <div className="feedback"><span>이 답변 괜찮나요?</span><button className="icon-button" type="button" aria-label="좋아요" disabled={Boolean(feedback)} onClick={() => void rate("GOOD")}><ThumbsUp size={17}/></button><button className="icon-button" type="button" aria-label="별로예요" disabled={Boolean(feedback)} onClick={() => void rate("BAD")}><ThumbsDown size={17}/></button>{feedback && <span>의견을 반영했어요.</span>}</div>}</div>)}</section>
       </div>}
     </div>
   </section>;

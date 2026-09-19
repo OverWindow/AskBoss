@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, RefreshCw, Send } from "lucide-react";
+import { Check, Copy, MessageCircle, RefreshCw, Send } from "lucide-react";
 import type { Boss } from "@askboss/shared";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../services/api-client";
@@ -38,7 +38,8 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
   const [simulationPreview, setSimulationPreview] = useState<SimulationPreview | null>(null);
   const [error, setError] = useState<string>();
   const [failedMessage, setFailedMessage] = useState<string>();
-  const bottom = useRef<HTMLDivElement>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string>();
+  const chatListRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const requestController = useRef<AbortController | undefined>(undefined);
   const simulationController = useRef<AbortController | undefined>(undefined);
@@ -59,7 +60,11 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
   }, [active]);
 
   useEffect(() => {
-    if (active) bottom.current?.scrollIntoView({ behavior: "smooth" });
+    if (!active) return;
+    window.requestAnimationFrame(() => {
+      const chatList = chatListRef.current;
+      if (chatList) chatList.scrollTop = chatList.scrollHeight;
+    });
   }, [messages, active, simulationPreview?.reaction, simulationPreview?.loading]);
 
   useEffect(() => {
@@ -106,6 +111,22 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
     if (simulationRequest) void runSimulation(simulationRequest);
   }, [simulationRequest?.id]);
 
+  const copyMessage = async (id: string, content: string) => {
+    if (!content) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedMessageId(id);
+      window.setTimeout(() => setCopiedMessageId((current) => current === id ? undefined : current), 1500);
+    } catch {
+      setError("메시지를 복사하지 못했습니다.");
+    }
+  };
+
+  const renderMessage = (id: string, role: Message["role"], content: string) => <div key={id} className={`chat-message ${role}`}>
+    {content || "…"}
+    {content && <button className="message-copy-button" type="button" aria-label={copiedMessageId === id ? "복사됨" : "메시지 복사"} onClick={() => void copyMessage(id, content)}>{copiedMessageId === id ? <Check size={14}/> : <Copy size={14}/>}</button>}
+  </div>;
+
   const send = async (retryMessage?: string) => {
     const message = (retryMessage ?? text).trim();
     if (!message || streaming || simulationLoading) return;
@@ -150,19 +171,18 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
   };
 
   return <section id="chat-panel" className="workspace-tab-panel" role="tabpanel" aria-labelledby="workspace-tab-chat" aria-label={`${boss.alias}와 대화`} hidden={!active} aria-busy={streaming || simulationLoading}>
-    <div className="workspace-panel-title"><span className="panel-kicker">CONVERSATION</span><h2><MessageCircle size={18}/>{boss.alias}와 대화</h2></div>
+    <div className="workspace-panel-title"><h2><MessageCircle size={18}/>{boss.alias}와 대화</h2></div>
     <p className="panel-hint">가상 시뮬레이션이며 실제 인물의 생각을 단정하지 않습니다.</p>
-    <div className="chat-list" aria-live="polite">
+    <div ref={chatListRef} className="chat-list" aria-live="polite">
       {history.isLoading && <p className="hint">이전 대화를 불러오는 중입니다.</p>}
       {history.isError && <p className="error-text" role="alert">이전 대화를 불러오지 못했습니다.</p>}
-      {!history.isLoading && messages.length === 0 && !simulationPreview && <div className="panel-empty"><MessageCircle size={22}/><p>상황이나 하고 싶은 말을 적어보세요.</p></div>}
-      {messages.map((message) => <div key={message.id} className={`chat-message ${message.role}`}>{message.content || "…"}</div>)}
-      {simulationPreview && <section className="simulation-preview" aria-label="임시 답변 시뮬레이션"><div className="simulation-preview-label"><strong>임시 시뮬레이션</strong><span>기록되지 않음</span></div><div className="chat-message assistant">{simulationPreview.inputText}</div><div className="chat-message user">{simulationPreview.reply}</div><div className="chat-message assistant">{simulationPreview.reaction || "…"}</div>{simulationPreview.error && <div className="chat-stream-error" role="alert"><span>{simulationPreview.error}</span><button className="small-button" type="button" disabled={simulationLoading} onClick={() => void runSimulation(simulationPreview.request)}><RefreshCw size={14}/>다시 시도</button></div>}</section>}
+      {!history.isLoading && messages.length === 0 && !simulationPreview && <div className="panel-empty"><MessageCircle size={22}/><p>하고 싶은 말을 적어보세요.</p></div>}
+      {messages.map((message) => renderMessage(message.id, message.role, message.content))}
+      {simulationPreview && <section className="simulation-preview" aria-label="임시 답변 시뮬레이션"><div className="simulation-preview-label"><strong>임시 시뮬레이션</strong><span>기록되지 않음</span></div>{renderMessage(`${simulationPreview.request.id}-input`, "assistant", simulationPreview.inputText)}{renderMessage(`${simulationPreview.request.id}-reply`, "user", simulationPreview.reply)}{renderMessage(`${simulationPreview.request.id}-reaction`, "assistant", simulationPreview.reaction)}{simulationPreview.error && <div className="chat-stream-error" role="alert"><span>{simulationPreview.error}</span><button className="small-button" type="button" disabled={simulationLoading} onClick={() => void runSimulation(simulationPreview.request)}><RefreshCw size={14}/>다시 시도</button></div>}</section>}
       {error && <div className="chat-stream-error" role="alert"><span>{error}</span>{failedMessage && <button className="small-button" type="button" disabled={streaming} onClick={() => void send(failedMessage)}><RefreshCw size={14}/>다시 시도</button>}</div>}
-      <div ref={bottom}/>
     </div>
     <div className="chat-composer">
-      <input ref={inputRef} className="input" value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) void send(); }} placeholder="상황이나 할 말을 입력하세요" aria-label="대화 입력"/>
+      <input ref={inputRef} className="input" value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) void send(); }} placeholder="할 말을 입력하세요" aria-label="대화 입력"/>
       <button className="primary-button" type="button" disabled={!text.trim() || streaming || simulationLoading} onClick={() => void send()} aria-label="보내기"><Send size={18}/></button>
     </div>
   </section>;

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ChatPanel } from "./ChatPanel";
 import { api } from "../../services/api-client";
@@ -11,7 +11,7 @@ vi.mock("../../services/sse-client", () => ({ streamBossChat: vi.fn(), streamBos
 const boss: any = { id: "00000000-0000-4000-8000-000000000001", scope: "GLOBAL", status: "READY", alias: "모두의 상사", avatarKey: "boss-male-01", persona: null, pki: null };
 
 describe("ChatPanel simulations", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
   it("renders the simulation separately from persisted chat history", async () => {
     Element.prototype.scrollIntoView = vi.fn();
@@ -32,5 +32,20 @@ describe("ChatPanel simulations", () => {
     await waitFor(() => expect(screen.getByText("오후에는 꼭 결과로 공유해.")).toHaveClass("assistant"));
     expect(api).toHaveBeenCalledTimes(1);
     expect(api).toHaveBeenCalledWith(`/bosses/${boss.id}/chat`);
+  });
+
+  it("uses speech-only copy and copies each message", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    vi.mocked(api).mockResolvedValue({ threadId: "thread-1", messages: [{ id: "message-1", role: "assistant", content: "확인해 볼게요.", createdAt: new Date().toISOString() }] } as any);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(<QueryClientProvider client={client}><ChatPanel boss={boss} active simulationRequest={null} onActivity={() => undefined}/></QueryClientProvider>);
+
+    expect(await screen.findByText("확인해 볼게요.")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("할 말을 입력하세요")).toBeInTheDocument();
+    expect(screen.queryByText("CONVERSATION")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "메시지 복사" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("확인해 볼게요."));
   });
 });
