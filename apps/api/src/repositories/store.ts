@@ -1,4 +1,4 @@
-import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, ChatMessageKind, HrDashboard, TranslationArchiveDetail, TranslationArchiveSummary } from "../shared.js";
+import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionPage, ChatMessageKind, HrDashboard, TranslationArchiveDetail, TranslationArchiveSummary } from "../shared.js";
 import type { AdminAiPromptSettings, AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalBossDefaults, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, PersonalBossDefaults, SessionRecord, SurveyAnswerRecord, TranslationExamplesSettings, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { ArchiveCursor } from "../utils/archive-cursor.js";
 
@@ -80,6 +80,7 @@ export interface Store {
   getArchiveByTranslation(sessionId: string, translationId: string): Promise<TranslationArchiveDetail | null>;
   listArchives(ownerHash: string, cursor?: ArchiveCursor, limit?: number): Promise<{ items: TranslationArchiveSummary[]; nextCursor: string | null }>;
   getArchive(ownerHash: string, archiveId: string): Promise<TranslationArchiveDetail | null>;
+  deleteArchive(ownerHash: string, archiveId: string): Promise<boolean>;
   setArchiveSelectedReply(ownerHash: string, archiveId: string, replyIndex: number): Promise<TranslationArchiveDetail | null>;
   upsertArchiveActualResponse(ownerHash: string, sessionId: string, archiveId: string, content: string, expiresAt: string): Promise<{ archive: TranslationArchiveDetail; activeChat: { threadId: string; archiveId: string; messages: ChatMessageRecord[] } | null; application: "NEXT_PERSONA_REBUILD" | "SESSION_CALIBRATION" | "ARCHIVE_ONLY" } | null>;
   deleteArchivesForBoss(bossId: string): Promise<void>;
@@ -89,6 +90,7 @@ export interface Store {
   addMonologue(sessionId: string, bossId: string, content: string): Promise<void>;
   trackAnalytics(subjectHash: string, input: AnalyticsEventInput): Promise<void>;
   getHrDashboard(): Promise<HrDashboard>;
+  getMockHrDashboard(): Promise<HrDashboard>;
   rollupAnalytics(): Promise<number>;
   cleanupExpired(): Promise<{ sessions: number; uploads: string[] }>;
   createAdminSession(tokenHash: string, ipHash: string, expiresAt: string): Promise<AdminSessionRecord>;
@@ -98,7 +100,7 @@ export interface Store {
   recordAdminLoginFailure(ipHash: string): Promise<AdminLoginAttempt>;
   clearAdminLoginFailures(ipHash: string): Promise<void>;
   getAdminDashboard(): Promise<AdminDashboard>;
-  listAdminSessions(cursor?: string, limit?: number): Promise<{ items: AdminSessionSummary[]; nextCursor: string | null }>;
+  listAdminSessions(page?: number, limit?: number): Promise<AdminSessionPage>;
   pruneMeaninglessSessions(): Promise<{ deleted: number; storagePaths: string[] }>;
   listAdminJobs(status?: string, cursor?: string, limit?: number): Promise<{ items: AdminJobSummary[]; nextCursor: string | null }>;
   getPersonalBossDefaults(): Promise<PersonalBossDefaults>;

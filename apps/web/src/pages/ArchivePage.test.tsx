@@ -41,15 +41,21 @@ function renderModal(onClose = vi.fn()) {
 }
 
 describe("ArchiveModal", () => {
+  let items: any[];
   beforeEach(() => {
+    items = [summary];
     mockedApi.mockReset();
     mockedApi.mockImplementation(async (path, options) => {
+      if (path === `/archives/${summary.id}` && options?.method === "DELETE") {
+        items = [];
+        return undefined as any;
+      }
       if (String(path).endsWith("/actual-response") && options?.method === "PUT") {
         const content = JSON.parse(String(options.body)).content;
         return { archive: { ...detail, actualResponse: { ...detail.actualResponse, content } }, activeChat: null, application: "SESSION_CALIBRATION" } as any;
       }
       if (path === `/archives/${summary.id}`) return { archive: detail } as any;
-      return { items: [summary], nextCursor: null } as any;
+      return { items, nextCursor: null } as any;
     });
   });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -85,5 +91,20 @@ describe("ArchiveModal", () => {
     renderModal(onClose);
     fireEvent.click(screen.getByRole("button", { name: "아카이브 닫기" }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires confirmation and removes the deleted item immediately", async () => {
+    renderModal();
+    await screen.findByText(summary.inputText);
+    fireEvent.click(screen.getByRole("button", { name: "번역 아카이브 삭제" }));
+    expect(screen.getByRole("dialog", { name: "번역 아카이브 삭제" })).toHaveTextContent("복구할 수 없습니다");
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(screen.getByText(summary.inputText)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "번역 아카이브 삭제" }));
+    fireEvent.click(screen.getByRole("button", { name: "영구 삭제" }));
+    await waitFor(() => expect(mockedApi).toHaveBeenCalledWith(`/archives/${summary.id}`, { method: "DELETE" }));
+    expect(await screen.findByText("아직 저장된 번역이 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText(summary.inputText)).not.toBeInTheDocument();
   });
 });

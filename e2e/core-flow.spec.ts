@@ -23,9 +23,10 @@ test.describe("메인 인터랙션", () => {
     const chatPanel = page.locator("#chat-panel");
     const dock = page.getByRole("complementary", { name: "대화와 번역" });
     await expect(dock).toBeVisible();
-    await expect(chatPanel).toBeVisible();
-    await expect(translatorPanel).toBeHidden();
-    await expect(page.getByRole("tab", { name: "대화" })).toHaveAttribute("aria-selected", "true");
+    await expect(translatorPanel).toBeVisible();
+    await expect(chatPanel).toBeHidden();
+    await expect(page.getByRole("tab", { name: "번역" })).toHaveAttribute("aria-selected", "true");
+    expect(await page.getByRole("tab").allTextContents()).toEqual(["번역", "대화"]);
 
     const avatarBox = await avatar.boundingBox();
     const dockBox = await dock.boundingBox();
@@ -33,6 +34,7 @@ test.describe("메인 인터랙션", () => {
     expect(dockBox).not.toBeNull();
     expect(avatarBox!.x + avatarBox!.width).toBeLessThan(dockBox!.x);
 
+    await page.getByRole("tab", { name: "대화" }).click();
     await page.getByLabel("대화 입력").fill("일정이 조금 늦어질 것 같습니다.");
     await page.getByRole("button", { name: "보내기" }).click();
     await expect(chatPanel.getByText(/현재 진행 상황부터/)).toBeVisible();
@@ -61,7 +63,8 @@ test.describe("메인 인터랙션", () => {
 
     await page.reload();
     await dismissTutorial(page);
-    await expect(page.getByRole("tab", { name: "대화" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "번역" })).toHaveAttribute("aria-selected", "true");
+    await page.getByRole("tab", { name: "대화" }).click();
     await expect(page.locator("#chat-panel").getByText("이거 언제 되나?", { exact: true })).toBeVisible();
     await expect(page.locator("#chat-panel").getByText("실제 답변", { exact: true })).toBeVisible();
     await expect(page.locator("#chat-panel").getByText("실제로는 내일 오전에 다시 보자고 했습니다.", { exact: true })).toBeVisible();
@@ -75,6 +78,10 @@ test.describe("메인 인터랙션", () => {
     await archived.click();
     await expect(page.getByText("마지막으로 복사한 답변")).toBeVisible();
     await expect(page.getByText("실제로는 내일 오전에 다시 보자고 했습니다.", { exact: true }).first()).toBeVisible();
+    await page.getByRole("button", { name: "번역 아카이브 삭제" }).click();
+    await expect(page.getByRole("dialog", { name: "번역 아카이브 삭제" })).toContainText("복구할 수 없습니다");
+    await page.getByRole("button", { name: "영구 삭제" }).click();
+    await expect(page.getByText("아직 저장된 번역이 없습니다.")).toBeVisible();
   });
 
   test("아바타를 누르면 서버 호출 없이 말풍선이 바뀐다", async ({ page }) => {
@@ -95,13 +102,14 @@ test("모바일에서는 하단 패널을 기본으로 펼치고 접을 수 있�
   await dismissTutorial(page);
   const avatar = page.getByAltText("모두의 상사 픽셀 아바타");
   await expect(avatar).toBeVisible();
-  await expect(page.locator("#chat-panel")).toBeVisible();
+  await expect(page.locator("#translator-panel")).toBeVisible();
+  await expect(page.locator("#chat-panel")).toBeHidden();
   const collapse = page.getByRole("button", { name: "패널 접기" });
   await expect(collapse).toHaveAttribute("aria-expanded", "true");
   await collapse.click();
   await expect(page.getByRole("button", { name: "패널 펼치기" })).toHaveAttribute("aria-expanded", "false");
-  await page.getByRole("tab", { name: "번역" }).click();
-  await expect(page.locator("#translator-panel")).toBeVisible();
+  await page.getByRole("tab", { name: "대화" }).click();
+  await expect(page.locator("#chat-panel")).toBeVisible();
   await expect(page.getByRole("button", { name: "패널 접기" })).toHaveAttribute("aria-expanded", "true");
   await expect(avatar).toBeVisible();
 });
@@ -138,6 +146,17 @@ test("낮은 모바일 화면에서도 상사 파악도가 하단 패널에 가�
     expect(collapsedIndicatorBox!.y + collapsedIndicatorBox!.height).toBeLessThanOrEqual(collapsedDockBox!.y + 1);
     await page.getByRole("button", { name: "패널 펼치기" }).click();
   }
+});
+
+test("HR Demo는 모바일에서도 실제 집계와 명시된 Mock 데이터를 전환한다", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/hr-demo");
+  await expect(page.getByRole("tab", { name: "실제 익명 집계" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "실제 익명 집계" })).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tab", { name: "Mock 데모" }).click();
+  await expect(page.getByText("모든 수치와 문구가 제품 시연용 가상 데이터이며 실제 사용자 정보가 아닙니다.")).toBeVisible();
+  await expect(page.getByText("4,872")).toBeVisible();
+  await expect(page.getByText("이거 언제까지 가능해?")).toBeVisible();
 });
 
 test("관리자 비밀번호 로그인 후 운영 현황을 확인할 수 있다", async ({ page }) => {

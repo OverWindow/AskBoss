@@ -35,7 +35,7 @@ describe("Sidebar boss deletion", () => {
     fireEvent.click(screen.getByRole("button", { name: "김부장 삭제" }));
     fireEvent.click(screen.getByRole("button", { name: "모두 삭제" }));
     await waitFor(() => expect(api).toHaveBeenCalledWith("/bosses/personal-boss", { method: "DELETE" }));
-    expect(useUiStore.getState()).toMatchObject({ selectedBossId: "00000000-0000-4000-8000-000000000001", activeWorkspaceTab: "chat", mobilePanelExpanded: true });
+    expect(useUiStore.getState()).toMatchObject({ selectedBossId: "00000000-0000-4000-8000-000000000001", activeWorkspaceTab: "translator", mobilePanelExpanded: true });
   });
 
   it("keeps the profile menu mounted during its closing animation", async () => {

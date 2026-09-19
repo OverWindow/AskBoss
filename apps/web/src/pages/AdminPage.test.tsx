@@ -22,7 +22,8 @@ describe("AdminPage", () => {
       if (path === "/admin/login") { authenticated = true; return { authenticated: true } as any; }
       if (path === "/admin/dashboard") return { generatedAt: new Date().toISOString(), sessions: { total: 2, active15m: 1, new24h: 2, expiring1h: 0 }, usage: { personalBosses: 1, chatMessages24h: 3, translations24h: 1 }, jobs: { pending: 0, running: 0, failed: 0, oldestPendingMinutes: null, failureReasons: [] }, uploads: { expiredIncomplete: 0 }, featureUsage: [], recentOperations: [] } as any;
       if (path === "/admin/credits") return { available: true, checkedAt: new Date().toISOString(), latencyMs: 20, models: { ok: true, available: ["gpt-5.6-luna"], missing: [], mode: "live" }, monthly: { quota: 100, used: 20, remaining: 80 }, purchased: { quota: 0, used: 0, remaining: 0 }, total: { quota: 100, used: 20, remaining: 80 } } as any;
-      if (path === "/admin/sessions" || path === "/admin/jobs") return { items: [] } as any;
+      if (path.startsWith("/admin/sessions?")) return { items: [], page: 1, pageSize: 20, total: 0, totalPages: 0 } as any;
+      if (path === "/admin/jobs") return { items: [] } as any;
       return {} as any;
     });
   });
@@ -35,6 +36,28 @@ describe("AdminPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "로그인" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "운영 관리자" })).toBeInTheDocument());
     expect(screen.getByText("AI 상태와 크레딧")).toBeInTheDocument();
+  });
+
+  it("shows recent sessions in fixed 20-item pages and moves without mixing rows", async () => {
+    mockedApi.mockImplementation(async (path: string) => {
+      if (path === "/admin/auth") return { authenticated: true, expiresAt: "2026-09-19T10:00:00Z" } as any;
+      if (path === "/admin/dashboard") return { generatedAt: new Date().toISOString(), sessions: { total: 21, active15m: 1, new24h: 2, expiring1h: 0 }, usage: { personalBosses: 0, chatMessages24h: 0, translations24h: 0 }, jobs: { pending: 0, running: 0, failed: 0, oldestPendingMinutes: null, failureReasons: [] }, uploads: { expiredIncomplete: 0 }, featureUsage: [], recentOperations: [] } as any;
+      if (path === "/admin/credits") return { available: false, checkedAt: new Date().toISOString(), latencyMs: 0, models: { ok: false, available: [], missing: [], mode: "demo" }, monthly: null, purchased: null, total: null } as any;
+      if (path === "/admin/sessions?page=1") return { items: [{ id: "page-one…0001", createdAt: "2026-09-19T09:00:00Z", lastSeenAt: "2026-09-19T09:00:00Z", expiresAt: "2026-10-19T09:00:00Z", bossCount: 1, chatMessageCount: 2, translationCount: 3 }], page: 1, pageSize: 20, total: 21, totalPages: 2 } as any;
+      if (path === "/admin/sessions?page=2") return { items: [{ id: "page-two…0021", createdAt: "2026-09-18T09:00:00Z", lastSeenAt: "2026-09-18T09:00:00Z", expiresAt: "2026-10-18T09:00:00Z", bossCount: 0, chatMessageCount: 0, translationCount: 0 }], page: 2, pageSize: 20, total: 21, totalPages: 2 } as any;
+      if (path === "/admin/jobs") return { items: [] } as any;
+      return {} as any;
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderAdmin(client);
+    expect(await screen.findByText("page-one…0001")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "최근 세션 페이지" })).toHaveTextContent("1 / 2");
+    expect(screen.getByRole("button", { name: "이전" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    expect(await screen.findByText("page-two…0021")).toBeInTheDocument();
+    expect(screen.queryByText("page-one…0001")).not.toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "최근 세션 페이지" })).toHaveTextContent("2 / 2");
+    expect(screen.getByRole("button", { name: "다음" })).toBeDisabled();
   });
 
   it("shows a recoverable connection error instead of an endless auth spinner", async () => {
@@ -78,7 +101,8 @@ describe("AdminPage", () => {
       if (path === "/admin/auth") return { authenticated: true, expiresAt: "2026-09-19T10:00:00Z" } as any;
       if (path === "/admin/dashboard") return { generatedAt: new Date().toISOString(), sessions: { total: 0, active15m: 0, new24h: 0, expiring1h: 0 }, usage: { personalBosses: 0, chatMessages24h: 0, translations24h: 0 }, jobs: { pending: 0, running: 0, failed: 0, oldestPendingMinutes: null, failureReasons: [] }, uploads: { expiredIncomplete: 0 }, featureUsage: [], recentOperations: [] } as any;
       if (path === "/admin/credits") return { available: false, checkedAt: new Date().toISOString(), latencyMs: 0, models: { ok: false, available: [], missing: [], mode: "demo" }, monthly: null, purchased: null, total: null } as any;
-      if (path === "/admin/sessions" || path === "/admin/jobs") return { items: [] } as any;
+      if (path.startsWith("/admin/sessions?")) return { items: [], page: 1, pageSize: 20, total: 0, totalPages: 0 } as any;
+      if (path === "/admin/jobs") return { items: [] } as any;
       if (path === "/admin/personal-boss-defaults") return { prompt: "", updatedAt: null } as any;
       if (path === "/admin/translation-examples") return { examples: ["예시 1", "예시 2", "예시 3"], updatedAt: null } as any;
       if (path === "/admin/ai-prompt-settings" && options.method === "PUT") { prompts = { ...JSON.parse(String(options.body)), updatedAt: "2026-09-19T12:30:00Z" }; return prompts as any; }
@@ -104,7 +128,8 @@ describe("AdminPage", () => {
       if (path === "/admin/auth") return { authenticated: true, expiresAt: "2026-09-19T10:00:00Z" } as any;
       if (path === "/admin/dashboard") return { generatedAt: new Date().toISOString(), sessions: { total: 0, active15m: 0, new24h: 0, expiring1h: 0 }, usage: { personalBosses: 0, chatMessages24h: 0, translations24h: 0 }, jobs: { pending: 0, running: 0, failed: 0, oldestPendingMinutes: null, failureReasons: [] }, uploads: { expiredIncomplete: 0 }, featureUsage: [], recentOperations: [] } as any;
       if (path === "/admin/credits") return { available: false, checkedAt: new Date().toISOString(), latencyMs: 0, models: { ok: false, available: [], missing: [], mode: "demo" }, monthly: null, purchased: null, total: null } as any;
-      if (path === "/admin/sessions" || path === "/admin/jobs") return { items: [] } as any;
+      if (path.startsWith("/admin/sessions?")) return { items: [], page: 1, pageSize: 20, total: 0, totalPages: 0 } as any;
+      if (path === "/admin/jobs") return { items: [] } as any;
       if (path === "/admin/personal-boss-defaults") return { prompt: "", updatedAt: null } as any;
       if (path === "/admin/translation-examples" && options.method === "PUT") { examples = JSON.parse(String(options.body)).examples; return { examples, updatedAt: "2026-09-19T12:00:00Z" } as any; }
       if (path === "/admin/translation-examples") return { examples, updatedAt: null } as any;

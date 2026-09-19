@@ -14,25 +14,27 @@ vi.mock("../features/translator/TranslatorPanel", () => ({ TranslatorPanel: ({ a
 
 describe("MainPage workspace", () => {
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-  beforeEach(() => useUiStore.setState({ selectedBossId: null, activeWorkspaceTab: "chat", mobilePanelExpanded: true }));
+  beforeEach(() => useUiStore.setState({ selectedBossId: null, activeWorkspaceTab: "translator", mobilePanelExpanded: true }));
 
-  it("대화 탭이 선택된 우측 통합 패널을 기본으로 표시한다", () => {
+  it("번역 탭이 왼쪽에서 선택된 우측 통합 패널을 기본으로 표시한다", () => {
     render(<MainPage/>);
     expect(screen.getByAltText("모두의 상사 픽셀 아바타")).toBeInTheDocument();
     expect(screen.getByText("수민씨, 밥은 먹었나?")).toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: "대화와 번역" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "대화" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "번역" })).toHaveAttribute("aria-selected", "false");
-    expect(screen.getByLabelText("모두의 상사와 대화")).not.toHaveAttribute("hidden");
-    expect(screen.getByLabelText("상사의 말 번역")).toHaveAttribute("hidden");
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs.map((tab) => tab.textContent)).toEqual(["번역", "대화"]);
+    expect(screen.getByRole("tab", { name: "대화" })).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByRole("tab", { name: "번역" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("모두의 상사와 대화")).toHaveAttribute("hidden");
+    expect(screen.getByLabelText("상사의 말 번역")).not.toHaveAttribute("hidden");
   });
 
   it("대화와 번역 탭을 전환하고 화살표 키를 지원한다", () => {
     render(<MainPage/>);
+    fireEvent.keyDown(screen.getByRole("tab", { name: "번역" }), { key: "ArrowRight" });
+    expect(screen.getByRole("tab", { name: "대화" })).toHaveAttribute("aria-selected", "true");
     fireEvent.click(screen.getByRole("tab", { name: "번역" }));
     expect(screen.getByLabelText("상사의 말 번역")).not.toHaveAttribute("hidden");
-    fireEvent.keyDown(screen.getByRole("tab", { name: "번역" }), { key: "ArrowLeft" });
-    expect(screen.getByRole("tab", { name: "대화" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("모바일 패널을 기본으로 펼친 후 접고 다시 펼 수 있다", () => {
@@ -55,6 +57,7 @@ describe("MainPage workspace", () => {
   it("기존 대화가 있으면 새 시뮬레이션 교체를 확인하고 취소 시 유지한다", () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
     render(<MainPage/>);
+    fireEvent.click(screen.getByRole("tab", { name: "대화" }));
     fireEvent.click(screen.getByRole("button", { name: "대화 있음" }));
     fireEvent.click(screen.getByRole("tab", { name: "번역" }));
     fireEvent.click(screen.getByRole("button", { name: "추천 답변 시뮬레이션" }));

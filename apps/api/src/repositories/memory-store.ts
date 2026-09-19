@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionSummary, type BossPersona, type ChatMessageKind, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationArchiveDetail, type TranslationExamplesSettings } from "../shared.js";
+import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionPage, type AdminSessionSummary, type BossPersona, type ChatMessageKind, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationArchiveDetail, type TranslationExamplesSettings } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationArchiveRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 import { computeTopRepeatedPhrases } from "../utils/hr-aggregation.js";
 import { buildActualResponseEvidence } from "../utils/actual-response.js";
 import { encodeArchiveCursor, type ArchiveCursor } from "../utils/archive-cursor.js";
+import { getMockHrDashboard } from "../services/hr-mock.js";
 
 const globalPersona: BossPersona = {
   summary: "한국 회사에서 흔히 볼 수 있는 중간관리자형의 가상 공통 페르소나입니다.",
@@ -162,6 +163,14 @@ export class MemoryStore implements Store {
   async getArchiveByTranslation(sessionId: string, translationId: string) { const row = [...this.archives.values()].find((item) => item.translationId === translationId && item.sourceSessionId === sessionId); return row ? publicArchive(row) : null; }
   async listArchives(ownerHash: string, cursor?: ArchiveCursor, limit = 20) { const cursorRow = cursor ? this.archives.get(cursor.id) : undefined; const rows = [...this.archives.values()].filter((item) => item.ownerHash === ownerHash && (!cursor || (cursorRow?.ownerHash === ownerHash && (item.createdAt < cursorRow.createdAt || (item.createdAt === cursorRow.createdAt && item.id < cursorRow.id))))).sort((a,b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id)); const page = rows.slice(0, limit); return { items: page.map(({ branches, ownerHash: _ownerHash, translationId: _translationId, sourceSessionId: _sourceSessionId, result: _result, ...item }) => ({ ...structuredClone(item), branchCount: branches.length })), nextCursor: rows.length > limit && page.length ? encodeArchiveCursor({ id: page.at(-1)!.id }) : null }; }
   async getArchive(ownerHash: string, archiveId: string) { const row = this.archives.get(archiveId); return row?.ownerHash === ownerHash ? publicArchive(row) : null; }
+  async deleteArchive(ownerHash: string, archiveId: string) {
+    const row = this.archives.get(archiveId);
+    if (!row || row.ownerHash !== ownerHash) return false;
+    for (const thread of this.threads.values()) if (thread.archiveId === archiveId) { thread.archiveId = null; thread.archiveBranchId = null; }
+    for (const evidence of this.evidence.values()) if (evidence.sourceArchiveId === archiveId) evidence.sourceArchiveId = null;
+    this.archives.delete(archiveId);
+    return true;
+  }
   async setArchiveSelectedReply(ownerHash: string, archiveId: string, replyIndex: number) { const row = this.archives.get(archiveId); if (!row || row.ownerHash !== ownerHash || !row.result.replies[replyIndex]) return null; row.lastCopiedReplyIndex = replyIndex; row.updatedAt = new Date().toISOString(); return publicArchive(row); }
   async upsertArchiveActualResponse(ownerHash: string, sessionId: string, archiveId: string, content: string, expiresAt: string) { const archive = this.archives.get(archiveId); if (!archive || archive.ownerHash !== ownerHash) return null; const now = new Date().toISOString(); const replyIndex = archive.actualResponse?.replyIndex ?? archive.lastCopiedReplyIndex; const replyText = archive.actualResponse?.replyText ?? (replyIndex === null ? null : archive.result.replies[replyIndex]?.text ?? null); archive.actualResponse = { content, replyIndex, replyText, updatedAt: now }; archive.updatedAt = now; const boss = await this.getBoss(sessionId, archive.boss.id); let application: "NEXT_PERSONA_REBUILD" | "SESSION_CALIBRATION" | "ARCHIVE_ONLY" = "ARCHIVE_ONLY"; if (boss) { application = boss.scope === "GLOBAL" ? "SESSION_CALIBRATION" : "NEXT_PERSONA_REBUILD"; const existing = [...this.evidence.values()].find((item) => item.sessionId === sessionId && item.sourceArchiveId === archiveId && item.type === "FEEDBACK"); const observedAt = existing?.observedAt ?? now; const built = buildActualResponseEvidence(archive.inputText, replyText, content, observedAt); if (existing) Object.assign(existing, built, { updatedAt: now, status: "READY" }); else await this.createEvidence({ bossId: boss.id, sessionId, type: "FEEDBACK", status: "READY", rawText: built.rawText, storagePath: null, parsedData: built.parsedData, observedAt, expiresAt, errorMessage: null, sourceArchiveId: archiveId }); }
     const active = [...this.threads.values()].find((thread) => thread.sessionId === sessionId && thread.archiveId === archiveId); let activeChat: { threadId: string; archiveId: string; messages: ChatMessageRecord[] } | null = null; if (active) { const oldBranch = archive.branches.find((item) => item.id === active.archiveBranchId); const activeReplyIndex = replyIndex ?? oldBranch?.replyIndex ?? 0; await this.resetChat(sessionId, active.bossId); const branch = { id: randomUUID(), kind: "ACTUAL" as const, status: "ACTIVE" as const, replyIndex: activeReplyIndex, messages: [] as ChatMessageRecord[], createdAt: now, updatedAt: now }; archive.branches.unshift(branch); const thread: ChatThreadRecord = { id: randomUUID(), sessionId, bossId: active.bossId, conversationSummary: null, messages: [], archiveId, archiveBranchId: branch.id, createdAt: now, expiresAt }; this.threads.set(thread.id, thread); await this.addChatMessage(thread.id, "assistant", archive.inputText, "SIMULATION_SOURCE"); await this.addChatMessage(thread.id, "user", archive.result.replies[activeReplyIndex]!.text, "SIMULATION_REPLY"); await this.addChatMessage(thread.id, "assistant", content, "ACTUAL_RESPONSE"); activeChat = { threadId: thread.id, archiveId, messages: structuredClone(thread.messages) }; }
@@ -173,8 +182,9 @@ export class MemoryStore implements Store {
   async addMonologue(sessionId: string, bossId: string, content: string) { const key = `${sessionId}:${bossId}`; const values = this.monologues.get(key) ?? []; values.push(content); this.monologues.set(key, values.slice(-10)); }
   async trackAnalytics(subjectHash: string, input: AnalyticsEventInput) { this.analytics.push({ ...input, subjectHash, occurredAt: new Date().toISOString() }); }
   async getHrDashboard(): Promise<HrDashboard> {
+    const actualAnalytics = this.analytics.filter((row) => !row.isDemo);
     const sameJobCounts = new Map<string, number>();
-    for (const row of this.analytics) {
+    for (const row of actualAnalytics) {
       const bucket = row.sameJobFunctionBucket;
       if (bucket === "SAME" || bucket === "DIFF") {
         sameJobCounts.set(bucket, (sameJobCounts.get(bucket) ?? 0) + 1);
@@ -185,24 +195,22 @@ export class MemoryStore implements Store {
       { bucket: "DIFF" as const, count: sameJobCounts.get("DIFF") ?? 0 },
     ] as { bucket: "SAME" | "DIFF"; count: number }[]).filter((item) => item.count > 0);
     const topRepeatedPhrases=computeTopRepeatedPhrases([...this.translations.values()].flatMap((row)=>Array.from({length:row.simulationCount},()=>({inputText:row.inputText}))));
-    if (this.analytics.length) {
-      const group = (key:"rankGapBucket"|"ageGapBucket") => [...this.analytics.reduce((map,row) => { const label=row[key]; if(label)map.set(label,(map.get(label)??0)+1); return map; },new Map<string,number>())].map(([label,value])=>({label,value}));
-      const topicCounts=this.analytics.reduce((map,row)=>{for(const topic of row.topicKeywords??[])map.set(topic,(map.get(topic)??0)+1);return map;},new Map<string,number>());
-      const featureCounts=this.analytics.reduce((map,row)=>map.set(row.feature,(map.get(row.feature)??0)+1),new Map<string,number>());
+    if (actualAnalytics.length) {
+      const group = (key:"rankGapBucket"|"ageGapBucket") => [...actualAnalytics.reduce((map,row) => { const label=row[key]; if(label)map.set(label,(map.get(label)??0)+1); return map; },new Map<string,number>())].map(([label,value])=>({label,value}));
+      const topicCounts=actualAnalytics.reduce((map,row)=>{for(const topic of row.topicKeywords??[])map.set(topic,(map.get(topic)??0)+1);return map;},new Map<string,number>());
+      const featureCounts=actualAnalytics.reduce((map,row)=>map.set(row.feature,(map.get(row.feature)??0)+1),new Map<string,number>());
       const topFeature=[...featureCounts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0]?.[0]??"-";
-      return {includesDemo:this.analytics.some(row=>Boolean(row.isDemo)),overview:{totalUses:this.analytics.length,activeSubjects:new Set(this.analytics.map(row=>row.subjectHash)).size,topFeature,summary:"최근 31일간의 익명 집계입니다."},topics:[...topicCounts].map(([text,value])=>({text,value})).sort((a,b)=>b.value-a.value).slice(0,30),rankGap:group("rankGapBucket"),ageGap:group("ageGapBucket"),sameJobFunctionDistribution,surfaceActualGapRate:null,topRepeatedPhrases};
+      return {dataSource:"ACTUAL",includesDemo:false,overview:{totalUses:actualAnalytics.length,activeSubjects:new Set(actualAnalytics.map(row=>row.subjectHash)).size,topFeature,summary:"최근 31일간의 실제 익명 집계이며 소표본도 그대로 포함됩니다."},topics:[...topicCounts].map(([text,value])=>({text,value})).sort((a,b)=>b.value-a.value).slice(0,30),rankGap:group("rankGapBucket"),ageGap:group("ageGapBucket"),sameJobFunctionDistribution,surfaceActualGapRate:null,topRepeatedPhrases};
     }
     return {
-      includesDemo: true,
-      overview: { totalUses: 500 + this.analytics.length, activeSubjects: 84, topFeature: "TRANSLATE", summary: "최근 사용자는 모호한 업무 지시와 보고 타이밍을 가장 자주 확인했습니다. 직급 차이가 큰 그룹에서는 답변 추천 사용이 상대적으로 높았습니다." },
-      topics: [{ text: "보고", value: 82 }, { text: "일정", value: 71 }, { text: "마감", value: 62 }, { text: "피드백", value: 55 }, { text: "회의", value: 44 }, { text: "메신저", value: 39 }, { text: "연차", value: 31 }, { text: "실수", value: 28 }],
-      rankGap: [{ label: "0", value: 48 }, { label: "1단계", value: 96 }, { label: "2단계", value: 154 }, { label: "3단계+", value: 202 }],
-      ageGap: [{ label: "0~5년", value: 73 }, { label: "6~10년", value: 118 }, { label: "11~20년", value: 191 }, { label: "20년+", value: 118 }],
-      sameJobFunctionDistribution,
-      surfaceActualGapRate: 0,
+      dataSource: "ACTUAL",
+      includesDemo: false,
+      overview: { totalUses: 0, activeSubjects: 0, topFeature: "-", summary: "아직 집계된 실제 사용자 데이터가 없습니다." },
+      topics: [], rankGap: [], ageGap: [], sameJobFunctionDistribution: [], surfaceActualGapRate: null,
       topRepeatedPhrases,
     };
   }
+  async getMockHrDashboard() { return getMockHrDashboard(); }
   async rollupAnalytics(){return 0;}
   async cleanupExpired() { const now = Date.now(); const expired = [...this.sessions.values()].filter((row) => Date.parse(row.expiresAt) <= now); const sessionUploads = [...this.uploads.values()].filter((row) => Date.parse(row.expiresAt) <= now && !row.completedAt); const globalUploads = [...this.globalUploads.values()].filter((row) => Date.parse(row.expiresAt) <= now && !row.completedAt); const uploads = [...sessionUploads, ...globalUploads].map((row) => row.storagePath); for (const session of expired) await this.deleteSession(session.id); for (const row of sessionUploads) this.uploads.delete(row.id); for (const row of globalUploads) this.globalUploads.delete(row.id); for (const [key,row] of this.adminSessions) if (Date.parse(row.expiresAt) <= now) this.adminSessions.delete(key); return { sessions: expired.length, uploads }; }
 
@@ -224,10 +232,11 @@ export class MemoryStore implements Store {
     const failureReasons = summarizeJobFailures([...this.jobs.values()].filter((job) => job.status === "FAILED").map((job) => job.errorMessage));
     return { generatedAt: new Date(now).toISOString(), sessions: { total: live.length, active15m: live.filter((row) => Date.parse(row.lastSeenAt) >= now - 15 * 60_000).length, new24h: live.filter((row) => Date.parse(row.createdAt) >= day).length, expiring1h: live.filter((row) => Date.parse(row.expiresAt) <= now + 60 * 60_000).length }, usage: { personalBosses: [...this.bosses.values()].filter((row) => row.scope === "SESSION").length, chatMessages24h: [...this.threads.values()].flatMap((row) => row.messages).filter((row) => Date.parse(row.createdAt) >= day).length, translations24h: [...this.translations.values()].filter((row) => Date.parse(row.createdAt) >= day).length }, jobs: { ...counts, oldestPendingMinutes: pending ? Math.floor((now - Date.parse(pending.createdAt)) / 60_000) : null, failureReasons }, uploads: { expiredIncomplete: [...this.uploads.values(), ...this.globalUploads.values()].filter((row) => !row.completedAt && Date.parse(row.expiresAt) <= now).length }, featureUsage, recentOperations: this.adminOperations.slice(-10).reverse() };
   }
-  async listAdminSessions(cursor?: string, limit = 20) {
-    const rows = [...this.sessions.values()].filter((row) => Date.parse(row.expiresAt) > Date.now() && (!cursor || row.createdAt < cursor)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)); const page = rows.slice(0,limit);
-    const items: AdminSessionSummary[] = page.map((row) => ({ id: row.id, createdAt: row.createdAt, lastSeenAt: row.lastSeenAt, expiresAt: row.expiresAt, bossCount: [...this.bosses.values()].filter((boss) => boss.sessionId === row.id).length, chatMessageCount: [...this.threads.values()].filter((thread) => thread.sessionId === row.id).reduce((sum,thread) => sum + thread.messages.length,0), translationCount: [...this.translations.values()].filter((translation) => translation.sessionId === row.id).length }));
-    return { items, nextCursor: rows.length > limit ? page.at(-1)?.createdAt ?? null : null };
+  async listAdminSessions(page = 1, limit = 20): Promise<AdminSessionPage> {
+    const rows = [...this.sessions.values()].filter((row) => Date.parse(row.expiresAt) > Date.now()).sort((a,b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+    const pageRows = rows.slice((page - 1) * limit, page * limit);
+    const items: AdminSessionSummary[] = pageRows.map((row) => ({ id: row.id, createdAt: row.createdAt, lastSeenAt: row.lastSeenAt, expiresAt: row.expiresAt, bossCount: [...this.bosses.values()].filter((boss) => boss.sessionId === row.id).length, chatMessageCount: [...this.threads.values()].filter((thread) => thread.sessionId === row.id).reduce((sum,thread) => sum + thread.messages.length,0), translationCount: [...this.translations.values()].filter((translation) => translation.sessionId === row.id).length }));
+    return { items, page, pageSize: limit, total: rows.length, totalPages: Math.max(1, Math.ceil(rows.length / limit)) };
   }
   async pruneMeaninglessSessions() {
     const meaningless = [...this.sessions.values()].filter((row) => {

@@ -96,9 +96,9 @@ export function MainPage() {
       <aside className="workspace-dock" aria-label="대화와 번역">
         <header className="workspace-tabs-header">
           <div className="workspace-tabs" role="tablist" aria-label="작업 선택">
-            <button id="workspace-tab-chat" data-tutorial="chat" type="button" role="tab" aria-selected={ui.activeWorkspaceTab === "chat"} aria-controls="chat-panel" tabIndex={ui.activeWorkspaceTab === "chat" ? 0 : -1} onKeyDown={(event) => onTabKeyDown(event, "chat")} onClick={() => selectTab("chat")}>대화</button>
             <button id="workspace-tab-translator" data-tutorial="translate" type="button" role="tab" aria-selected={ui.activeWorkspaceTab === "translator"} aria-controls="translator-panel" tabIndex={ui.activeWorkspaceTab === "translator" ? 0 : -1} onKeyDown={(event) => onTabKeyDown(event, "translator")} onClick={() => selectTab("translator")}>번역</button>
-            <span className={`workspace-tab-indicator ${ui.activeWorkspaceTab === "translator" ? "is-translator" : ""}`} aria-hidden="true"/>
+            <button id="workspace-tab-chat" data-tutorial="chat" type="button" role="tab" aria-selected={ui.activeWorkspaceTab === "chat"} aria-controls="chat-panel" tabIndex={ui.activeWorkspaceTab === "chat" ? 0 : -1} onKeyDown={(event) => onTabKeyDown(event, "chat")} onClick={() => selectTab("chat")}>대화</button>
+            <span className={`workspace-tab-indicator ${ui.activeWorkspaceTab === "chat" ? "is-chat" : ""}`} aria-hidden="true"/>
           </div>
           <button className="mobile-panel-toggle" type="button" aria-expanded={ui.mobilePanelExpanded} aria-controls="workspace-dock-body" onClick={() => ui.set({ mobilePanelExpanded: !ui.mobilePanelExpanded })}>
             {ui.mobilePanelExpanded ? <ChevronDown size={18}/> : <ChevronUp size={18}/>}
@@ -106,8 +106,8 @@ export function MainPage() {
           </button>
         </header>
         <div id="workspace-dock-body" className="workspace-dock-body">
-          <ChatPanel boss={boss} active={ui.activeWorkspaceTab === "chat"} simulationRequest={simulationRequest} externalChatUpdate={externalChatUpdate} onActivity={({ thinking: nextThinking, speech: nextSpeech }) => { setThinking(nextThinking); if (nextSpeech) setSpeech(nextSpeech); }} onConversationStateChange={updateChatState} onReset={resetBossSpeech}/>
           <TranslatorPanel boss={boss} active={ui.activeWorkspaceTab === "translator"} examples={translationExamples.data?.examples ?? DEFAULT_TRANSLATION_EXAMPLES} simulationDisabled={chatState.busy} onSourceMessage={(message) => { setThinking(false); setSpeech(message); }} onActualResponseApplied={(chat) => { if (chat) setExternalChatUpdate(chat); }} onSimulate={(request) => { if (chatState.busy) return false; if ((chatState.hasContent || chatState.hasUnsavedActualResponse) && !window.confirm("현재 대화를 삭제하고 새 시뮬레이션을 시작할까요? 기존 대화는 아카이브에 유지됩니다.")) return false; setSimulationRequest(request); setSpeech(request.inputText); setThinking(true); selectTab("chat"); return true; }}/>
+          <ChatPanel boss={boss} active={ui.activeWorkspaceTab === "chat"} simulationRequest={simulationRequest} externalChatUpdate={externalChatUpdate} onActivity={({ thinking: nextThinking, speech: nextSpeech }) => { setThinking(nextThinking); if (nextSpeech) setSpeech(nextSpeech); }} onConversationStateChange={updateChatState} onReset={resetBossSpeech}/>
         </div>
       </aside>
     </div>

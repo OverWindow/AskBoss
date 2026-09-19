@@ -55,7 +55,7 @@ describe("Tutorial", () => {
     expect(await screen.findByRole("dialog", { name: "서비스 사용 안내" })).toHaveTextContent("모두의 상사");
     expect(useUiStore.getState()).toMatchObject({
       sidebarCollapsed: false,
-      activeWorkspaceTab: "chat",
+      activeWorkspaceTab: "translator",
       mobilePanelExpanded: true,
     });
 

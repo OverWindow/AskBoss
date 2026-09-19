@@ -245,6 +245,7 @@ export interface AdminDashboard {
 }
 
 export interface HrDashboard {
+  dataSource: "ACTUAL" | "MOCK";
   includesDemo: boolean;
   overview: { totalUses: number; activeSubjects: number; topFeature: string; summary: string };
   topics: { text: string; value: number }[];
@@ -263,6 +264,14 @@ export interface AdminSessionSummary {
   bossCount: number;
   chatMessageCount: number;
   translationCount: number;
+}
+
+export interface AdminSessionPage {
+  items: AdminSessionSummary[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
 }
 
 export interface AdminJobSummary {

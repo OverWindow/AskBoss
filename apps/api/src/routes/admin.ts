@@ -17,6 +17,7 @@ const cursor = (value: unknown) => typeof value === "string" && !Number.isNaN(Da
 const GLOBAL_BOSS_ID = "00000000-0000-4000-8000-000000000001";
 const idParamSchema = z.object({ id: z.string().uuid() });
 const companyResearchInputSchema = z.object({ companyName: z.string().trim().min(1).max(120) });
+const adminSessionPageSchema = z.coerce.number().int().min(1).max(100_000).default(1);
 const requireAdminMutation = async (request: Parameters<typeof assertAdminOrigin>[0]) => { assertAdminOrigin(request); await requireAdmin(request); };
 
 export const adminRoutes: FastifyPluginAsync = async (app) => {
@@ -146,7 +147,8 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   app.get("/admin/sessions", async (request) => {
     await requireAdmin(request);
     const query = request.query as Record<string, unknown>;
-    const result = await store.listAdminSessions(cursor(query.cursor), 20);
+    const page = parse(adminSessionPageSchema, query.page);
+    const result = await store.listAdminSessions(page, 20);
     return { ...result, items: result.items.map((item) => ({ ...item, id: maskId(item.id) })) };
   });
   app.get("/admin/jobs", async (request) => {

@@ -238,4 +238,20 @@ describe("admin API", () => {
       expect((await store.getAiPromptSettings()).translation).toBe(before.translation);
     }
   });
+
+  it("paginates recent sessions in fixed groups of twenty", async () => {
+    for (let index = 0; index < 21; index += 1) await app.inject({ method: "POST", url: "/api/session" });
+    const login = await app.inject({ method: "POST", url: "/api/admin/login", headers: { origin, "x-forwarded-for": "10.0.0.44" }, payload: { password: env.ADMIN_PASSWORD } });
+    const cookie = String(login.headers["set-cookie"]).split(";")[0]!;
+    const first = await app.inject({ method: "GET", url: "/api/admin/sessions?page=1", headers: { cookie } });
+    const second = await app.inject({ method: "GET", url: "/api/admin/sessions?page=2", headers: { cookie } });
+    expect(first.statusCode).toBe(200);
+    expect(first.json()).toMatchObject({ page: 1, pageSize: 20, total: expect.any(Number), totalPages: expect.any(Number) });
+    expect(first.json().items).toHaveLength(20);
+    expect(second.json().page).toBe(2);
+    expect(first.json().totalPages).toBe(Math.ceil(first.json().total / 20));
+    const firstIds = new Set(first.json().items.map((item: any) => item.id));
+    expect(second.json().items.every((item: any) => !firstIds.has(item.id))).toBe(true);
+    expect(first.json().items.every((item: any) => /^.{8}….{4}$/.test(item.id))).toBe(true);
+  });
 });

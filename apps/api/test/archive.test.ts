@@ -125,4 +125,31 @@ describe("translation archives", () => {
     const saved = await app.inject({ method: "PUT", url: `/api/archives/${translated.json().archiveId}/actual-response`, headers: { cookie: cookies(currentSession.cookie, ownerCookie) }, payload: { content: "내일 다시 알려줘." } });
     expect(saved.json().archive.actualResponse).toMatchObject({ content: "내일 다시 알려줘.", replyIndex: null, replyText: null });
   });
+
+  it("deletes only an owner-scoped archive while preserving the active chat and learned evidence", async () => {
+    const currentSession = await session();
+    const translated = await app.inject({ method: "POST", url: `/api/bosses/${globalBossId}/translate`, headers: { cookie: currentSession.cookie }, payload: { inputText: "중간 보고 가능해?", channel: "사내 메신저" } });
+    const archiveId = translated.json().archiveId as string;
+    const ownerCookie = responseCookie(translated as any, "boss_archive");
+    const ownerCookies = cookies(currentSession.cookie, ownerCookie);
+    await app.inject({ method: "PUT", url: `/api/archives/${archiveId}/selected-reply`, headers: { cookie: ownerCookies }, payload: { replyIndex: 0 } });
+    await app.inject({ method: "POST", url: `/api/bosses/${globalBossId}/chat/simulate`, headers: { cookie: currentSession.cookie }, payload: { translationId: translated.json().translationId, replyIndex: 0 } });
+    await app.inject({ method: "PUT", url: `/api/archives/${archiveId}/actual-response`, headers: { cookie: ownerCookies }, payload: { content: "세 시에 초안부터 보여 줘." } });
+
+    const otherSession = await session();
+    const rejected = await app.inject({ method: "DELETE", url: `/api/archives/${archiveId}`, headers: { cookie: otherSession.cookie } });
+    expect(rejected.statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: `/api/archives/${archiveId}`, headers: { cookie: ownerCookies } })).statusCode).toBe(200);
+
+    const deleted = await app.inject({ method: "DELETE", url: `/api/archives/${archiveId}`, headers: { cookie: ownerCookies } });
+    expect(deleted.statusCode).toBe(204);
+    expect((await app.inject({ method: "GET", url: `/api/archives/${archiveId}`, headers: { cookie: ownerCookies } })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: "/api/archives", headers: { cookie: ownerCookies } })).json().items.some((item: any) => item.id === archiveId)).toBe(false);
+
+    const chat = await app.inject({ method: "GET", url: `/api/bosses/${globalBossId}/chat`, headers: { cookie: currentSession.cookie } });
+    expect(chat.json()).toMatchObject({ archiveId: null, messages: expect.arrayContaining([expect.objectContaining({ content: "세 시에 초안부터 보여 줘." })]) });
+    const learned = [...((store as any).evidence?.values() ?? [])].find((item: any) => item.rawText?.includes("세 시에 초안부터 보여 줘."));
+    if (learned) expect(learned.sourceArchiveId).toBeNull();
+    expect((await app.inject({ method: "DELETE", url: `/api/archives/${archiveId}`, headers: { cookie: ownerCookies } })).statusCode).toBe(404);
+  });
 });

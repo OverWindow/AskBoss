@@ -34,13 +34,13 @@ const steps: TutorialStep[] = [
     preferredSide: "right",
   },
   {
-    target: "chat",
-    message: "우측 대화 탭에서 나랑 업무 상황을 미리 연습해 볼 수 있고.",
+    target: "translate",
+    message: "상사가 무슨 뜻으로 말한 건지 모르겠다면 먼저 번역 탭을 써봐.",
     preferredSide: "left",
   },
   {
-    target: "translate",
-    message: "상사가 무슨 뜻으로 말한 건지 모르겠다면 옆의 번역 탭을 써봐.",
+    target: "chat",
+    message: "옆의 대화 탭에서는 나랑 업무 상황을 미리 연습해 볼 수 있고.",
     preferredSide: "right",
   },
   {
@@ -139,7 +139,7 @@ export function Tutorial() {
       previousLayout.current = { sidebarCollapsed, mobileNavOpen, activeWorkspaceTab: state.activeWorkspaceTab, mobilePanelExpanded: state.mobilePanelExpanded };
       setStep(0);
       setUi({
-        activeWorkspaceTab: "chat",
+        activeWorkspaceTab: "translator",
         mobilePanelExpanded: true,
         sidebarCollapsed: false,
       });

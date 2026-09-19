@@ -40,7 +40,7 @@ export function Sidebar() {
       await queryClient.invalidateQueries({ queryKey: ["bosses"] });
       if (ui.selectedBossId === deleteTarget.id) {
         const globalBoss = bosses.find((boss) => boss.scope === "GLOBAL");
-        ui.set({ selectedBossId: globalBoss?.id ?? null, activeWorkspaceTab: "chat", mobilePanelExpanded: true });
+        ui.set({ selectedBossId: globalBoss?.id ?? null, activeWorkspaceTab: "translator", mobilePanelExpanded: true });
         navigate("/");
       }
       setDeleteTarget(null);

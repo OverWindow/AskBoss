@@ -1,13 +1,13 @@
 import postgres, { type Sql } from "postgres";
-import type { AdminAiPromptSettings, AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, Boss, ChatMessageKind, CompanyResearch, HrDashboard, TranslationArchiveBranch, TranslationArchiveDetail, TranslationArchiveSummary, TranslationExamples, UserProfile } from "../shared.js";
+import type { AdminAiPromptSettings, AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionPage, AdminSessionSummary, Boss, ChatMessageKind, CompanyResearch, HrDashboard, TranslationArchiveBranch, TranslationArchiveDetail, TranslationArchiveSummary, TranslationExamples, UserProfile } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord } from "../types.js";
 import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
-import { MemoryStore } from "./memory-store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 import { toIsoTimestamp } from "../utils/database.js";
 import { computeSurfaceActualGap } from "../utils/hr-aggregation.js";
 import { buildActualResponseEvidence } from "../utils/actual-response.js";
 import { encodeArchiveCursor, type ArchiveCursor } from "../utils/archive-cursor.js";
+import { getMockHrDashboard } from "../services/hr-mock.js";
 
 const camelSession = (r: any): SessionRecord => ({ id: r.id, tokenHash: r.token_hash, createdAt: r.created_at.toISOString(), lastSeenAt: r.last_seen_at.toISOString(), expiresAt: r.expires_at.toISOString() });
 const camelBoss = (r: any): BossRecord => ({
@@ -42,7 +42,6 @@ const camelArchiveSummary = (r: any): TranslationArchiveSummary => ({
 
 export class PostgresStore implements Store {
   private sql: Sql;
-  private demo = new MemoryStore();
   constructor(url: string) {
     this.sql = postgres(url, {
       max: 5,
@@ -196,6 +195,7 @@ export class PostgresStore implements Store {
   async getArchiveByTranslation(sessionId: string, translationId: string) { const [row] = await this.sql`select * from translation_archives where translation_request_id=${translationId} and source_session_id=${sessionId}`; return row ? this.loadArchive(this.sql, row) : null; }
   async listArchives(ownerHash: string, cursor?: ArchiveCursor, limit=20) { const rows = await this.sql`select a.*,(select count(*)::int from translation_archive_branches b where b.archive_id=a.id) branch_count from translation_archives a where a.owner_hash=${ownerHash} and (${cursor?.id ?? null}::uuid is null or exists(select 1 from translation_archives c where c.id=${cursor?.id ?? null}::uuid and c.owner_hash=${ownerHash} and (a.created_at<c.created_at or (a.created_at=c.created_at and a.id<c.id)))) order by a.created_at desc,a.id desc limit ${limit+1}`; const page=rows.slice(0,limit); return {items:page.map(camelArchiveSummary),nextCursor:rows.length>limit&&page.length?encodeArchiveCursor({id:page.at(-1)!.id}):null}; }
   async getArchive(ownerHash: string, archiveId: string) { const [row] = await this.sql`select * from translation_archives where id=${archiveId} and owner_hash=${ownerHash}`; return row ? this.loadArchive(this.sql, row) : null; }
+  async deleteArchive(ownerHash: string, archiveId: string) { const rows=await this.sql`delete from translation_archives where id=${archiveId} and owner_hash=${ownerHash} returning id`;return rows.length>0; }
   async setArchiveSelectedReply(ownerHash: string, archiveId: string, replyIndex: number) { const [row] = await this.sql`update translation_archives set last_copied_reply_index=${replyIndex},updated_at=now() where id=${archiveId} and owner_hash=${ownerHash} returning *`; return row ? this.loadArchive(this.sql, row) : null; }
   async upsertArchiveActualResponse(ownerHash: string, sessionId: string, archiveId: string, content: string, expiresAt: string) { return this.sql.begin(async (sql) => {
     const [archive] = await sql`select * from translation_archives where id=${archiveId} and owner_hash=${ownerHash} for update`; if (!archive) return null;
@@ -216,13 +216,12 @@ export class PostgresStore implements Store {
   async addMonologue(sessionId:string,bossId:string,content:string) { await this.sql`insert into monologue_history(session_id,boss_id,content) values(${sessionId},${bossId},${content})`; }
   async trackAnalytics(subjectHash:string,i:AnalyticsEventInput) { await this.sql`insert into analytics_events(anonymous_subject_hash,event_type,feature,user_age_band,boss_age_band,rank_gap_bucket,age_gap_bucket,same_job_function_bucket,topic_keywords,persona_confidence_bucket,is_demo,expires_at) values(${subjectHash},${i.eventType},${i.feature},${i.userAgeBand??null},${i.bossAgeBand??null},${i.rankGapBucket??null},${i.ageGapBucket??null},${i.sameJobFunctionBucket??null},${i.topicKeywords??[]},${i.personaConfidenceBucket??null},${i.isDemo??false},now()+interval '31 days')`; }
   async getHrDashboard(): Promise<HrDashboard> {
-    const [total] = await this.sql`select count(*)::int value,count(distinct anonymous_subject_hash)::int subjects,coalesce(bool_or(is_demo),false) includes_demo from analytics_events where expires_at>now()`;
-    if (!total?.value) return this.demo.getHrDashboard();
-    const rank=await this.sql<{label:string;value:number}[]>`select rank_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and rank_gap_bucket is not null group by rank_gap_bucket order by label`;
-    const age=await this.sql<{label:string;value:number}[]>`select age_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and age_gap_bucket is not null group by age_gap_bucket order by label`;
-    const sameJob=await this.sql<{bucket:string;count:number}[]>`select same_job_function_bucket bucket,count(*)::int count from analytics_events where expires_at>now() and same_job_function_bucket is not null group by same_job_function_bucket order by bucket`;
-    const topics=await this.sql<{text:string;value:number}[]>`select keyword text,count(*)::int value from analytics_events cross join unnest(topic_keywords) keyword where expires_at>now() group by keyword order by value desc limit 30`;
-    const [feature]=await this.sql`select feature,count(*)::int value from analytics_events where expires_at>now() group by feature order by value desc,feature limit 1`;
+    const [total] = await this.sql`select count(*)::int value,count(distinct anonymous_subject_hash)::int subjects from analytics_events where expires_at>now() and not is_demo`;
+    const rank=await this.sql<{label:string;value:number}[]>`select rank_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and not is_demo and rank_gap_bucket is not null group by rank_gap_bucket order by label`;
+    const age=await this.sql<{label:string;value:number}[]>`select age_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and not is_demo and age_gap_bucket is not null group by age_gap_bucket order by label`;
+    const sameJob=await this.sql<{bucket:string;count:number}[]>`select same_job_function_bucket bucket,count(*)::int count from analytics_events where expires_at>now() and not is_demo and same_job_function_bucket is not null group by same_job_function_bucket order by bucket`;
+    const topics=await this.sql<{text:string;value:number}[]>`select keyword text,count(*)::int value from analytics_events cross join unnest(topic_keywords) keyword where expires_at>now() and not is_demo group by keyword order by value desc limit 30`;
+    const [feature]=await this.sql`select feature,count(*)::int value from analytics_events where expires_at>now() and not is_demo group by feature order by value desc,feature limit 1`;
     const translationRows = await this.sql<{ session_id:string; input_text: string; boss_id: string; alias: string | null; plain_meaning: string; caution: string | null; gap_score:number|null }[]>`
       select t.session_id, t.input_text, t.boss_id, b.alias, t.result->>'plainMeaning' as plain_meaning, t.result->>'caution' as caution, (t.result->>'surfaceActualGapScore')::numeric as gap_score
       from translation_requests t
@@ -246,16 +245,18 @@ export class PostgresStore implements Store {
     })));
     const sameJobFunctionDistribution = sameJob.map((r: any) => ({ bucket: r.bucket as "SAME" | "DIFF", count: r.count }));
     return {
-      includesDemo: Boolean(total.includes_demo),
-      overview: { totalUses: total.value, activeSubjects: total.subjects, topFeature: feature?.feature??"-", summary: "최근 31일간의 익명 집계이며 소표본 구간도 포함됩니다." },
+      dataSource: "ACTUAL",
+      includesDemo: false,
+      overview: { totalUses: total?.value??0, activeSubjects: total?.subjects??0, topFeature: feature?.feature??"-", summary: total?.value ? "최근 31일간의 실제 익명 집계이며 소표본도 그대로 포함됩니다." : "아직 집계된 실제 사용자 데이터가 없습니다." },
       topics: topics.map((r: any) => ({ text: r.text, value: r.value })),
       rankGap: rank.map((r: any) => ({ label: r.label, value: r.value })),
       ageGap: age.map((r: any) => ({ label: r.label, value: r.value })),
       sameJobFunctionDistribution,
-      surfaceActualGapRate: gap.rate,
+      surfaceActualGapRate: translationRows.length ? gap.rate : null,
       topRepeatedPhrases: repeatedRows.map((r: any) => ({ phrase: r.phrase, count: Number(r.count) })),
     };
   }
+  async getMockHrDashboard() { return getMockHrDashboard(); }
   async rollupAnalytics(){
     const dimensions=[
       this.sql`select occurred_at::date aggregate_date,'rank_gap' dimension,coalesce(rank_gap_bucket,'UNKNOWN') dimension_value,feature,count(*)::int event_count,count(distinct anonymous_subject_hash)::int distinct_subject_count,is_demo from analytics_events where occurred_at<date_trunc('day',now()) group by 1,3,4,7`,
@@ -295,10 +296,10 @@ export class PostgresStore implements Store {
     const failureRows = await this.sql`select error_message from ai_jobs where status='FAILED'`;
     return { generatedAt:new Date().toISOString(),sessions:{total:sessions!.total,active15m:sessions!.active_15m,new24h:sessions!.new_24h,expiring1h:sessions!.expiring_1h},usage:{personalBosses:usage!.personal_bosses,chatMessages24h:usage!.chat_messages_24h,translations24h:usage!.translations_24h},jobs:{pending:jobs!.pending,running:jobs!.running,failed:jobs!.failed,oldestPendingMinutes:jobs!.oldest_pending_minutes === null ? null : Math.floor(Number(jobs!.oldest_pending_minutes)),failureReasons:summarizeJobFailures(failureRows.map((row:any)=>row.error_message))},uploads:{expiredIncomplete:uploads!.expired_incomplete},featureUsage:featureRows.map((row:any)=>({feature:row.feature,value:row.value})),recentOperations:operationRows.map((row:any)=>({id:row.id,type:row.type,status:row.status,detail:row.detail,createdAt:toIsoTimestamp(row.created_at ?? row.createdAt,"admin_operations.created_at")}))};
   }
-  async listAdminSessions(cursor?: string, limit = 20) {
-    const rows = await this.sql`select s.id,s.created_at as "createdAt",s.last_seen_at as "lastSeenAt",s.expires_at as "expiresAt",(select count(*)::int from bosses b where b.session_id=s.id) as "bossCount",(select count(*)::int from chat_messages m join chat_threads t on t.id=m.thread_id where t.session_id=s.id) as "chatMessageCount",(select count(*)::int from translation_requests tr where tr.session_id=s.id) as "translationCount" from sessions s where s.expires_at>now() and (${cursor ?? null}::timestamptz is null or s.created_at<${cursor ?? null}::timestamptz) order by s.created_at desc limit ${limit + 1}`;
-    const hasMore = rows.length > limit;
-    const items: AdminSessionSummary[] = rows.slice(0,limit).map((row:any)=>({
+  async listAdminSessions(page = 1, limit = 20): Promise<AdminSessionPage> {
+    const [count] = await this.sql`select count(*)::int total from sessions where expires_at>now()`;
+    const rows = await this.sql`select s.id,s.created_at as "createdAt",s.last_seen_at as "lastSeenAt",s.expires_at as "expiresAt",(select count(*)::int from bosses b where b.session_id=s.id) as "bossCount",(select count(*)::int from chat_messages m join chat_threads t on t.id=m.thread_id where t.session_id=s.id) as "chatMessageCount",(select count(*)::int from translation_requests tr where tr.session_id=s.id) as "translationCount" from sessions s where s.expires_at>now() order by s.created_at desc,s.id desc limit ${limit} offset ${(page-1)*limit}`;
+    const items: AdminSessionSummary[] = rows.map((row:any)=>({
       id: row.id,
       createdAt: toIsoTimestamp(row.createdAt ?? row.created_at, "sessions.created_at"),
       lastSeenAt: toIsoTimestamp(row.lastSeenAt ?? row.last_seen_at, "sessions.last_seen_at"),
@@ -307,7 +308,7 @@ export class PostgresStore implements Store {
       chatMessageCount: Number(row.chatMessageCount ?? row.chat_message_count ?? 0),
       translationCount: Number(row.translationCount ?? row.translation_count ?? 0),
     }));
-    return {items,nextCursor:hasMore ? items.at(-1)?.createdAt ?? null:null};
+    const total=Number(count?.total??0);return {items,page,pageSize:limit,total,totalPages:Math.max(1,Math.ceil(total/limit))};
   }
   async pruneMeaninglessSessions() {
     const rows = await this.sql`select s.id from sessions s where s.expires_at>now() and s.last_seen_at<now()-interval '24 hours' and not exists (select 1 from user_profiles p where p.session_id=s.id) and not exists (select 1 from bosses b where b.session_id=s.id) and not exists (select 1 from chat_threads t join chat_messages m on m.thread_id=t.id where t.session_id=s.id) and not exists (select 1 from translation_requests tr where tr.session_id=s.id)`;

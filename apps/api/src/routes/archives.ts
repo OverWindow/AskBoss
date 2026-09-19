@@ -32,6 +32,14 @@ export const archiveRoutes: FastifyPluginAsync = async (app) => {
     return { archive };
   });
 
+  app.delete("/archives/:archiveId", async (request, reply) => {
+    await requireSession(request);
+    const ownerHash = requireArchiveOwner(request, reply);
+    const { archiveId } = parse(archiveIdParamsSchema, request.params);
+    if (!(await store.deleteArchive(ownerHash, archiveId))) throw new HttpError(404, "아카이브를 찾을 수 없습니다.", "ARCHIVE_NOT_FOUND");
+    return reply.code(204).send();
+  });
+
   app.put("/archives/:archiveId/selected-reply", async (request, reply) => {
     await requireSession(request);
     const ownerHash = requireArchiveOwner(request, reply);

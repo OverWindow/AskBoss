@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Activity, AlertTriangle, Bot, Clock3, Database, LogOut, Play, RefreshCw, Settings2, ShieldCheck, UsersRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
-import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminAiPromptSettingsInput, type AdminCredits, type AdminDashboard, type AdminJobSummary, type AdminSessionSummary, type PersonalBossDefaults, type TranslationExamples, type TranslationExamplesSettings } from "@askboss/shared";
+import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminAiPromptSettingsInput, type AdminCredits, type AdminDashboard, type AdminJobSummary, type AdminSessionPage, type PersonalBossDefaults, type TranslationExamples, type TranslationExamplesSettings } from "@askboss/shared";
 import { api } from "../services/api-client";
 import { GlobalBossAdmin } from "../features/admin/GlobalBossAdmin";
 
@@ -164,12 +164,17 @@ function AiPromptSettingsCard() {
 
 function AdminDashboardView({ onLogout }: { onLogout: () => Promise<void> }) {
   const cache = useQueryClient();
+  const [sessionPage, setSessionPage] = useState(1);
   const dashboard = useQuery({ queryKey: ["admin", "dashboard"], queryFn: () => adminApi<AdminDashboard>("/admin/dashboard"), refetchInterval: 30_000, retry: 1 });
   const credits = useQuery({ queryKey: ["admin", "credits"], queryFn: () => adminApi<AdminCredits>("/admin/credits"), refetchInterval: 60_000, retry: 1 });
-  const sessions = useQuery({ queryKey: ["admin", "sessions"], queryFn: () => adminApi<{ items: AdminSessionSummary[] }>("/admin/sessions"), retry: 1 });
+  const sessions = useQuery({ queryKey: ["admin", "sessions", sessionPage], queryFn: () => adminApi<AdminSessionPage>(`/admin/sessions?page=${sessionPage}`), retry: 1 });
   const jobs = useQuery({ queryKey: ["admin", "jobs"], queryFn: () => adminApi<{ items: AdminJobSummary[] }>("/admin/jobs"), retry: 1 });
   const [running, setRunning] = useState<string>();
   const [message, setMessage] = useState<string>();
+
+  useEffect(() => {
+    if (sessions.data && sessionPage > sessions.data.totalPages) setSessionPage(Math.max(1, sessions.data.totalPages));
+  }, [sessionPage, sessions.data]);
 
   const refresh = async () => { await cache.invalidateQueries({ queryKey: ["admin"] }); };
   const operation = async (key: string, path: string) => {
@@ -212,7 +217,7 @@ function AdminDashboardView({ onLogout }: { onLogout: () => Promise<void> }) {
 
     <section className="admin-section"><div className="admin-section-title"><Clock3 size={19}/><div><h2>AI Job</h2><p>오래 대기하거나 실패한 작업을 확인합니다.</p></div></div><div className="admin-metric-grid"><Metric label="대기" value={data.jobs.pending}/><Metric label="실행 중" value={data.jobs.running}/><Metric label="실패" value={data.jobs.failed}/><Metric label="최장 대기" value={data.jobs.oldestPendingMinutes === null ? "없음" : `${data.jobs.oldestPendingMinutes}분`}/></div>{data.jobs.failureReasons.length > 0 && <div className="failure-summary" aria-label="Job 실패 원인 요약">{data.jobs.failureReasons.map((item) => <span key={item.reason}>{item.reason} <strong>{item.count}</strong></span>)}</div>}{jobs.isError ? <div className="admin-inline-error"><AlertTriangle size={18}/><span>Job 목록을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void jobs.refetch()}>다시 시도</button></div> : <div className="admin-table-wrap"><table><thead><tr><th>종류</th><th>상태</th><th>시도</th><th>시각</th><th>조치</th></tr></thead><tbody>{jobs.data?.items.map((job) => <tr key={job.id}><td>{job.type}</td><td><span className={`job-status status-${job.status.toLowerCase()}`}>{job.status}</span>{job.errorMessage && <small className="job-error">{job.errorMessage}</small>}</td><td>{job.attempts}/{job.maxAttempts}</td><td>{formatDate(job.updatedAt)}</td><td>{job.status === "FAILED" ? <button className="small-button" disabled={running === job.id} onClick={() => void operation(job.id, `/admin/jobs/${job.id}/retry`)}><Play size={14}/>재시도</button> : "—"}</td></tr>)}</tbody></table></div>}</section>
 
-    <section className="admin-grid-two"><div className="admin-section"><div className="admin-section-title"><Database size={19}/><div><h2>최근 세션</h2><p>식별자는 마스킹됩니다.</p></div></div>{sessions.isError ? <div className="admin-inline-error"><AlertTriangle size={18}/><span>세션 목록을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void sessions.refetch()}>다시 시도</button></div> : <div className="admin-table-wrap"><table><thead><tr><th>세션</th><th>마지막 활동</th><th>상사</th><th>대화</th></tr></thead><tbody>{sessions.data?.items.map((session) => <tr key={session.id}><td><code>{session.id}</code></td><td>{formatDate(session.lastSeenAt)}</td><td>{session.bossCount}</td><td>{session.chatMessageCount}</td></tr>)}</tbody></table></div>}</div>
+    <section className="admin-grid-two"><div className="admin-section"><div className="admin-section-title"><Database size={19}/><div><h2>최근 세션</h2><p>식별자는 마스킹됩니다.</p></div></div>{sessions.isError ? <div className="admin-inline-error"><AlertTriangle size={18}/><span>세션 목록을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void sessions.refetch()}>다시 시도</button></div> : <><div className="admin-table-wrap"><table><thead><tr><th>세션</th><th>마지막 활동</th><th>상사</th><th>대화</th></tr></thead><tbody>{sessions.data?.items?.map((session) => <tr key={session.id}><td><code>{session.id}</code></td><td>{formatDate(session.lastSeenAt)}</td><td>{session.bossCount}</td><td>{session.chatMessageCount}</td></tr>)}</tbody></table></div>{sessions.data && sessions.data.totalPages > 1 && <nav className="admin-pagination" aria-label="최근 세션 페이지"><button className="small-button" type="button" disabled={sessionPage <= 1 || sessions.isFetching} onClick={() => setSessionPage((page) => Math.max(1, page - 1))}>이전</button><span>{sessionPage} / {sessions.data.totalPages}</span><button className="small-button" type="button" disabled={sessionPage >= sessions.data.totalPages || sessions.isFetching} onClick={() => setSessionPage((page) => page + 1)}>다음</button></nav>}</>}</div>
     <div className="admin-section"><div className="admin-section-title"><ShieldCheck size={19}/><div><h2>유지관리</h2><p>최근 활동이나 사용자 입력이 있는 세션은 변경하지 않습니다.</p></div></div><div className="maintenance-actions"><button className="secondary-button" disabled={Boolean(running)} onClick={() => void operation("cleanup", "/admin/maintenance/cleanup")}>만료 데이터 정리</button><button className="secondary-button" disabled={Boolean(running)} onClick={() => void operation("rollup", "/admin/maintenance/rollup")}>Analytics 집계</button><button className="secondary-button" disabled={Boolean(running)} onClick={() => void pruneMeaninglessSessions()}>무의미 세션 삭제</button></div><h3>최근 실행</h3><ul className="operation-list">{data.recentOperations.map((item) => <li key={item.id}><span>{item.type}</span><strong className={item.status === "SUCCEEDED" ? "success-text" : "error-text"}>{item.status}</strong><time>{formatDate(item.createdAt)}</time></li>)}{data.recentOperations.length === 0 && <li>실행 기록이 없습니다.</li>}</ul></div></section>
   </main>;
 }

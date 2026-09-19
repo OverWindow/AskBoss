@@ -1,16 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Wordcloud } from "@visx/wordcloud";
 import { Text } from "@visx/text";
 import type { HrDashboard } from "@askboss/shared";
 import { api } from "../../services/api-client";
 
 const featureLabel=(feature:string)=>({TRANSLATE:"번역",CHAT:"대화",SIMULATE:"시뮬레이션",MONOLOGUE:"혼잣말",PERSONA_REBUILD:"페르소나 재생성"}[feature]??feature);
+const MOCK_COLORS = ["#375DF3", "#7B61FF", "#EC6F91", "#F6A94A", "#28A78C", "#49A4E8"];
 
-export function HrDashboard() {
+export function HrDashboard({ dataset }: { dataset: "actual" | "mock" }) {
   const query = useQuery({
-    queryKey: ["hr-dashboard"],
-    queryFn: () => api<HrDashboard>("/hr/dashboard"),
+    queryKey: ["hr-dashboard", dataset],
+    queryFn: () => api<HrDashboard>(`/hr/dashboard?dataset=${dataset}`),
   });
 
   if (query.isLoading) {
@@ -26,14 +27,16 @@ export function HrDashboard() {
   }
 
   const d = query.data;
+  const isMock = d.dataSource === "MOCK";
 
   return (
-    <main className="hr-main">
+    <main className={`hr-main${isMock ? " is-mock" : ""}`}>
+      {isMock && <div className="hr-mock-banner" role="note"><strong>Mock 데모</strong><span>모든 수치와 문구가 제품 시연용 가상 데이터이며 실제 사용자 정보가 아닙니다.</span></div>}
       <header id="overview" className="hr-title-row">
         <div>
           <h2>조직 커뮤니케이션 인사이트</h2>
         </div>
-        {d.includesDemo && <span className="demo-badge">데모 데이터 포함</span>}
+        <span className="demo-badge">{isMock ? "100% 가상 데이터" : "실제 익명 집계"}</span>
       </header>
 
       <p className="hr-summary">{d.overview.summary}</p>
@@ -55,12 +58,12 @@ export function HrDashboard() {
 
       <section id="topics" className="chart-section">
         <h3>자주 등장한 주제</h3>
-        <TopicCloud words={d.topics} />
+        {d.topics.length > 0 ? <TopicCloud words={d.topics} colorful={isMock}/> : <EmptyPlaceholder>아직 집계된 대화 주제가 없습니다.</EmptyPlaceholder>}
       </section>
 
       <div id="demographics" className="chart-grid">
-        <Chart title="직급 차이별 사용량" data={d.rankGap} />
-        <Chart title="나이 차이별 사용량" data={d.ageGap} />
+        <Chart title="직급 차이별 사용량" data={d.rankGap} colorful={isMock}/>
+        <Chart title="나이 차이별 사용량" data={d.ageGap} colorful={isMock}/>
       </div>
 
       <div id="insights" className="chart-grid">
@@ -78,7 +81,7 @@ export function HrDashboard() {
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Bar dataKey="value" fill="#375DF3" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="#375DF3" radius={[4, 4, 0, 0]}>{d.sameJobFunctionDistribution.map((item, index) => <Cell key={item.bucket} fill={isMock ? MOCK_COLORS[(index + 3) % MOCK_COLORS.length] : "#375DF3"}/>)}</Bar>
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -146,7 +149,7 @@ function EmptyPlaceholder({ children }: { children: React.ReactNode }) {
   );
 }
 
-function TopicCloud({ words }: { words: { text: string; value: number }[] }) {
+function TopicCloud({ words, colorful }: { words: { text: string; value: number }[]; colorful: boolean }) {
   return (
     <div className="word-cloud">
       <svg viewBox="0 0 720 240" role="img" aria-label="주요 대화 주제 워드 클라우드">
@@ -162,10 +165,10 @@ function TopicCloud({ words }: { words: { text: string; value: number }[] }) {
           random={() => 0.5}
         >
           {(cloudWords) =>
-            cloudWords.map((word) => (
+            cloudWords.map((word, index) => (
               <Text
                 key={word.text}
-                fill="#375DF3"
+                fill={colorful ? MOCK_COLORS[index % MOCK_COLORS.length] : "#375DF3"}
                 textAnchor="middle"
                 transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
                 fontSize={word.size}
@@ -181,19 +184,19 @@ function TopicCloud({ words }: { words: { text: string; value: number }[] }) {
   );
 }
 
-function Chart({ title, data }: { title: string; data: { label: string; value: number }[] }) {
+function Chart({ title, data, colorful }: { title: string; data: { label: string; value: number }[]; colorful: boolean }) {
   return (
     <section className="chart-section">
       <h3>{title}</h3>
-      <ResponsiveContainer width="100%" height={260}>
+      {data.length > 0 ? <ResponsiveContainer width="100%" height={260}>
         <BarChart data={data}>
           <CartesianGrid stroke="rgba(33,34,50,.1)" vertical={false} />
           <XAxis dataKey="label" tick={{ fontSize: 12 }} />
           <YAxis tick={{ fontSize: 12 }} />
           <Tooltip />
-          <Bar dataKey="value" fill="#375DF3" radius={[4, 4, 0, 0]} />
+          <Bar dataKey="value" fill="#375DF3" radius={[4, 4, 0, 0]}>{data.map((item, index) => <Cell key={item.label} fill={colorful ? MOCK_COLORS[index % MOCK_COLORS.length] : "#375DF3"}/>)}</Bar>
         </BarChart>
-      </ResponsiveContainer>
+      </ResponsiveContainer> : <EmptyPlaceholder>아직 집계된 데이터가 없습니다.</EmptyPlaceholder>}
     </section>
   );
 }
