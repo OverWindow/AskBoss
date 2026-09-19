@@ -7,7 +7,7 @@ const MOCK_HR_DASHBOARD: HrDashboard = {
     totalUses: 4_872,
     activeSubjects: 326,
     topFeature: "TRANSLATE",
-    summary: "시연용 가상 조직에서는 일정 조율, 보고 방식, 피드백 해석이 가장 자주 다뤄졌습니다. 직급과 나이 차이가 큰 상황일수록 번역과 시뮬레이션 사용 비중이 높게 나타납니다.",
+    summary: "",
   },
   topics: [
     { text: "보고", value: 94 }, { text: "일정", value: 88 }, { text: "피드백", value: 81 },

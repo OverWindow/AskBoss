@@ -44,9 +44,9 @@ describe("HrDemoPage datasets", () => {
     expect(screen.getByRole("tab", { name: "실제 익명 집계" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByText(/모든 수치와 문구가 제품 시연용 가상 데이터/)).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Mock 데모" }));
+    fireEvent.click(screen.getByRole("tab", { name: "가상 데모" }));
     expect(await screen.findByText(/모든 수치와 문구가 제품 시연용 가상 데이터/)).toBeInTheDocument();
-    expect(screen.getByText("100% 가상 데이터")).toBeInTheDocument();
+    expect(screen.queryByText("100% 가상 데이터")).not.toBeInTheDocument();
     expect(screen.getByText("이거 언제까지 가능해?")).toBeInTheDocument();
     expect(screen.getByText("보고")).toBeInTheDocument();
     await waitFor(() => expect(api).toHaveBeenCalledWith("/hr/dashboard?dataset=actual"));
