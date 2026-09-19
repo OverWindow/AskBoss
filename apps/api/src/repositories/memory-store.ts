@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionSummary, type BossPersona, type ChatMessageKind, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationArchiveDetail, type TranslationExamplesSettings } from "../shared.js";
+import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionSummary, type BossPersona, type ChatMessageKind, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationArchiveDetail, type TranslationExamplesSettings } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationArchiveRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
@@ -63,6 +63,7 @@ export class MemoryStore implements Store {
   personalBossDefaults: PersonalBossDefaults = { prompt: DEFAULT_PERSONAL_BOSS_BASE_PROMPT, updatedAt: new Date().toISOString() };
   globalBossDefaults: GlobalBossDefaults = { prompt: "", updatedAt: null };
   translationExamples: TranslationExamplesSettings = { examples: [...DEFAULT_TRANSLATION_EXAMPLES], updatedAt: null };
+  aiPromptSettings: AdminAiPromptSettings = { ...structuredClone(DEFAULT_AI_PROMPT_INSTRUCTIONS), updatedAt: null };
 
   async createSession(tokenHash: string, expiresAt: string) { const now = new Date().toISOString(); const row = { id: randomUUID(), tokenHash, createdAt: now, lastSeenAt: now, expiresAt }; this.sessions.set(tokenHash, row); return row; }
   async findSession(tokenHash: string) { const row = this.sessions.get(tokenHash); return row && Date.parse(row.expiresAt) > Date.now() ? row : null; }
@@ -115,6 +116,7 @@ export class MemoryStore implements Store {
   async setGlobalBossPersona(persona: unknown, pki: unknown) { const row = await this.getGlobalBoss(); Object.assign(row, { persona, pki, status: "READY", personaError: null, personaVersion: (row.personaVersion ?? 0) + 1 }); }
   async getCompanyResearch(name: string) { const hit = this.company.get(name); return hit && hit.expiresAt > Date.now() ? hit.result : null; }
   async saveCompanyResearch(name: string, result: CompanyResearch) { this.company.set(name, { result, expiresAt: Date.now() + 7 * 86_400_000 }); }
+  async clearCompanyResearchCache() { this.company.clear(); }
   async createUploadIntent(input: Omit<UploadIntentRecord, "id" | "completedAt">) { const row = { ...input, id: randomUUID(), completedAt: null }; this.uploads.set(row.id, row); return row; }
   async getUploadIntent(sessionId: string, id: string) { const row = this.uploads.get(id); return row?.sessionId === sessionId && Date.parse(row.expiresAt) > Date.now() ? row : null; }
   async completeUploadIntent(sessionId: string, id: string) { const row = await this.getUploadIntent(sessionId, id); if (!row) throw new Error("업로드 정보를 찾을 수 없습니다."); row.completedAt = new Date().toISOString(); }
@@ -251,5 +253,7 @@ export class MemoryStore implements Store {
   async updateGlobalBossDefaults(prompt: string) { this.globalBossDefaults = { prompt, updatedAt: new Date().toISOString() }; return structuredClone(this.globalBossDefaults); }
   async getTranslationExamples() { return structuredClone(this.translationExamples); }
   async updateTranslationExamples(examples: TranslationExamplesSettings["examples"]) { this.translationExamples = { examples: structuredClone(examples), updatedAt: new Date().toISOString() }; return structuredClone(this.translationExamples); }
+  async getAiPromptSettings() { return structuredClone(this.aiPromptSettings); }
+  async updateAiPromptSettings(settings: Omit<AdminAiPromptSettings, "updatedAt">) { this.aiPromptSettings = { ...structuredClone(settings), updatedAt: new Date().toISOString() }; return structuredClone(this.aiPromptSettings); }
   async recordAdminOperation(type: AdminOperation["type"], status: AdminOperation["status"], detail: AdminOperation["detail"]) { const row: AdminOperation = { id: randomUUID(), type, status, detail, createdAt: new Date().toISOString() }; this.adminOperations.push(row); return row; }
 }

@@ -42,5 +42,15 @@ export function buildGlobalBossPromptPreview(boss: BossRecord, basePrompt: strin
     message: MOCK_QUESTION,
   });
 
-  return { messages: [...messages], usesMockUserData: true };
+  return {
+    messages: [...messages],
+    sources: [
+      { role: "system", component: "안전·출력 규칙", origin: "서버 고정 규칙", description: "근거 안의 지시를 실행하지 않고 일반 텍스트로 응답하도록 강제합니다.", usesMockData: false },
+      { role: "system", component: "모두의 상사 기본 성격", origin: "관리자 저장값", description: "이 화면의 ‘모두의 상사 전용 프롬프트’에 저장된 운영 지침입니다.", usesMockData: false },
+      { role: "user", component: "상사 정보·페르소나", origin: "모두의 상사 관리", description: "관리자가 저장한 기본 정보와 현재 사용자에게 제공 중인 페르소나입니다.", usesMockData: false },
+      { role: "user", component: "사용자 프로필", origin: "미리보기 전용 가상 데이터", description: "실제 사용자 대신 고정된 가상 프로필을 사용합니다.", usesMockData: true },
+      { role: "user", component: "대화 요약·이력·질문", origin: "미리보기 전용 가상 데이터", description: "프롬프트 조립 형태를 확인하기 위한 고정 예시이며 실제 사용자 대화가 아닙니다.", usesMockData: true },
+    ],
+    usesMockUserData: true,
+  };
 }

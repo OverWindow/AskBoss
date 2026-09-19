@@ -25,7 +25,7 @@ export const translationRoutes: FastifyPluginAsync = async (app) => {
     const ownerHash = requireArchiveOwner(request, reply);
     const body = parse(translationInputSchema, request.body);
     const bossId = (request.params as { bossId: string }).bossId;
-    const [boss, profile] = await Promise.all([store.getBoss(session.id, bossId), store.getProfile(session.id)]);
+    const [boss, profile, prompts] = await Promise.all([store.getBoss(session.id, bossId), store.getProfile(session.id), store.getAiPromptSettings()]);
     if (!boss) throw new HttpError(404, "상사를 찾을 수 없습니다.");
     const { basePrompt, globalBoss, sessionCalibration } = await getBossPromptContext(boss, session.id);
 
@@ -39,7 +39,7 @@ export const translationRoutes: FastifyPluginAsync = async (app) => {
     request.raw.once("aborted", onClientAbort);
 
     try {
-      const result = plainTextValues(await ai.translateBossMessage({ profile, boss, basePrompt, globalBoss: boss.scope === "SESSION" ? globalBoss : undefined, sessionCalibration, ...body }, controller.signal));
+      const result = plainTextValues(await ai.translateBossMessage({ profile, boss, basePrompt, globalBoss: boss.scope === "SESSION" ? globalBoss : undefined, sessionCalibration, promptInstruction: prompts.translation, ...body }, controller.signal));
       const { translation: row, archive } = await store.createTranslationWithArchive({ sessionId: session.id, bossId, inputText: body.inputText, channel: body.channel, result, expiresAt: sessionExpiry() }, ownerHash, boss);
       void track(session.id, "TRANSLATE", profile, boss, { topicKeywords: topics(body.inputText) }).catch((error) => request.log.warn(error, "translation analytics failed"));
       return { translationId: row.id, archiveId: archive.id, result };

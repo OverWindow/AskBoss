@@ -1,5 +1,5 @@
 import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, ChatMessageKind, HrDashboard, TranslationArchiveDetail, TranslationArchiveSummary } from "../shared.js";
-import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalBossDefaults, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, PersonalBossDefaults, SessionRecord, SurveyAnswerRecord, TranslationExamplesSettings, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
+import type { AdminAiPromptSettings, AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalBossDefaults, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, PersonalBossDefaults, SessionRecord, SurveyAnswerRecord, TranslationExamplesSettings, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { ArchiveCursor } from "../utils/archive-cursor.js";
 
 export interface CreateBossInput {
@@ -39,6 +39,7 @@ export interface Store {
   setGlobalBossPersona(persona: unknown, pki: unknown): Promise<void>;
   getCompanyResearch(normalizedName: string): Promise<CompanyResearch | null>;
   saveCompanyResearch(normalizedName: string, result: CompanyResearch): Promise<void>;
+  clearCompanyResearchCache(): Promise<void>;
   createUploadIntent(input: Omit<UploadIntentRecord, "id" | "completedAt">): Promise<UploadIntentRecord>;
   getUploadIntent(sessionId: string, id: string): Promise<UploadIntentRecord | null>;
   completeUploadIntent(sessionId: string, id: string): Promise<void>;
@@ -106,5 +107,7 @@ export interface Store {
   updateGlobalBossDefaults(prompt: string): Promise<GlobalBossDefaults>;
   getTranslationExamples(): Promise<TranslationExamplesSettings>;
   updateTranslationExamples(examples: TranslationExamplesSettings["examples"]): Promise<TranslationExamplesSettings>;
+  getAiPromptSettings(): Promise<AdminAiPromptSettings>;
+  updateAiPromptSettings(settings: Omit<AdminAiPromptSettings, "updatedAt">): Promise<AdminAiPromptSettings>;
   recordAdminOperation(type: AdminOperation["type"], status: AdminOperation["status"], detail: AdminOperation["detail"]): Promise<AdminOperation>;
 }

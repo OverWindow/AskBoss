@@ -1,5 +1,7 @@
 import { jsonOnly } from "./shared.js";
-export const companyPrompt = (name: string) => `${jsonOnly}
-공개적으로 확인 가능한 정보만으로 '${name}'을 조사해 CompanyResearch JSON을 작성하라.
-기업문화는 관찰 가능한 신호와 추정을 구분하고 특정 상사 개인의 성격으로 일반화하지 말라.
+import { DEFAULT_AI_PROMPT_INSTRUCTIONS } from "../shared.js";
+export const companyPrompt = (name: string, instruction: string = DEFAULT_AI_PROMPT_INSTRUCTIONS.onboarding.companyResearch) => `${jsonOnly}
+다음 관리자 업무 지침을 회사 조사에 반영한다.
+<admin-instruction>${instruction}</admin-instruction>
+조사 대상 회사: '${name}'
 필드: companyName, industry, companySizeHint, businessSummary, organizationHints, workCultureSignals, confidence(0~1), sourceSummary.`;

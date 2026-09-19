@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { adminGlobalBossDefaultsSchema, adminGlobalBossPatchSchema, adminGlobalUploadSignSchema, adminJobStatusSchema, adminLoginSchema, adminPersonalBossDefaultsSchema, adminTranslationExamplesSchema, evidenceSchema, surveyAnswersSchema, UPLOAD_LIMITS } from "../shared.js";
+import { adminAiPromptSettingsSchema, adminGlobalBossDefaultsSchema, adminGlobalBossPatchSchema, adminGlobalUploadSignSchema, adminJobStatusSchema, adminLoginSchema, adminPersonalBossDefaultsSchema, adminTranslationExamplesSchema, evidenceSchema, surveyAnswersSchema, UPLOAD_LIMITS } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { cleanup } from "../services/cleanup.js";
 import { getAdminCredits } from "../services/ai/credits.js";
@@ -81,6 +81,30 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     });
     return settings;
   });
+  app.get("/admin/ai-prompt-settings", async (request) => {
+    await requireAdmin(request);
+    return store.getAiPromptSettings();
+  });
+  app.put("/admin/ai-prompt-settings", async (request) => {
+    await requireAdminMutation(request);
+    const settings = parse(adminAiPromptSettingsSchema, request.body);
+    const previous = await store.getAiPromptSettings();
+    const changedKeys = [
+      previous.translation !== settings.translation ? "translation" : null,
+      previous.onboarding.companyResearch !== settings.onboarding.companyResearch ? "companyResearch" : null,
+      previous.onboarding.evidenceExtraction !== settings.onboarding.evidenceExtraction ? "evidenceExtraction" : null,
+      previous.onboarding.surveyGeneration !== settings.onboarding.surveyGeneration ? "surveyGeneration" : null,
+      previous.onboarding.personaGeneration !== settings.onboarding.personaGeneration ? "personaGeneration" : null,
+    ].filter((key): key is string => Boolean(key));
+    const saved = await store.updateAiPromptSettings(settings);
+    if (changedKeys.includes("companyResearch")) await store.clearCompanyResearchCache();
+    await store.recordAdminOperation("AI_PROMPT_SETTINGS_UPDATE", "SUCCEEDED", {
+      changedCount: changedKeys.length,
+      changedKeys: changedKeys.join(","),
+      totalLength: settings.translation.length + Object.values(settings.onboarding).reduce((sum, prompt) => sum + prompt.length, 0),
+    });
+    return saved;
+  });
   app.get("/admin/global-boss", async (request) => {
     await requireAdmin(request);
     const [boss,evidence,surveyAnswers]=await Promise.all([store.getGlobalBoss(),store.listGlobalEvidence(),store.listGlobalSurveyAnswers()]);
@@ -98,7 +122,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     await requireAdminMutation(request);
     const {companyName}=parse(companyResearchInputSchema,request.body);
     const key=companyName.normalize("NFKC").toLocaleLowerCase("ko");const cached=await store.getCompanyResearch(key);if(cached)return {research:cached,cached:true};
-    try{const research=await ai.researchCompany(companyName);await store.saveCompanyResearch(key,research);return {research,cached:false};}catch{return {research:null,cached:false,warning:"회사 정보를 찾지 못했습니다."};}
+    try{const prompts=await store.getAiPromptSettings();const research=await ai.researchCompany(companyName,prompts.onboarding.companyResearch);await store.saveCompanyResearch(key,research);return {research,cached:false};}catch{return {research:null,cached:false,warning:"회사 정보를 찾지 못했습니다."};}
   });
   app.post("/admin/global-boss/uploads/sign",{config:{rateLimit:{max:20,timeWindow:"1 minute"}}},async(request)=>{
     await requireAdminMutation(request);const body=parse(adminGlobalUploadSignSchema,request.body);const limit=body.contentType==="text/plain"?UPLOAD_LIMITS.text:UPLOAD_LIMITS.image;if(body.size>limit)throw new HttpError(413,"파일 크기 제한을 초과했습니다.","FILE_TOO_LARGE");
@@ -112,7 +136,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
   app.delete("/admin/global-boss/evidence/:id",async(request,reply)=>{
     await requireAdminMutation(request);const {id}=parse(idParamSchema,request.params);const evidence=await store.getGlobalEvidence(id);if(!evidence)throw new HttpError(404,"관찰 자료를 찾을 수 없습니다.");if(evidence.storagePath)await storage.remove([evidence.storagePath]);await store.deleteGlobalEvidence(id);await store.recordAdminOperation("GLOBAL_BOSS_UPDATE","SUCCEEDED",{action:"evidence_delete",evidenceId:maskId(id)!});return reply.code(204).send();
   });
-  app.post("/admin/global-boss/survey/generate",{config:{rateLimit:{max:10,timeWindow:"1 minute"}}},async(request)=>{await requireAdminMutation(request);return {questions:await ai.generateSurvey(await store.getGlobalBoss())};});
+  app.post("/admin/global-boss/survey/generate",{config:{rateLimit:{max:10,timeWindow:"1 minute"}}},async(request)=>{await requireAdminMutation(request);const [boss,prompts]=await Promise.all([store.getGlobalBoss(),store.getAiPromptSettings()]);return {questions:await ai.generateSurvey(boss,prompts.onboarding.surveyGeneration)};});
   app.put("/admin/global-boss/survey/answers",async(request)=>{
     await requireAdminMutation(request);const body=parse(surveyAnswersSchema,request.body);await store.upsertGlobalSurveyAnswers(body.answers);const parsedData={observations:body.answers.map(answer=>({category:String(answer.questionSnapshot.category??"일상 소통"),summary:`${String(answer.questionSnapshot.situation??"")} / ${answer.selectedOption??answer.freeText??""}`,observedAt:new Date().toISOString(),contextQuality:.65,messages:[]}))};const existing=(await store.listGlobalEvidence()).find(item=>item.type==="SURVEY");if(existing)await store.updateGlobalEvidence(existing.id,{status:"READY",parsedData,observedAt:new Date().toISOString(),errorMessage:null});else await store.createGlobalEvidence({bossId:GLOBAL_BOSS_ID,type:"SURVEY",status:"READY",sourceName:"관리자 설문",rawText:null,storagePath:null,parsedData,observedAt:new Date().toISOString(),errorMessage:null});await store.recordAdminOperation("GLOBAL_BOSS_UPDATE","SUCCEEDED",{action:"survey",answers:body.answers.length});return {saved:true};
   });

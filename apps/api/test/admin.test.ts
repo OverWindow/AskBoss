@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
 import { env } from "../src/config/env";
 import { store } from "../src/repositories";
-import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES } from "@askboss/shared";
+import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES } from "@askboss/shared";
 
 const app = buildApp();
 const origin = "http://localhost:5173";
@@ -192,6 +192,50 @@ describe("admin API", () => {
     } finally {
       await store.updateTranslationExamples([...before.examples]);
       expect((await store.getTranslationExamples()).examples).toEqual(before.examples.length ? before.examples : [...DEFAULT_TRANSLATION_EXAMPLES]);
+    }
+  });
+
+  it("validates and updates shared AI prompt instructions without auditing their text", async () => {
+    const anonymous = await app.inject({ method: "GET", url: "/api/admin/ai-prompt-settings" });
+    expect(anonymous.statusCode).toBe(401);
+    const login = await app.inject({ method: "POST", url: "/api/admin/login", headers: { origin, "x-forwarded-for": "10.0.0.43" }, payload: { password: env.ADMIN_PASSWORD } });
+    const cookie = String(login.headers["set-cookie"]).split(";")[0]!;
+    const before = await store.getAiPromptSettings();
+    const initial = await app.inject({ method: "GET", url: "/api/admin/ai-prompt-settings", headers: { cookie } });
+    expect(initial.statusCode).toBe(200);
+    expect(initial.json()).toMatchObject(DEFAULT_AI_PROMPT_INSTRUCTIONS);
+    const settings = {
+      translation: "상사의 표현과 가능한 의도를 구분해서 설명한다.",
+      onboarding: {
+        companyResearch: "검증 가능한 공개 정보와 추정을 분리한다.",
+        evidenceExtraction: "메시지의 발신자와 앞뒤 맥락을 우선 추출한다.",
+        surveyGeneration: "구체적인 업무 상황을 묻는 질문을 만든다.",
+        personaGeneration: "반복 관찰과 직접 대화를 가장 강한 근거로 사용한다.",
+      },
+    };
+    try {
+      const crossOrigin = await app.inject({ method: "PUT", url: "/api/admin/ai-prompt-settings", headers: { cookie, origin: "https://attacker.example" }, payload: settings });
+      expect(crossOrigin.statusCode).toBe(403);
+      const blank = await app.inject({ method: "PUT", url: "/api/admin/ai-prompt-settings", headers: { cookie, origin }, payload: { ...settings, translation: " " } });
+      expect(blank.statusCode).toBe(400);
+      const tooLong = await app.inject({ method: "PUT", url: "/api/admin/ai-prompt-settings", headers: { cookie, origin }, payload: { ...settings, onboarding: { ...settings.onboarding, personaGeneration: "가".repeat(5_001) } } });
+      expect(tooLong.statusCode).toBe(400);
+
+      await store.saveCompanyResearch("prompt-cache-test", { companyName: "테스트", industry: null, companySizeHint: null, businessSummary: "캐시", organizationHints: [], workCultureSignals: [], confidence: 0.5, sourceSummary: [] });
+      expect(await store.getCompanyResearch("prompt-cache-test")).not.toBeNull();
+      const updated = await app.inject({ method: "PUT", url: "/api/admin/ai-prompt-settings", headers: { cookie, origin }, payload: settings });
+      expect(updated.statusCode).toBe(200);
+      expect(updated.json()).toMatchObject({ ...settings, updatedAt: expect.any(String) });
+      expect(await store.getCompanyResearch("prompt-cache-test")).toBeNull();
+
+      const dashboard = await app.inject({ method: "GET", url: "/api/admin/dashboard", headers: { cookie } });
+      const operation = dashboard.json().recentOperations.find((item: any) => item.type === "AI_PROMPT_SETTINGS_UPDATE");
+      expect(operation.detail.changedKeys).toContain("translation");
+      expect(operation.detail.changedKeys).toContain("companyResearch");
+      expect(JSON.stringify(operation)).not.toContain(settings.translation);
+    } finally {
+      await store.updateAiPromptSettings({ translation: before.translation, onboarding: before.onboarding });
+      expect((await store.getAiPromptSettings()).translation).toBe(before.translation);
     }
   });
 });

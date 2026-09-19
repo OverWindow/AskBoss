@@ -59,6 +59,16 @@ export const translationExamplesSchema = z.tuple([
   z.string().trim().min(1).max(200),
 ]);
 export const adminTranslationExamplesSchema = z.object({ examples: translationExamplesSchema });
+const adminPromptInstructionSchema = z.string().trim().min(1, "프롬프트 지침을 입력해 주세요.").max(5_000, "프롬프트 지침은 5,000자 이하로 입력해 주세요.");
+export const adminAiPromptSettingsSchema = z.object({
+  translation: adminPromptInstructionSchema,
+  onboarding: z.object({
+    companyResearch: adminPromptInstructionSchema,
+    evidenceExtraction: adminPromptInstructionSchema,
+    surveyGeneration: adminPromptInstructionSchema,
+    personaGeneration: adminPromptInstructionSchema,
+  }),
+});
 export const adminJobStatusSchema = z.enum(["PENDING", "RUNNING", "SUCCEEDED", "FAILED"]);
 export const adminGlobalBossPatchSchema = z.object({
   alias: z.string().trim().min(1).max(40).optional(),

@@ -33,6 +33,8 @@ describe("translation API", () => {
     vi.spyOn(ai as any, "translateBossMessage").mockImplementation(async (...args: any[]) => { seen.push(args[0]); return translate(...args); });
     await store.updatePersonalBossDefaults("개인 상사 전용 테스트 성격");
     await store.updateGlobalBossDefaults("모두의 상사 전용 테스트 성격");
+    const beforePrompts = await store.getAiPromptSettings();
+    await store.updateAiPromptSettings({ translation: "모든 상사 공통 번역 테스트 지침", onboarding: beforePrompts.onboarding });
     try {
       const session = await app.inject({ method: "POST", url: "/api/session" });
       const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
@@ -47,12 +49,15 @@ describe("translation API", () => {
       await app.inject({ method: "POST", url: `/api/bosses/${personal.json().boss.id}/translate`, headers: { cookie }, payload: { inputText: "확인했나?", channel: "사내 메신저" } });
 
       expect(seen[0].basePrompt).toBe("모두의 상사 전용 테스트 성격");
+      expect(seen[0].promptInstruction).toBe("모든 상사 공통 번역 테스트 지침");
       expect(seen[0].globalBoss).toBeUndefined();
       expect(seen[1].basePrompt).toBe("개인 상사 전용 테스트 성격");
+      expect(seen[1].promptInstruction).toBe("모든 상사 공통 번역 테스트 지침");
       expect(seen[1].globalBoss?.scope).toBe("GLOBAL");
     } finally {
       await store.updatePersonalBossDefaults(DEFAULT_PERSONAL_BOSS_BASE_PROMPT);
       await store.updateGlobalBossDefaults("");
+      await store.updateAiPromptSettings({ translation: beforePrompts.translation, onboarding: beforePrompts.onboarding });
     }
   });
 

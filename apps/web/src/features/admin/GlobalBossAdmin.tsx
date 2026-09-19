@@ -7,7 +7,9 @@ import { api } from "../../services/api-client";
 import { uploadToSignedUrl } from "../../services/upload-client";
 
 const TIMEOUT = 60_000;
+const READ_TIMEOUT = 12_000;
 const adminApi = <T,>(path: string, options: RequestInit = {}) => api<T>(path, { ...options, timeoutMs: TIMEOUT });
+const adminReadApi = <T,>(path: string) => api<T>(path, { timeoutMs: READ_TIMEOUT });
 const Options = ({ values }: { values: readonly (string | number)[] }) => <>{values.map((value) => <option key={value} value={value}>{typeof value === "number" ? `${value}대${value === 60 ? "+" : ""}` : value}</option>)}</>;
 
 interface Props { onLogout: () => Promise<void> }
@@ -15,18 +17,19 @@ interface Props { onLogout: () => Promise<void> }
 export function GlobalBossAdmin({ onLogout }: Props) {
   const detail = useQuery({
     queryKey: ["admin", "global-boss"],
-    queryFn: () => adminApi<AdminGlobalBossDetail>("/admin/global-boss"),
+    queryFn: () => adminReadApi<AdminGlobalBossDetail>("/admin/global-boss"),
     refetchInterval: (query) => query.state.data?.evidence.some((item) => item.status === "PENDING" || item.status === "PROCESSING") ? 1_200 : false,
+    retry: false,
   });
   const promptSettings = useQuery({
     queryKey: ["admin", "global-boss-defaults"],
-    queryFn: () => adminApi<GlobalBossDefaults>("/admin/global-boss-defaults"),
-    retry: 1,
+    queryFn: () => adminReadApi<GlobalBossDefaults>("/admin/global-boss-defaults"),
+    retry: false,
   });
   const promptPreview = useQuery({
     queryKey: ["admin", "global-boss", "prompt-preview"],
-    queryFn: () => adminApi<GlobalBossPromptPreview>("/admin/global-boss/prompt-preview"),
-    retry: 1,
+    queryFn: () => adminReadApi<GlobalBossPromptPreview>("/admin/global-boss/prompt-preview"),
+    retry: false,
   });
   const [boss, setBoss] = useState<Boss | null>(null);
   const [globalPrompt, setGlobalPrompt] = useState("");
@@ -154,7 +157,10 @@ export function GlobalBossAdmin({ onLogout }: Props) {
       </div>}
       <div className="admin-prompt-preview">
         <div className="admin-prompt-preview-title"><div><h3>AI 전달 프롬프트 원문</h3><p className="hint">저장된 실사용 설정과 페르소나에 관리자 미리보기용 가상 프로필·대화·질문을 결합합니다. 실제 사용자 데이터는 포함하지 않습니다.</p></div><button className="small-button" type="button" disabled={promptPreview.isFetching} onClick={() => void promptPreview.refetch()}><RefreshCw size={14}/>{promptPreview.isFetching ? "갱신 중…" : "새로고침"}</button></div>
-        {promptPreview.isError ? <div className="admin-inline-error"><span>프롬프트 원문을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void promptPreview.refetch()}>다시 시도</button></div> : promptPreview.isLoading ? <p className="hint">프롬프트 원문을 조립하는 중입니다.</p> : promptPreview.data?.messages.map((promptMessage) => <div className="admin-prompt-raw" key={promptMessage.role}><strong>{promptMessage.role}</strong><pre>{promptMessage.content}</pre></div>)}
+        {promptPreview.isError ? <div className="admin-inline-error"><span>프롬프트 원문을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void promptPreview.refetch()}>다시 시도</button></div> : promptPreview.isLoading ? <p className="hint">프롬프트 원문을 조립하는 중입니다.</p> : <>
+          <div className="admin-prompt-sources"><h4>구성요소 출처</h4><div className="admin-table-wrap"><table><thead><tr><th>역할</th><th>구성요소</th><th>가져온 곳</th><th>설명</th></tr></thead><tbody>{promptPreview.data?.sources.map((source) => <tr key={`${source.role}:${source.component}`}><td><code>{source.role}</code></td><td>{source.component}{source.usesMockData && <span className="prompt-source-mock">가상</span>}</td><td>{source.origin}</td><td>{source.description}</td></tr>)}</tbody></table></div></div>
+          {promptPreview.data?.messages.map((promptMessage) => <div className="admin-prompt-raw" key={promptMessage.role}><strong>{promptMessage.role}</strong><pre>{promptMessage.content}</pre></div>)}
+        </>}
       </div>
     </section>
 

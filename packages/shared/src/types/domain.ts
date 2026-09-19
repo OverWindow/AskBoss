@@ -167,17 +167,42 @@ export interface TranslationExamplesSettings {
   updatedAt: string | null;
 }
 
+export interface AiPromptInstructions {
+  translation: string;
+  onboarding: {
+    companyResearch: string;
+    evidenceExtraction: string;
+    surveyGeneration: string;
+    personaGeneration: string;
+  };
+}
+
+export interface AdminAiPromptSettings extends AiPromptInstructions {
+  updatedAt: string | null;
+}
+
+export type AdminAiPromptSettingsInput = AiPromptInstructions;
+
+export interface GlobalBossPromptSource {
+  role: "system" | "user";
+  component: string;
+  origin: string;
+  description: string;
+  usesMockData: boolean;
+}
+
 export interface GlobalBossPromptPreview {
   messages: [
     { role: "system"; content: string },
     { role: "user"; content: string },
   ];
+  sources: GlobalBossPromptSource[];
   usesMockUserData: true;
 }
 
 export interface AdminOperation {
   id: string;
-  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD" | "PERSONAL_BOSS_DEFAULTS_UPDATE" | "GLOBAL_BOSS_DEFAULTS_UPDATE" | "TRANSLATION_EXAMPLES_UPDATE" | "MEANINGLESS_SESSIONS_PRUNE";
+  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD" | "PERSONAL_BOSS_DEFAULTS_UPDATE" | "GLOBAL_BOSS_DEFAULTS_UPDATE" | "TRANSLATION_EXAMPLES_UPDATE" | "AI_PROMPT_SETTINGS_UPDATE" | "MEANINGLESS_SESSIONS_PRUNE";
   status: "SUCCEEDED" | "FAILED";
   detail: Record<string, number | string | boolean | null>;
   createdAt: string;

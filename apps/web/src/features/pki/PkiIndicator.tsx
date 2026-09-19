@@ -1,2 +1,38 @@
-import { useState } from "react";import type { Boss } from "@askboss/shared";
-export function PkiIndicator({boss}: {boss:Boss}){const [open,setOpen]=useState(false);if(boss.scope==="GLOBAL")return null;const pki=boss.pki;return <div data-tutorial="pki" style={{position:"relative"}}><button className="pki-button" onClick={()=>setOpen(!open)} aria-expanded={open}><div className="pki-row"><span>상사 파악도</span><span>{pki?.score??0}</span></div><div className="pki-track"><div className="pki-fill" style={{width:`${pki?.score??0}%`}}/></div><div className="pki-note">정보가 더 쌓이면 반응을 더 안정적으로 추정할 수 있어요.</div></button>{open&&pki&&<div className="pki-popover"><strong>파악도 구성</strong><div className="pki-breakdown"><div><span>정보 충족도</span><b>{pki.completeness}</b></div><div><span>근거 신뢰도</span><b>{pki.evidenceReliability}</b></div><div><span>상황 다양성</span><b>{pki.diversity}</b></div><div><span>최신성</span><b>{pki.freshness}</b></div></div></div>}</div>;}
+import { useEffect, useId, useRef, useState } from "react";
+import { Info } from "lucide-react";
+import type { Boss } from "@askboss/shared";
+
+export function PkiIndicator({ boss }: { boss: Boss }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const popoverId = useId();
+  const pki = boss.pki;
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
+    const onPointerDown = (event: PointerEvent) => { if (!rootRef.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => { document.removeEventListener("keydown", onKeyDown); document.removeEventListener("pointerdown", onPointerDown); };
+  }, [open]);
+
+  if (boss.scope === "GLOBAL") return null;
+
+  return <div ref={rootRef} data-tutorial="pki" className="pki-indicator">
+    <div className="pki-row"><span className="pki-label">상사 파악도 <button className="pki-info-button" type="button" aria-label="상사 파악도 산정 방식 보기" aria-expanded={open} aria-controls={popoverId} onClick={() => setOpen((value) => !value)}><Info size={15}/></button></span><span>{pki?.score ?? 0}</span></div>
+    <div className="pki-track" aria-hidden="true"><div className="pki-fill" style={{ width: `${pki?.score ?? 0}%` }}/></div>
+    <div className="pki-note">정보가 더 쌓이면 반응을 더 안정적으로 추정할 수 있어요.</div>
+    {open && <div id={popoverId} className="pki-popover" role="dialog" aria-label="상사 파악도 산정 방식">
+      <strong>상사 파악도 구성</strong>
+      <p className="pki-formula">정보 충족도 35% + 근거 신뢰도 30% + 상황 다양성 20% + 최신성 15%</p>
+      <div className="pki-breakdown">
+        <div><span><b>정보 충족도 · 35%</b><small>5개 업무 상황별 관찰이 충분히 쌓였는지 반영합니다.</small></span><b>{pki?.completeness ?? 0}</b></div>
+        <div><span><b>근거 신뢰도 · 30%</b><small>페르소나 특성과 연결된 근거 수와 맥락 품질을 반영합니다.</small></span><b>{pki?.evidenceReliability ?? 0}</b></div>
+        <div><span><b>상황 다양성 · 20%</b><small>서로 다른 시기와 업무 상황에서 관찰됐는지 반영합니다.</small></span><b>{pki?.diversity ?? 0}</b></div>
+        <div><span><b>최신성 · 15%</b><small>최근 관찰일수록 높게 반영하며 시간이 지나면 점차 낮아집니다.</small></span><b>{pki?.freshness ?? 0}</b></div>
+      </div>
+      <p className="pki-refresh-note">자료와 설문을 반영해 페르소나를 재생성할 때 다시 집계됩니다.</p>
+    </div>}
+  </div>;
+}

@@ -106,6 +106,40 @@ test("모바일에서는 하단 패널을 기본으로 펼치고 접을 수 있�
   await expect(avatar).toBeVisible();
 });
 
+test("낮은 모바일 화면에서도 상사 파악도가 하단 패널에 가려지지 않는다", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await dismissTutorial(page);
+  await page.evaluate(async () => {
+    const response = await fetch("/api/bosses", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ alias: "모바일 파악도 테스트", avatarKey: "boss-male-01", jobFunction: "개발", yearsOfServiceBand: "10~14년", rank: "팀장", companyName: "테스트 회사", ageBand: 40, hierarchyScore: 70 }) });
+    if (!response.ok) throw new Error("테스트 상사를 만들지 못했습니다.");
+  });
+  await page.reload();
+  await dismissTutorial(page);
+  await page.getByRole("button", { name: "모바일 파악도 테스트", exact: true }).click();
+
+  for (const viewport of [{ width: 390, height: 844 }, { width: 375, height: 667 }]) {
+    await page.setViewportSize(viewport);
+    const indicator = page.locator("[data-tutorial='pki']");
+    const dock = page.getByRole("complementary", { name: "대화와 번역" });
+    await indicator.scrollIntoViewIfNeeded();
+    await expect(indicator).toBeVisible();
+    const indicatorBox = await indicator.boundingBox();
+    const dockBox = await dock.boundingBox();
+    expect(indicatorBox).not.toBeNull();
+    expect(dockBox).not.toBeNull();
+    expect(indicatorBox!.y + indicatorBox!.height).toBeLessThanOrEqual(dockBox!.y + 1);
+
+    const collapse = page.getByRole("button", { name: "패널 접기" });
+    await collapse.click();
+    await indicator.scrollIntoViewIfNeeded();
+    const collapsedIndicatorBox = await indicator.boundingBox();
+    const collapsedDockBox = await dock.boundingBox();
+    expect(collapsedIndicatorBox!.y + collapsedIndicatorBox!.height).toBeLessThanOrEqual(collapsedDockBox!.y + 1);
+    await page.getByRole("button", { name: "패널 펼치기" }).click();
+  }
+});
+
 test("관리자 비밀번호 로그인 후 운영 현황을 확인할 수 있다", async ({ page }) => {
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "관리자 로그인" })).toBeVisible();
@@ -115,6 +149,8 @@ test("관리자 비밀번호 로그인 후 운영 현황을 확인할 수 있다
   await expect(page.getByRole("heading", { name: "세션 현황" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "AI 상태와 크레딧" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "개인 상사 공통 기본 성격" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI 업무 프롬프트" })).toBeVisible();
+  await expect(page.getByLabel("번역 업무 지침")).not.toHaveValue("");
   await expect(page.getByLabel("개인 상사 공통 시스템 프롬프트")).not.toHaveValue("");
   await page.getByRole("link", { name: "모두의 상사 관리" }).click();
   await expect(page.getByRole("heading", { name: "모두의 상사 관리" })).toBeVisible();

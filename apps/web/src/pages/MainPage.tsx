@@ -90,7 +90,7 @@ export function MainPage() {
         </button>
         <h1 id="boss-alias" className="boss-alias">{boss.alias}</h1>
         <p className="boss-subtitle">{boss.scope === "GLOBAL" ? "모두가 사용할 수 있는 가상의 공통 상사" : "관찰을 바탕으로 만든 가상 행동 모델"}</p>
-        {boss.scope === "GLOBAL" ? <div className="pki-button pki-indicator-placeholder" aria-hidden="true"><div className="pki-row"><span>상사 파악도</span><span>0</span></div><div className="pki-track"><div className="pki-fill" style={{width:0}}/></div><div className="pki-note">정보가 더 쌓이면 반응을 더 안정적으로 추정할 수 있어요.</div></div> : <PkiIndicator boss={boss}/>}
+        <PkiIndicator boss={boss}/>
         {boss.status === "FAILED" && <p className="error-text">Persona 생성에 실패했습니다. 입력 정보는 저장되어 있습니다.</p>}
       </section>
       <aside className="workspace-dock" aria-label="대화와 번역">
