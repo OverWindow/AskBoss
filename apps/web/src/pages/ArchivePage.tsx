@@ -34,7 +34,7 @@ function ArchiveCard({ summary, onDelete, deleting }: { summary: TranslationArch
     <div className="archive-card-heading-row">
       <button className="archive-card-heading" type="button" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
         <img src={`/avatars/${summary.boss.avatarKey}.png`} alt=""/>
-        <span><small>{summary.boss.alias} · {summary.channel} · {new Date(summary.createdAt).toLocaleString("ko-KR")}</small><strong>{summary.inputText}</strong></span>
+        <span><small>{summary.boss.alias} · {new Date(summary.createdAt).toLocaleString("ko-KR")}</small><strong>{summary.inputText}</strong></span>
         {summary.actualResponse && <em>실제 답변 있음</em>}
         {expanded ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}
       </button>
@@ -92,7 +92,7 @@ export function ArchiveModal({ open, onClose }: { open: boolean; onClose: () => 
   if (!open) return null;
   return <div className="archive-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="archive-modal" role="dialog" aria-modal="true" aria-labelledby="archive-modal-title">
-      <header className="archive-modal-header"><div><span className="step-kicker">ARCHIVE</span><h1 id="archive-modal-title">번역 아카이브</h1><p>번역 당시 내용과 복사한 답변, 실제 답변, 이어진 대화를 이 기기에 보관합니다.</p></div><button className="icon-button" type="button" aria-label="아카이브 닫기" onClick={onClose}><X size={19}/></button></header>
+      <header className="archive-modal-header"><div><h1 id="archive-modal-title">번역 아카이브</h1><p>번역 당시 내용과 복사한 답변, 실제 답변, 이어진 대화를 이 기기에 보관합니다.</p></div><button className="icon-button" type="button" aria-label="아카이브 닫기" onClick={onClose}><X size={19}/></button></header>
       <div className="archive-modal-body">
         {session.isLoading ? <div className="loading-state"><div className="spinner"/><p>아카이브를 불러오는 중입니다.</p></div> : session.isError ? <div className="empty-state"><p className="error-text" role="alert">세션을 시작하지 못했습니다.</p></div> : archives.isLoading ? <div className="loading-state"><div className="spinner"/><p>아카이브를 불러오는 중입니다.</p></div> : archives.isError ? <p className="error-text" role="alert">아카이브를 불러오지 못했습니다.</p> : items.length === 0 ? <div className="archive-empty"><Archive size={28}/><h2>아직 저장된 번역이 없습니다.</h2><p>번역이 완료되면 자동으로 이곳에 저장됩니다.</p></div> : <div className="archive-list">{items.map((item) => <ArchiveCard key={item.id} summary={item} deleting={deleting && deleteTarget?.id === item.id} onDelete={() => { setDeleteError(undefined); setDeleteTarget(item); }}/>)}</div>}
         {archives.hasNextPage && <button className="secondary-button archive-more" type="button" disabled={archives.isFetchingNextPage} onClick={() => void archives.fetchNextPage()}>{archives.isFetchingNextPage ? "불러오는 중…" : "더 보기"}</button>}

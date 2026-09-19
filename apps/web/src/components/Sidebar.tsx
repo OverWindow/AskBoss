@@ -67,17 +67,17 @@ export function Sidebar() {
             {boss.scope === "SESSION" && <button className="boss-delete-button" type="button" aria-label={`${boss.alias} 삭제`} title={`${boss.alias} 삭제`} onClick={(event) => { event.stopPropagation(); setDeleteError(""); setDeleteTarget(boss); }}><X size={15}/></button>}
           </div>;
         })}
-        <div className="nav-divider"/>
         <Link to="/boss/new" data-tutorial="add-boss" className="boss-nav-item add-boss" onClick={() => ui.set({ mobileNavOpen: false })} title="상사 추가"><Plus size={18}/><span className="hide-collapsed">상사 추가</span></Link>
       </nav>
       <div className="sidebar-bottom">
+        <div className="nav-divider"/>
         <button className="nav-link" type="button" title="아카이브" onClick={() => ui.set({ archiveOpen: true, mobileNavOpen: false, settingsOpen: false })}><Archive size={19}/><span className="hide-collapsed">아카이브</span></button>
         <Link className="nav-link" to="/hr-demo" title="HR Demo"><BarChart3 size={19}/><span className="hide-collapsed">HR Demo</span></Link>
         <button className="sidebar-user" onClick={() => ui.set({ settingsOpen: !ui.settingsOpen })} title={profile ? `@${profile.handle}` : "사용자 설정"}><UserRound size={19}/><span className="hide-collapsed">{profile ? `@${profile.handle}` : "사용자 설정"}</span></button>
         <AnimatePresence>{ui.settingsOpen && <motion.div className="profile-menu" initial={{ opacity: 0, y: 8, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: .97 }} transition={{ duration: .2, ease: [0.22, 1, 0.36, 1] }}><Link to="/settings" onClick={() => ui.set({ settingsOpen: false })}>내 정보 · 상사 관리</Link><button onClick={() => { try { localStorage.removeItem(TUTORIAL_STORAGE_KEY); } catch { /* Storage may be unavailable. */ } ui.set({ tutorialOpen: true, settingsOpen: false }); navigate("/"); }}>튜토리얼 다시 보기</button><button className="danger-button" onClick={reset}>세션 데이터 초기화</button></motion.div>}</AnimatePresence>
       </div>
     </aside>
-    <Dialog open={Boolean(deleteTarget)} title="상사 데이터 삭제" onClose={() => { if (!deleting) setDeleteTarget(null); }}>
+    <Dialog compact open={Boolean(deleteTarget)} title="상사 데이터 삭제" onClose={() => { if (!deleting) setDeleteTarget(null); }}>
       <p><strong>{deleteTarget?.alias}</strong>와 연결된 모든 데이터를 삭제합니다.</p>
       <p className="hint">상사 프로필, 관찰 자료와 업로드 파일, 설문, 페르소나, 대화, 번역 아카이브, 혼잣말, 관련 AI 작업이 모두 삭제되며 복구할 수 없습니다.</p>
       {deleteError && <p className="error-text" role="alert">{deleteError}</p>}

@@ -89,9 +89,9 @@ export function MainPage() {
           <span className="thinking-indicator" aria-hidden="true"><i/><i/><i/></span>
         </button>
         <h1 id="boss-alias" className="boss-alias">{boss.alias}</h1>
-        <p className="boss-subtitle">{boss.scope === "GLOBAL" ? "모두가 사용할 수 있는 가상의 공통 상사" : "관찰을 바탕으로 만든 가상 행동 모델"}</p>
+        {boss.scope === "GLOBAL" ? <p className="boss-subtitle">모두가 사용할 수 있는 가상의 공통 상사</p> : <p className="boss-subtitle boss-subtitle-placeholder" aria-hidden="true">&#160;</p>}
         <PkiIndicator boss={boss}/>
-        {boss.status === "FAILED" && <p className="error-text">Persona 생성에 실패했습니다. 입력 정보는 저장되어 있습니다.</p>}
+        {boss.status === "FAILED" && <p className="error-text">페르소나 생성에 실패했습니다. 입력 정보는 저장되어 있습니다.</p>}
       </section>
       <aside className="workspace-dock" aria-label="대화와 번역">
         <header className="workspace-tabs-header">
