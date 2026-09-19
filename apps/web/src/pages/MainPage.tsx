@@ -66,17 +66,18 @@ export function MainPage() {
   if (session.isLoading || bosses.isLoading) return <div className="loading-state"><div className="boss-loading"><img className="loading-boss-avatar" src="/avatars/boss-male-01-loading.png" alt="모두의 상사 픽셀 아바타" width="150" height="150" fetchPriority="high"/><div className="spinner"/><p>모두의 상사를 부르는 중입니다.</p></div></div>;
   if (session.isError || bosses.isError || !boss) return <div className="empty-state"><div><h1>서비스를 시작하지 못했습니다.</h1><p>API 서버 연결을 확인한 뒤 다시 시도해 주세요.</p></div></div>;
 
-  return <AppShell>
+  return <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: .25, ease: "easeOut" }}>
+    <AppShell>
     <div className={`interaction-workspace ${ui.mobilePanelExpanded ? "" : "is-mobile-panel-collapsed"}`}>
       <section data-tutorial="workspace" className={`boss-stage ${thinking ? "is-thinking" : ""}`} aria-labelledby="boss-alias">
-        <div className="speech-bubble" aria-live="polite">{speech}</div>
+        <div aria-live="polite"><AnimatePresence mode="popLayout" initial={false}><motion.div key={`${boss.id}:${speech}`} className="speech-bubble" initial={{ opacity: 0, scale: .97, y: 4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .97, y: -4 }} transition={{ duration: .25, ease: [0.22, 1, 0.36, 1] }}>{speech}</motion.div></AnimatePresence></div>
         <button className="avatar-frame avatar-button" type="button" onClick={changeAvatarSpeech} aria-label={`${boss.alias}의 한마디 바꾸기`}>
-          <AnimatePresence mode="wait" initial={false}><motion.span key={boss.id} className="avatar-transition" initial={{ opacity: 0, scale: .96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.03 }} transition={{ duration: .24, ease: [0.22, 1, 0.36, 1] }}><img className="boss-avatar" src={`/avatars/${boss.avatarKey}.png`} alt={`${boss.alias} 픽셀 아바타`}/><img className="boss-avatar boss-avatar--closed" src={`/avatars/${boss.avatarKey}-closed.png`} alt="" aria-hidden="true"/></motion.span></AnimatePresence>
+          <AnimatePresence mode="wait" initial={false}><motion.span key={boss.id} className="avatar-transition" initial={{ opacity: 0, scale: .98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.01 }} transition={{ duration: .35, ease: [0.22, 1, 0.36, 1] }}><img className="boss-avatar" src={`/avatars/${boss.avatarKey}.png`} alt={`${boss.alias} 픽셀 아바타`}/><img className="boss-avatar boss-avatar--closed" src={`/avatars/${boss.avatarKey}-closed.png`} alt="" aria-hidden="true"/></motion.span></AnimatePresence>
           <span className="thinking-indicator" aria-hidden="true"><i/><i/><i/></span>
         </button>
         <h1 id="boss-alias" className="boss-alias">{boss.alias}</h1>
         <p className="boss-subtitle">{boss.scope === "GLOBAL" ? "모두가 사용할 수 있는 가상의 공통 상사" : "관찰을 바탕으로 만든 가상 행동 모델"}</p>
-        <PkiIndicator boss={boss}/>
+        {boss.scope === "GLOBAL" ? <div className="pki-button pki-indicator-placeholder" aria-hidden="true"><div className="pki-row"><span>상사 파악도</span><span>0</span></div><div className="pki-track"><div className="pki-fill" style={{width:0}}/></div><div className="pki-note">정보가 더 쌓이면 반응을 더 안정적으로 추정할 수 있어요.</div></div> : <PkiIndicator boss={boss}/>}
         {boss.status === "FAILED" && <p className="error-text">Persona 생성에 실패했습니다. 입력 정보는 저장되어 있습니다.</p>}
       </section>
       <aside className="workspace-dock" aria-label="대화와 번역">
@@ -98,5 +99,6 @@ export function MainPage() {
       </aside>
     </div>
     <Tutorial/>
-  </AppShell>;
+  </AppShell>
+  </motion.div>;
 }
