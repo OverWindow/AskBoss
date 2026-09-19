@@ -72,6 +72,7 @@ describe("ArchiveModal", () => {
     expect(screen.getByText(/실제 답변 기반 대화/)).toBeInTheDocument();
     expect(screen.getByText("네, 확인했습니다.")).toBeInTheDocument();
     expect(screen.getAllByText("내일 오전에 다시 보자.").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/당시 보낸 답변/)).not.toBeInTheDocument();
   });
 
   it("edits an actual response from an archive card", async () => {

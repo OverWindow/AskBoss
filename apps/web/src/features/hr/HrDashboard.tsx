@@ -31,7 +31,6 @@ export function HrDashboard({ dataset }: { dataset: "actual" | "mock" }) {
 
   return (
     <main className={`hr-main${isMock ? " is-mock" : ""}`}>
-      {isMock && <div className="hr-mock-banner" role="note"><strong>가상 데모</strong><span>모든 수치와 문구가 제품 시연용 가상 데이터이며 실제 사용자 정보가 아닙니다.</span></div>}
       {d.overview.summary && <p className="hr-summary">{d.overview.summary}</p>}
 
       <div className="metric-line">
