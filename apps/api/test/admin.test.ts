@@ -19,6 +19,44 @@ describe("admin API", () => {
     expect(response.statusCode).toBe(403);
   });
 
+  it("allows a same-origin admin login on a production deployment", async () => {
+    const previousNodeEnv = env.NODE_ENV;
+    const previousWebOrigin = env.WEB_ORIGIN;
+    env.NODE_ENV = "production";
+    env.WEB_ORIGIN = "http://localhost:5173";
+    try {
+      const allowed = await app.inject({
+        method: "POST",
+        url: "/api/admin/login",
+        headers: {
+          origin: "https://ask-boss-mauve.vercel.app",
+          host: "ask-boss-mauve.vercel.app",
+          "x-forwarded-proto": "https",
+          "x-forwarded-for": "10.0.0.11",
+        },
+        payload: { password: env.ADMIN_PASSWORD },
+      });
+      expect(allowed.statusCode).toBe(200);
+
+      const rejected = await app.inject({
+        method: "POST",
+        url: "/api/admin/login",
+        headers: {
+          origin: "https://attacker.example",
+          host: "ask-boss-mauve.vercel.app",
+          "x-forwarded-proto": "https",
+          "x-forwarded-for": "10.0.0.12",
+        },
+        payload: { password: env.ADMIN_PASSWORD },
+      });
+      expect(rejected.statusCode).toBe(403);
+      expect(rejected.json().error.code).toBe("INVALID_ORIGIN");
+    } finally {
+      env.NODE_ENV = previousNodeEnv;
+      env.WEB_ORIGIN = previousWebOrigin;
+    }
+  });
+
   it("creates and revokes an HttpOnly admin session", async () => {
     const login = await app.inject({ method: "POST", url: "/api/admin/login", headers: { origin, "x-forwarded-for": "10.0.0.10" }, payload: { password: env.ADMIN_PASSWORD } });
     expect(login.statusCode).toBe(200);

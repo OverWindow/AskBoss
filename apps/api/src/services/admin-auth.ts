@@ -25,17 +25,34 @@ export function adminSourceKey(request: Pick<FastifyRequest, "ip">) {
     : createHash("sha256").update(`askboss-admin:${request.ip}`).digest("hex");
 }
 
+function firstHeader(value: string | string[] | undefined) {
+  const header = Array.isArray(value) ? value[0] : value;
+  return header?.split(",", 1)[0]?.trim();
+}
+
+function normalizeHttpOrigin(value: string | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function requestOrigin(request: FastifyRequest) {
+  const host = firstHeader(request.headers.host) ?? firstHeader(request.headers["x-forwarded-host"]);
+  const protocol = firstHeader(request.headers["x-forwarded-proto"]) ?? request.protocol;
+  return host ? normalizeHttpOrigin(`${protocol}://${host}`) : null;
+}
+
 export function assertAdminOrigin(request: FastifyRequest) {
-  const origin = request.headers.origin;
+  const origin = normalizeHttpOrigin(request.headers.origin);
   if (!origin) throw new HttpError(403, "요청 출처를 확인할 수 없습니다.", "INVALID_ORIGIN");
-  if (origin === env.WEB_ORIGIN) return;
+  if (origin === normalizeHttpOrigin(env.WEB_ORIGIN) || origin === requestOrigin(request)) return;
   if (env.NODE_ENV !== "production") {
-    try {
-      const url = new URL(origin);
-      if (["localhost", "127.0.0.1"].includes(url.hostname) && url.protocol === "http:") return;
-    } catch {
-      // Invalid origins fail closed below.
-    }
+    const url = new URL(origin);
+    if (["localhost", "127.0.0.1"].includes(url.hostname) && url.protocol === "http:") return;
   }
   throw new HttpError(403, "허용되지 않은 요청 출처입니다.", "INVALID_ORIGIN");
 }

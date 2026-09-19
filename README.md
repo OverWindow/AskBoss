@@ -29,7 +29,7 @@ openssl rand -hex 32    # ADMIN_SESSION_SECRET
 
 ## 배포
 
-루트 Vercel 프로젝트 하나에서 Web 정적 빌드와 `/api` Node Function을 동일 origin으로 제공합니다. `/admin` 하위 경로도 SPA로 rewrite됩니다. 배포 전에 `.env.example`의 서버 환경변수를 Vercel에 등록하고 `/api/health/ai`에서 필수 모델을 확인합니다.
+루트 Vercel 프로젝트 하나에서 Web 정적 빌드와 `/api` Node Function을 동일 origin으로 제공합니다. `/admin` 하위 경로도 SPA로 rewrite됩니다. 배포 전에 `.env.example`의 서버 환경변수를 Vercel에 등록하고 `/api/health/ai`에서 필수 모델을 확인합니다. 운영 관리자 로그인을 위해 `ADMIN_PASSWORD`, `ADMIN_SESSION_SECRET`을 반드시 설정하고, `WEB_ORIGIN`은 실제 운영 origin(예: `https://ask-boss-mauve.vercel.app`)으로 설정합니다. 같은 배포 도메인의 `/admin` 요청은 Host와 Origin이 일치할 때도 허용됩니다.
 
 ## 검증
 
