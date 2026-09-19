@@ -8,6 +8,7 @@ import { TUTORIAL_STORAGE_KEY } from "../features/tutorial/Tutorial";
 import { api } from "../services/api-client";
 import { useUiStore } from "../stores/ui-store";
 import { Dialog } from "./Dialog";
+import { SERVICE_NAME } from "../config/brand";
 
 export function Sidebar() {
   const ui = useUiStore();
@@ -50,7 +51,7 @@ export function Sidebar() {
 
   return <>
     <aside className={`sidebar ${ui.mobileNavOpen ? "is-mobile-open" : ""}`} aria-label="주요 메뉴">
-      <div className="brand"><span className="brand-mark">AB</span><span className="hide-collapsed">AskBoss</span></div>
+      <div className="brand"><span className="hide-collapsed">{SERVICE_NAME}</span></div>
       <button className="sidebar-toggle" onClick={() => ui.set({ sidebarCollapsed: !ui.sidebarCollapsed })} aria-label={ui.sidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기"}>{ui.sidebarCollapsed ? <ChevronRight size={16}/> : <ChevronLeft size={16}/>}</button>
       {ui.mobileNavOpen && <button className="icon-button" style={{ position: "absolute", right: 12, top: 24 }} onClick={() => ui.set({ mobileNavOpen: false })} aria-label="메뉴 닫기"><X size={18}/></button>}
       <nav className="boss-nav">

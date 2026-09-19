@@ -147,6 +147,7 @@
 .translation-examples{display:flex;flex-wrap:wrap;gap:7px}
 .translation-examples button{border:1px solid var(--hr-border);border-radius:999px;background:#fff;padding:7px 10px;color:var(--hr-primary);font-size:.76rem;text-align:left}
 .translation-examples button:hover,.translation-examples button:focus-visible{border-color:var(--hr-accent);background:rgba(78,141,124,.06)}
+.boss-loading{display:grid;justify-items:center;gap:12px}.loading-boss-avatar{width:150px;height:150px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 12px 14px rgba(38,58,69,.1));animation:loading-avatar-float 1.8s ease-in-out infinite}.boss-loading p{margin:2px 0 0}@keyframes loading-avatar-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
 
 @media(max-width:1199px){
   .interaction-workspace{grid-template-columns:minmax(0,1fr) minmax(330px,38vw)}
