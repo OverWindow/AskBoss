@@ -32,7 +32,6 @@ export function HrDashboard() {
       <header id="overview" className="hr-title-row">
         <div>
           <h2>조직 커뮤니케이션 인사이트</h2>
-          <p className="hint">익명화된 집계이며 소표본 구간도 포함합니다.</p>
         </div>
         {d.includesDemo && <span className="demo-badge">데모 데이터 포함</span>}
       </header>

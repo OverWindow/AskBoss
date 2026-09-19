@@ -1,2 +1,47 @@
-import { Link } from "react-router-dom";import { motion } from "framer-motion";import { ChevronLeft } from "lucide-react";import { HrDashboard } from "../features/hr/HrDashboard";import { SERVICE_NAME } from "../config/brand";
-export function HrDemoPage(){return <motion.div className="hr-layout" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ duration: .3, ease: "easeOut" }}><aside className="hr-nav"><h1>{SERVICE_NAME} · HR</h1><Link to="/"><ChevronLeft size={15} style={{verticalAlign:"middle"}}/> 사용자 화면</Link><a href="#overview">요약</a><a href="#topics">주요 주제</a><a href="#demographics">직급·나이</a><a href="#insights">조직 인사이트</a><a href="#repeated">반복 시뮬레이션</a></aside><HrDashboard/></motion.div>}
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
+import { ChevronLeft } from "lucide-react";
+import { HrDashboard } from "../features/hr/HrDashboard";
+import { SERVICE_NAME } from "../config/brand";
+
+const SECTIONS = [
+  { id: "overview", label: "요약" },
+  { id: "topics", label: "주요 주제" },
+  { id: "demographics", label: "직급·나이" },
+  { id: "insights", label: "조직 인사이트" },
+  { id: "repeated", label: "반복 시뮬레이션" },
+];
+
+export function HrDemoPage() {
+  const [activeSection, setActiveSection] = useState<string>(SECTIONS[0]!.id);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const position = window.scrollY + window.innerHeight * 0.3;
+      let current = SECTIONS[0]!.id;
+      for (const section of SECTIONS) {
+        const el = document.getElementById(section.id);
+        if (el && el.offsetTop <= position) current = section.id;
+      }
+      setActiveSection(current);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const scrollTo = (id: string) => (event: React.MouseEvent) => {
+    event.preventDefault();
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  return <motion.div className="hr-layout" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ duration: .3, ease: "easeOut" }}>
+    <aside className="hr-nav">
+      <img className="hr-brand-logo" src="/image.png" alt={SERVICE_NAME} />
+      <Link to="/"><ChevronLeft size={15} style={{ verticalAlign: "middle" }} /> 사용자 화면</Link>
+      {SECTIONS.map((section) => <a key={section.id} href={`#${section.id}`} className={activeSection === section.id ? "is-active" : ""} onClick={scrollTo(section.id)}>{section.label}</a>)}
+    </aside>
+    <HrDashboard />
+  </motion.div>;
+}
