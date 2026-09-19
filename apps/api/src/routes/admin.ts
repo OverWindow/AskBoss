@@ -124,4 +124,17 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     try { const rolledUp = await store.rollupAnalytics(); await store.recordAdminOperation("ANALYTICS_ROLLUP", "SUCCEEDED", { rolledUp }); return { rolledUp }; }
     catch (error) { await store.recordAdminOperation("ANALYTICS_ROLLUP", "FAILED", { error: "operation_failed" }); throw error; }
   });
+  app.post("/admin/maintenance/prune-meaningless-sessions", async (request, reply) => {
+    assertAdminOrigin(request); await requireAdmin(request);
+    try {
+      const result = await store.pruneMeaninglessSessions();
+      if (result.storagePaths.length) await storage.remove(result.storagePaths);
+      await store.recordAdminOperation("MEANINGLESS_SESSIONS_PRUNE", "SUCCEEDED", { deletedSessionCount: result.deleted, deletedStoragePathCount: result.storagePaths.length });
+      return reply.code(200).send({ deletedSessionCount: result.deleted, deletedStoragePaths: result.storagePaths });
+    }
+    catch (error) {
+      await store.recordAdminOperation("MEANINGLESS_SESSIONS_PRUNE", "FAILED", { error: "operation_failed" });
+      throw error;
+    }
+  });
 };

@@ -27,7 +27,7 @@ describe("translation API", () => {
     });
   });
 
-  it("injects the administrator default only for personal bosses", async () => {
+  it("injects the administrator default for global and personal bosses", async () => {
     const seen: any[] = [];
     const translate = ai.translateBossMessage.bind(ai) as (...args: any[]) => Promise<any>;
     vi.spyOn(ai as any, "translateBossMessage").mockImplementation(async (...args: any[]) => { seen.push(args[0]); return translate(...args); });
@@ -39,13 +39,13 @@ describe("translation API", () => {
         method: "POST",
         url: "/api/bosses",
         headers: { cookie },
-        payload: { alias: "테스트 상사", avatarKey: "boss-male-01", jobFunction: "개발", yearsOfServiceBand: "10~14년", rank: "팀장", companyName: "테스트 회사", ageBand: 40, hierarchyScore: 70, genderBalanceScore: 0 },
+        payload: { alias: "테스트 상사", avatarKey: "boss-male-01", jobFunction: "개발", yearsOfServiceBand: "10~14년", rank: "팀장", companyName: "테스트 회사", ageBand: 40, hierarchyScore: 70 },
       });
 
       await app.inject({ method: "POST", url: "/api/bosses/00000000-0000-4000-8000-000000000001/translate", headers: { cookie }, payload: { inputText: "확인했나?", channel: "사내 메신저" } });
       await app.inject({ method: "POST", url: `/api/bosses/${personal.json().boss.id}/translate`, headers: { cookie }, payload: { inputText: "확인했나?", channel: "사내 메신저" } });
 
-      expect(seen[0].basePrompt).toBeUndefined();
+      expect(seen[0].basePrompt).toBe("결론과 마감을 먼저 확인하는 테스트 기본 성격");
       expect(seen[1].basePrompt).toBe("결론과 마감을 먼저 확인하는 테스트 기본 성격");
     } finally {
       await store.updatePersonalBossDefaults(DEFAULT_PERSONAL_BOSS_BASE_PROMPT);
@@ -53,7 +53,7 @@ describe("translation API", () => {
   });
 
   it("normalizes Markdown from every user-visible translation field", async () => {
-    vi.spyOn(ai, "translateBossMessage").mockResolvedValueOnce({ plainMeaning: "**현재 상황** 공유 요청", likelyIntent: ["- 일정 확인"], tone: "`간결함`", caution: "[단정 금지](https://example.com)", confidence: 0.7, replies: [{ text: "**오늘** 공유하겠습니다.", style: "무난하게", reason: "- 일정 명시" }, { text: "오후에 공유하겠습니다.", style: "간결하게", reason: "시점 명시" }, { text: "정리해서 공유드리겠습니다.", style: "부드럽게", reason: "예의 유지" }] });
+    vi.spyOn(ai, "translateBossMessage").mockResolvedValueOnce({ plainMeaning: "**현재 상황** 공유 요청", likelyIntent: ["- 일정 확인"], tone: "`간결함`", caution: "[단정 금지](https://example.com)", confidence: 0.7, surfaceActualGapScore: 20, replies: [{ text: "**오늘** 공유하겠습니다.", style: "무난하게", reason: "- 일정 명시" }, { text: "오후에 공유하겠습니다.", style: "간결하게", reason: "시점 명시" }, { text: "정리해서 공유드리겠습니다.", style: "부드럽게", reason: "예의 유지" }] });
     const session = await app.inject({ method: "POST", url: "/api/session" });
     const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
     const response = await app.inject({ method: "POST", url: "/api/bosses/00000000-0000-4000-8000-000000000001/translate", headers: { cookie }, payload: { inputText: "언제 되나?", channel: "사내 메신저" } });

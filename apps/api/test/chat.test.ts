@@ -1,6 +1,7 @@
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app";
 import { ai } from "../src/services/ai";
+import { store } from "../src/repositories";
 
 const app = buildApp();
 afterAll(() => app.close());
@@ -67,12 +68,14 @@ describe("chat SSE", () => {
     const bossId = "00000000-0000-4000-8000-000000000001";
     const translated = await app.inject({ method: "POST", url: `/api/bosses/${bossId}/translate`, headers: { cookie }, payload: { inputText: "이거 언제 되나?", channel: "사내 메신저" } });
     const { translationId, result } = translated.json();
+    const incrementSimulation = vi.spyOn(store,"incrementTranslationSimulation");
 
     const stream = await app.inject({ method: "POST", url: `/api/bosses/${bossId}/chat/simulate`, headers: { cookie, accept: "text/event-stream" }, payload: { translationId, replyIndex: 1 } });
     expect(stream.statusCode).toBe(200);
     expect([...stream.body.matchAll(/^event: (\w+)/gm)].map((match) => match[1])).toEqual(expect.arrayContaining(["meta", "delta", "done"]));
     expect(stream.body).toContain("이거 언제 되나?");
     expect(stream.body).toContain(result.replies[1].text);
+    expect(incrementSimulation).toHaveBeenCalledWith(expect.any(String),translationId);
 
     const history = await app.inject({ method: "GET", url: `/api/bosses/${bossId}/chat`, headers: { cookie } });
     expect(history.json()).toMatchObject({ threadId: null, messages: [] });

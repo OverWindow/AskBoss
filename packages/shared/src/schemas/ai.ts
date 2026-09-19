@@ -16,6 +16,6 @@ export const bossPersonaSchema = z.object({
 export const surveyQuestionsSchema = z.array(z.object({ id: z.string(), category: z.string(), situation: z.string(), options: z.array(z.object({ id: z.string(), label: z.string() })).min(2), allowFreeText: z.boolean() })).length(5);
 export const extractedEvidenceSchema = z.object({ observations: z.array(z.object({ category: z.string(), summary: z.string(), observedAt: z.string().nullable(), contextQuality: z.number().min(0).max(1), messages: z.array(z.object({ speaker: z.string().nullable(), timestamp: z.string().nullable(), content: z.string(), contextBefore: z.string().optional(), contextAfter: z.string().optional() })) })) });
 export const translationResultSchema = z.object({
-  plainMeaning: z.string(), likelyIntent: z.array(z.string()), tone: z.string(), caution: z.string().optional(), confidence: z.number().min(0).max(1),
+  plainMeaning: z.string(), likelyIntent: z.array(z.string()), tone: z.string(), caution: z.string().optional(), confidence: z.number().min(0).max(1), surfaceActualGapScore: z.number().min(0).max(100),
   replies: z.tuple([z.object({ text: z.string(), style: z.string(), reason: z.string() }), z.object({ text: z.string(), style: z.string(), reason: z.string() }), z.object({ text: z.string(), style: z.string(), reason: z.string() })]),
 });

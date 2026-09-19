@@ -1,9 +1,9 @@
-import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary } from "../shared.js";
+import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, HrDashboard } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, PersonalBossDefaults, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 
 export interface CreateBossInput {
   alias: string; avatarKey: string; jobFunction: string; yearsOfServiceBand: string; rank: string; companyName: string;
-  ageBand: number; hierarchyScore: number; genderBalanceScore: number; companyResearch?: CompanyResearch | null;
+  ageBand: number; hierarchyScore: number; companyResearch?: CompanyResearch | null;
 }
 
 export interface UpdateGlobalBossInput {
@@ -15,7 +15,6 @@ export interface UpdateGlobalBossInput {
   companyName?: string | null;
   ageBand?: number | null;
   hierarchyScore?: number | null;
-  genderBalanceScore?: number | null;
   companyResearch?: CompanyResearch | null;
 }
 
@@ -71,13 +70,14 @@ export interface Store {
   addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string): Promise<ChatMessageRecord>;
   listChatMessages(sessionId: string, bossId: string, cursor?: string, limit?: number): Promise<{ threadId: string | null; messages: ChatMessageRecord[]; nextCursor: string | null }>;
   updateThreadSummary(threadId: string, summary: string): Promise<void>;
-  createTranslation(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback">): Promise<TranslationRecord>;
+  createTranslation(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback" | "simulationCount">): Promise<TranslationRecord>;
   getTranslation(sessionId: string, id: string): Promise<TranslationRecord | null>;
   setTranslationFeedback(sessionId: string, id: string, feedback: "GOOD" | "BAD"): Promise<void>;
+  incrementTranslationSimulation(sessionId: string, id: string): Promise<void>;
   listMonologues(sessionId: string, bossId: string, limit: number): Promise<string[]>;
   addMonologue(sessionId: string, bossId: string, content: string): Promise<void>;
   trackAnalytics(subjectHash: string, input: AnalyticsEventInput): Promise<void>;
-  getHrDashboard(): Promise<any>;
+  getHrDashboard(): Promise<HrDashboard>;
   rollupAnalytics(): Promise<number>;
   cleanupExpired(): Promise<{ sessions: number; uploads: string[] }>;
   createAdminSession(tokenHash: string, ipHash: string, expiresAt: string): Promise<AdminSessionRecord>;
@@ -88,6 +88,7 @@ export interface Store {
   clearAdminLoginFailures(ipHash: string): Promise<void>;
   getAdminDashboard(): Promise<AdminDashboard>;
   listAdminSessions(cursor?: string, limit?: number): Promise<{ items: AdminSessionSummary[]; nextCursor: string | null }>;
+  pruneMeaninglessSessions(): Promise<{ deleted: number; storagePaths: string[] }>;
   listAdminJobs(status?: string, cursor?: string, limit?: number): Promise<{ items: AdminJobSummary[]; nextCursor: string | null }>;
   getPersonalBossDefaults(): Promise<PersonalBossDefaults>;
   updatePersonalBossDefaults(prompt: string): Promise<PersonalBossDefaults>;

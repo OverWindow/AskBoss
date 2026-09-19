@@ -11,7 +11,7 @@ import { translatorPrompt } from "../../prompts/translator.js";
 import { monologuePrompt } from "../../prompts/monologue.js";
 import { hrSummaryPrompt } from "../../prompts/hr-summary.js";
 import { simulationPrompt } from "../../prompts/simulation.js";
-import { personalBossSystemPrompt } from "../../prompts/shared.js";
+import { bossSystemPrompt } from "../../prompts/shared.js";
 import type { AiService, BossChatInput } from "./types.js";
 import { plainTextValues, toPlainText } from "../../utils/plain-text.js";
 
@@ -28,20 +28,20 @@ export class MindlogicAiService implements AiService {
     const response=await this.client.chat.completions.create({model:env.AI_PRIMARY_MODEL,temperature:.2,messages:[{role:"user",content:[{type:"text",text:evidencePrompt("첨부 이미지의 대화 내용을 분석하라.")},{type:"image_url",image_url:{url}}]}]});
     return this.validateOrRepair(env.AI_PRIMARY_MODEL,response.choices[0]?.message.content??"",extractedEvidenceSchema);
   }
-  buildPersona(input:any){const {basePrompt,...context}=input;return this.structured(env.AI_PRIMARY_MODEL,personaPrompt(context),bossPersonaSchema,undefined,input.boss?.scope==="SESSION"?personalBossSystemPrompt(basePrompt):undefined);}
+  buildPersona(input:any){const {basePrompt,globalBoss,...context}=input;return this.structured(env.AI_PRIMARY_MODEL,personaPrompt(context),bossPersonaSchema,undefined,bossSystemPrompt(basePrompt,input.boss?.scope==="SESSION"?globalBoss?.persona:undefined));}
   generateSurvey(boss:any){return this.structured(env.AI_PRIMARY_MODEL,surveyPrompt(boss),surveyQuestionsSchema);}
   async *streamChatWithBoss(input:BossChatInput,signal?:AbortSignal){
-    const {message,basePrompt,...context}=input;
-    const stream=await this.client.chat.completions.create({model:env.AI_PRIMARY_MODEL,messages:[...(input.boss.scope==="SESSION"?[{role:"system" as const,content:personalBossSystemPrompt(basePrompt)}]:[]),{role:"user",content:`${chatPrompt(context)}\n사용자: ${message}\n상사:`}],temperature:.4,stream:true},{signal});
+    const {message,basePrompt,globalPersona,...context}=input;
+    const stream=await this.client.chat.completions.create({model:env.AI_PRIMARY_MODEL,messages:[{role:"system" as const,content:bossSystemPrompt(basePrompt,input.boss.scope==="SESSION"?globalPersona:undefined)},{role:"user",content:`${chatPrompt(context)}\n사용자: ${message}\n상사:`}],temperature:.4,stream:true},{signal});
     for await(const part of stream){
       if(signal?.aborted)throw signal.reason;
       const content=part.choices[0]?.delta?.content;
       if(content)yield content;
     }
   }
-  async *streamSimulatedBossReaction(input:any,signal?:AbortSignal){const {basePrompt,...context}=input;const stream=await this.client.chat.completions.create({model:env.AI_PRIMARY_MODEL,messages:[...(input.boss.scope==="SESSION"?[{role:"system" as const,content:personalBossSystemPrompt(basePrompt)}]:[]),{role:"user",content:simulationPrompt(context)}],temperature:.4,stream:true},{signal});for await(const part of stream){if(signal?.aborted)throw signal.reason;const content=part.choices[0]?.delta?.content;if(content)yield content;}}
-  translateBossMessage(input:any,signal?:AbortSignal){const {basePrompt,...context}=input;return this.structured(env.AI_PRIMARY_MODEL,translatorPrompt(context),translationResultSchema,signal,input.boss?.scope==="SESSION"?personalBossSystemPrompt(basePrompt):undefined);}
-  async generateMonologue(input:any){const {basePrompt,...context}=input;return toPlainText(await this.text(env.AI_PRIMARY_MODEL,monologuePrompt(context),undefined,input.boss?.scope==="SESSION"?personalBossSystemPrompt(basePrompt):undefined));}
+  async *streamSimulatedBossReaction(input:any,signal?:AbortSignal){const {basePrompt,globalBoss,...context}=input;const stream=await this.client.chat.completions.create({model:env.AI_PRIMARY_MODEL,messages:[{role:"system" as const,content:bossSystemPrompt(basePrompt,input.boss.scope==="SESSION"?globalBoss?.persona:undefined)},{role:"user",content:simulationPrompt(context)}],temperature:.4,stream:true},{signal});for await(const part of stream){if(signal?.aborted)throw signal.reason;const content=part.choices[0]?.delta?.content;if(content)yield content;}}
+  translateBossMessage(input:any,signal?:AbortSignal){const {basePrompt,globalBoss,...context}=input;return this.structured(env.AI_PRIMARY_MODEL,translatorPrompt(context),translationResultSchema,signal,bossSystemPrompt(basePrompt,input.boss?.scope==="SESSION"?globalBoss?.persona:undefined));}
+  async generateMonologue(input:any){const {basePrompt,globalBoss,...context}=input;return toPlainText(await this.text(env.AI_PRIMARY_MODEL,monologuePrompt(context),undefined,bossSystemPrompt(basePrompt,input.boss?.scope==="SESSION"?globalBoss?.persona:undefined)));}
   async generateHrSummary(data:any){return toPlainText(await this.text(env.AI_PRIMARY_MODEL,hrSummaryPrompt(data)));}
   async health(){
     const required=[env.AI_PRIMARY_MODEL,env.AI_COMPANY_RESEARCH_MODEL];

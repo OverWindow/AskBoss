@@ -2,8 +2,8 @@ import { describe,expect,it } from "vitest";
 import { validateStep } from "./steps";
 
 const draft={
-  profile:{handle:"ab",ageBand:30,yearsOfServiceBand:"",rank:"",entryPath:"",weaknesses:[]},
-  boss:{alias:"",avatarKey:"boss-male-01",jobFunction:"",yearsOfServiceBand:"",rank:"",companyName:"",ageBand:40,hierarchyScore:50,genderBalanceScore:0},
+  profile:{handle:"ab",ageBand:30,yearsOfServiceBand:"",jobFunction:"",rank:"",entryPath:"",weaknesses:[]},
+  boss:{alias:"",avatarKey:"boss-male-01",jobFunction:"",yearsOfServiceBand:"",rank:"",companyName:"",ageBand:40,hierarchyScore:50},
 };
 
 describe("validateStep",()=>{

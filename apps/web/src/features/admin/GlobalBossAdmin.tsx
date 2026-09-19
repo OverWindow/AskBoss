@@ -37,7 +37,7 @@ export function GlobalBossAdmin({ onLogout }: Props) {
     if (!boss) return;
     setBusy("save"); setMessage("");
     try {
-      const { boss: saved } = await adminApi<{ boss: Boss }>("/admin/global-boss", { method: "PATCH", body: JSON.stringify({ alias: boss.alias, avatarKey: boss.avatarKey, jobFunction: boss.jobFunction, yearsOfServiceBand: boss.yearsOfServiceBand, rank: boss.rank, companyName: boss.companyName, ageBand: boss.ageBand, hierarchyScore: boss.hierarchyScore, genderBalanceScore: boss.genderBalanceScore, companyResearch: boss.companyResearch }) });
+      const { boss: saved } = await adminApi<{ boss: Boss }>("/admin/global-boss", { method: "PATCH", body: JSON.stringify({ alias: boss.alias, avatarKey: boss.avatarKey, jobFunction: boss.jobFunction, yearsOfServiceBand: boss.yearsOfServiceBand, rank: boss.rank, companyName: boss.companyName, ageBand: boss.ageBand, hierarchyScore: boss.hierarchyScore, companyResearch: boss.companyResearch }) });
       setBoss(saved); setMessage("모두의 상사 기본 정보를 저장했습니다."); await detail.refetch();
     } catch (error) { setMessage(error instanceof Error ? error.message : "저장하지 못했습니다."); }
     finally { setBusy(undefined); }
@@ -119,7 +119,6 @@ export function GlobalBossAdmin({ onLogout }: Props) {
         <label>회사<input className="input" value={boss.companyName ?? ""} onChange={(event) => { patchBoss("companyName", event.target.value || null); patchBoss("companyResearch", null); }}/></label>
         <label>나이대<select className="select" value={boss.ageBand ?? ""} onChange={(event) => patchBoss("ageBand", event.target.value ? Number(event.target.value) : null)}><option value="">미지정</option><Options values={AGE_BANDS}/></select></label>
         <label>위계도 <b>{boss.hierarchyScore ?? 50}</b><input className="range" type="range" min="0" max="100" value={boss.hierarchyScore ?? 50} onChange={(event) => patchBoss("hierarchyScore", Number(event.target.value))}/></label>
-        <label>성비 <b>{boss.genderBalanceScore ?? 0}</b><input className="range" type="range" min="-100" max="100" value={boss.genderBalanceScore ?? 0} onChange={(event) => patchBoss("genderBalanceScore", Number(event.target.value))}/></label>
         <div className="admin-form-actions"><button className="secondary-button" disabled={!boss.companyName || Boolean(busy)} onClick={() => void researchCompany()}><RefreshCw size={16}/>{busy === "research" ? "조사 중…" : "회사 정보 조사"}</button><button className="primary-button" disabled={Boolean(busy)} onClick={() => void saveBoss()}><Save size={16}/>{busy === "save" ? "저장 중…" : "기본 정보 저장"}</button></div>
         {boss.companyResearch && <div className="company-research-preview"><strong>{boss.companyResearch.industry ?? "업종 미확인"}</strong><p>{boss.companyResearch.businessSummary}</p><small>신뢰도 {Math.round(boss.companyResearch.confidence * 100)}%</small></div>}
       </div>

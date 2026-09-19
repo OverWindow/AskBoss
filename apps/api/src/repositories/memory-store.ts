@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionSummary, type BossPersona, type PersonalBossDefaults } from "../shared.js";
+import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionSummary, type BossPersona, type HrDashboard, type PersonalBossDefaults } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
+import { computeTopRepeatedPhrases } from "../utils/hr-aggregation.js";
 
 const globalPersona: BossPersona = {
   summary: "한국 회사에서 흔히 볼 수 있는 중간관리자형의 가상 공통 페르소나입니다.",
@@ -16,7 +17,7 @@ const globalPersona: BossPersona = {
 
 const globalBoss: BossRecord = {
   id: "00000000-0000-4000-8000-000000000001", scope: "GLOBAL", status: "READY", sessionId: null, alias: "모두의 상사", avatarKey: "boss-male-01",
-  jobFunction: null, yearsOfServiceBand: null, rank: "팀장", companyName: null, ageBand: 40, hierarchyScore: 55, genderBalanceScore: 0,
+  jobFunction: null, yearsOfServiceBand: null, rank: "팀장", companyName: null, ageBand: 40, hierarchyScore: 55,
   companyResearch: null, persona: globalPersona, pki: null, personaError: null, expiresAt: null,
   personaVersion: 1,
 };
@@ -48,9 +49,14 @@ export class MemoryStore implements Store {
   async deleteSession(id: string) {
     for (const [key, row] of this.sessions) if (row.id === id) this.sessions.delete(key);
     this.profiles.delete(id);
-    for (const [key, row] of this.bosses) if (row.sessionId === id) this.bosses.delete(key);
+    const bossIds=[...this.bosses.values()].filter((row)=>row.sessionId===id).map((row)=>row.id);
+    for (const bossId of bossIds) { this.bosses.delete(bossId); this.surveys.delete(bossId); }
     for (const [key, row] of this.evidence) if (row.sessionId === id) this.evidence.delete(key);
     for (const [key, row] of this.threads) if (row.sessionId === id) this.threads.delete(key);
+    for (const [key,row] of this.translations) if (row.sessionId===id) this.translations.delete(key);
+    for (const [key,row] of this.uploads) if (row.sessionId===id) this.uploads.delete(key);
+    for (const [key,row] of this.jobs) if (row.sessionId===id) this.jobs.delete(key);
+    for (const bossId of bossIds) this.monologues.delete(`${id}:${bossId}`);
   }
   async getProfile(sessionId: string) { return this.profiles.get(sessionId) ?? null; }
   async isHandleAvailable(handle: string, sessionId?: string) { return ![...this.profiles].some(([id, profile]) => id !== sessionId && profile.handle.toLocaleLowerCase("ko") === handle.toLocaleLowerCase("ko")); }
@@ -118,20 +124,32 @@ export class MemoryStore implements Store {
   async addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string) { const row: ChatMessageRecord = { id: randomUUID(), role, content, createdAt: new Date().toISOString() }; const thread = this.threads.get(threadId); if (!thread) throw new Error("대화를 찾을 수 없습니다."); thread.messages.push(row); return row; }
   async listChatMessages(sessionId: string, bossId: string, cursor?: string, limit = 50) { const thread = [...this.threads.values()].filter((row) => row.sessionId === sessionId && row.bossId === bossId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]; if (!thread) return { threadId: null, messages: [], nextCursor: null }; const filtered = cursor ? thread.messages.filter((message) => message.createdAt < cursor) : thread.messages; const messages = filtered.slice(-limit); return { threadId: thread.id, messages, nextCursor: filtered.length > limit ? messages[0]?.createdAt ?? null : null }; }
   async updateThreadSummary(threadId: string, summary: string) { const row = this.threads.get(threadId); if (row) row.conversationSummary = summary; }
-  async createTranslation(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback">) { const row: TranslationRecord = { ...input, id: randomUUID(), feedback: null, createdAt: new Date().toISOString() }; this.translations.set(row.id, row); return row; }
+  async createTranslation(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback" | "simulationCount">) { const row: TranslationRecord = { ...input, id: randomUUID(), feedback: null, simulationCount: 0, createdAt: new Date().toISOString() }; this.translations.set(row.id, row); return row; }
   async getTranslation(sessionId: string, id: string) { const row = this.translations.get(id); return row?.sessionId === sessionId && Date.parse(row.expiresAt) > Date.now() ? row : null; }
   async setTranslationFeedback(sessionId: string, id: string, feedback: "GOOD" | "BAD") { const row = this.translations.get(id); if (!row || row.sessionId !== sessionId) throw new Error("번역 결과를 찾을 수 없습니다."); row.feedback = feedback; }
+  async incrementTranslationSimulation(sessionId: string, id: string) { const row = await this.getTranslation(sessionId,id); if (!row) throw new Error("번역 결과를 찾을 수 없습니다."); row.simulationCount += 1; }
   async listMonologues(sessionId: string, bossId: string, limit: number) { return (this.monologues.get(`${sessionId}:${bossId}`) ?? []).slice(-limit); }
   async addMonologue(sessionId: string, bossId: string, content: string) { const key = `${sessionId}:${bossId}`; const values = this.monologues.get(key) ?? []; values.push(content); this.monologues.set(key, values.slice(-10)); }
   async trackAnalytics(subjectHash: string, input: AnalyticsEventInput) { this.analytics.push({ ...input, subjectHash, occurredAt: new Date().toISOString() }); }
-  async getHrDashboard() {
+  async getHrDashboard(): Promise<HrDashboard> {
+    const sameJobCounts = new Map<string, number>();
+    for (const row of this.analytics) {
+      const bucket = row.sameJobFunctionBucket;
+      if (bucket === "SAME" || bucket === "DIFF") {
+        sameJobCounts.set(bucket, (sameJobCounts.get(bucket) ?? 0) + 1);
+      }
+    }
+    const sameJobFunctionDistribution = ([
+      { bucket: "SAME" as const, count: sameJobCounts.get("SAME") ?? 0 },
+      { bucket: "DIFF" as const, count: sameJobCounts.get("DIFF") ?? 0 },
+    ] as { bucket: "SAME" | "DIFF"; count: number }[]).filter((item) => item.count > 0);
+    const topRepeatedPhrases=computeTopRepeatedPhrases([...this.translations.values()].flatMap((row)=>Array.from({length:row.simulationCount},()=>({inputText:row.inputText}))));
     if (this.analytics.length) {
       const group = (key:"rankGapBucket"|"ageGapBucket") => [...this.analytics.reduce((map,row) => { const label=row[key]; if(label)map.set(label,(map.get(label)??0)+1); return map; },new Map<string,number>())].map(([label,value])=>({label,value}));
       const topicCounts=this.analytics.reduce((map,row)=>{for(const topic of row.topicKeywords??[])map.set(topic,(map.get(topic)??0)+1);return map;},new Map<string,number>());
       const featureCounts=this.analytics.reduce((map,row)=>map.set(row.feature,(map.get(row.feature)??0)+1),new Map<string,number>());
       const topFeature=[...featureCounts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0]?.[0]??"-";
-      const hourly=this.analytics.reduce((map,row)=>{const hour=new Date(row.occurredAt).getHours();map.set(hour,(map.get(hour)??0)+1);return map;},new Map<number,number>());
-      return {includesDemo:this.analytics.some(row=>Boolean(row.isDemo)),overview:{totalUses:this.analytics.length,activeSubjects:new Set(this.analytics.map(row=>row.subjectHash)).size,topFeature,summary:"최근 31일간의 익명 집계입니다. 5명 미만의 소표본 구간도 포함됩니다."},topics:[...topicCounts].map(([text,value])=>({text,value})).sort((a,b)=>b.value-a.value).slice(0,30),rankGap:group("rankGapBucket"),ageGap:group("ageGapBucket"),byTime:Array.from({length:24},(_,hour)=>({label:`${hour}시`,value:hourly.get(hour)??0}))};
+      return {includesDemo:this.analytics.some(row=>Boolean(row.isDemo)),overview:{totalUses:this.analytics.length,activeSubjects:new Set(this.analytics.map(row=>row.subjectHash)).size,topFeature,summary:"최근 31일간의 익명 집계입니다."},topics:[...topicCounts].map(([text,value])=>({text,value})).sort((a,b)=>b.value-a.value).slice(0,30),rankGap:group("rankGapBucket"),ageGap:group("ageGapBucket"),sameJobFunctionDistribution,surfaceActualGapRate:null,topRepeatedPhrases};
     }
     return {
       includesDemo: true,
@@ -139,7 +157,9 @@ export class MemoryStore implements Store {
       topics: [{ text: "보고", value: 82 }, { text: "일정", value: 71 }, { text: "마감", value: 62 }, { text: "피드백", value: 55 }, { text: "회의", value: 44 }, { text: "메신저", value: 39 }, { text: "연차", value: 31 }, { text: "실수", value: 28 }],
       rankGap: [{ label: "0", value: 48 }, { label: "1단계", value: 96 }, { label: "2단계", value: 154 }, { label: "3단계+", value: 202 }],
       ageGap: [{ label: "0~5년", value: 73 }, { label: "6~10년", value: 118 }, { label: "11~20년", value: 191 }, { label: "20년+", value: 118 }],
-      byTime: Array.from({ length: 24 }, (_, hour) => ({ label: `${hour}시`, value: Math.round(5 + 34 * Math.exp(-Math.pow(hour - 14, 2) / 20) + 20 * Math.exp(-Math.pow(hour - 9, 2) / 8)) })),
+      sameJobFunctionDistribution,
+      surfaceActualGapRate: 0,
+      topRepeatedPhrases,
     };
   }
   async rollupAnalytics(){return 0;}
@@ -167,6 +187,19 @@ export class MemoryStore implements Store {
     const rows = [...this.sessions.values()].filter((row) => Date.parse(row.expiresAt) > Date.now() && (!cursor || row.createdAt < cursor)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)); const page = rows.slice(0,limit);
     const items: AdminSessionSummary[] = page.map((row) => ({ id: row.id, createdAt: row.createdAt, lastSeenAt: row.lastSeenAt, expiresAt: row.expiresAt, bossCount: [...this.bosses.values()].filter((boss) => boss.sessionId === row.id).length, chatMessageCount: [...this.threads.values()].filter((thread) => thread.sessionId === row.id).reduce((sum,thread) => sum + thread.messages.length,0), translationCount: [...this.translations.values()].filter((translation) => translation.sessionId === row.id).length }));
     return { items, nextCursor: rows.length > limit ? page.at(-1)?.createdAt ?? null : null };
+  }
+  async pruneMeaninglessSessions() {
+    const meaningless = [...this.sessions.values()].filter((row) => {
+      if (Date.parse(row.expiresAt) <= Date.now() || Date.parse(row.lastSeenAt) > Date.now()-86_400_000) return false;
+      const hasProfile = this.profiles.has(row.id);
+      const hasBoss = [...this.bosses.values()].some((boss) => boss.sessionId === row.id);
+      const hasMessages = [...this.threads.values()].some((thread) => thread.sessionId === row.id && thread.messages.length > 0);
+      const hasTranslations = [...this.translations.values()].some((translation) => translation.sessionId === row.id);
+      return !hasProfile && !hasBoss && !hasMessages && !hasTranslations;
+    });
+    const storagePaths = [...this.evidence.values()].filter((row) => meaningless.some((session) => session.id === row.sessionId) && row.storagePath).map((row) => row.storagePath!);
+    for (const session of meaningless) await this.deleteSession(session.id);
+    return { deleted: meaningless.length, storagePaths };
   }
   async listAdminJobs(status?: string, cursor?: string, limit = 20) {
     const rows = [...this.jobs.values()].filter((row) => (!status || row.status === status) && (!cursor || row.createdAt < cursor)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)); const page = rows.slice(0,limit);

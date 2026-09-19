@@ -48,7 +48,6 @@ export interface Boss {
   companyName: string | null;
   ageBand: number | null;
   hierarchyScore: number | null;
-  genderBalanceScore: number | null;
   companyResearch: CompanyResearch | null;
   persona: BossPersona | null;
   pki: PkiBreakdown | null;
@@ -61,6 +60,7 @@ export interface UserProfile {
   ageBand: number;
   yearsOfServiceBand: string;
   rank: string;
+  jobFunction: string;
   entryPath: string;
   weaknesses: string[];
 }
@@ -95,6 +95,7 @@ export interface TranslationResult {
   tone: string;
   caution?: string;
   confidence: number;
+  surfaceActualGapScore: number;
   replies: [{ text: string; style: string; reason: string }, { text: string; style: string; reason: string }, { text: string; style: string; reason: string }];
 }
 
@@ -105,7 +106,7 @@ export interface PersonalBossDefaults {
 
 export interface AdminOperation {
   id: string;
-  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD" | "PERSONAL_BOSS_DEFAULTS_UPDATE";
+  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD" | "PERSONAL_BOSS_DEFAULTS_UPDATE" | "MEANINGLESS_SESSIONS_PRUNE";
   status: "SUCCEEDED" | "FAILED";
   detail: Record<string, number | string | boolean | null>;
   createdAt: string;
@@ -145,6 +146,17 @@ export interface AdminDashboard {
   uploads: { expiredIncomplete: number };
   featureUsage: { feature: string; value: number }[];
   recentOperations: AdminOperation[];
+}
+
+export interface HrDashboard {
+  includesDemo: boolean;
+  overview: { totalUses: number; activeSubjects: number; topFeature: string; summary: string };
+  topics: { text: string; value: number }[];
+  rankGap: { label: string; value: number }[];
+  ageGap: { label: string; value: number }[];
+  sameJobFunctionDistribution: { bucket: "SAME" | "DIFF"; count: number }[];
+  surfaceActualGapRate: number | null;
+  topRepeatedPhrases: { phrase: string; count: number }[];
 }
 
 export interface AdminSessionSummary {

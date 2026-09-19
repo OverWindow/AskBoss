@@ -64,14 +64,14 @@ function PersonalBossDefaultsCard() {
     setSaving(true); setMessage(undefined);
     try {
       const saved = await adminApi<PersonalBossDefaults>("/admin/personal-boss-defaults", { method: "PUT", body: JSON.stringify({ prompt }) });
-      setPrompt(saved.prompt); setMessage(saved.prompt ? "개인 상사 기본 성격을 저장했습니다." : "개인 상사 기본 성격을 비활성화했습니다."); await settings.refetch();
+      setPrompt(saved.prompt); setMessage(saved.prompt ? "상사 공통 기본 성격을 저장했습니다." : "상사 공통 기본 성격을 비활성화했습니다."); await settings.refetch();
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : "기본 성격을 저장하지 못했습니다."); }
     finally { setSaving(false); }
   };
 
-  return <section className="admin-section"><div className="admin-section-title"><Settings2 size={19}/><div><h2>개인 상사 공통 기본 성격</h2><p>모든 기존·신규 개인 상사의 페르소나, 번역, 대화, 혼잣말에 적용됩니다. 모두의 상사는 제외됩니다.</p></div></div>
+  return <section className="admin-section"><div className="admin-section-title"><Settings2 size={19}/><div><h2>상사 공통 기본 성격</h2><p>모두의 상사와 모든 기존·신규 개인 상사의 페르소나, 번역, 대화, 혼잣말에 적용됩니다.</p></div></div>
     {settings.isError ? <div className="admin-inline-error"><AlertTriangle size={18}/><span>기본 성격을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void settings.refetch()}>다시 시도</button></div> : <div className="admin-prompt-form">
-      <label htmlFor="personal-boss-base-prompt">시스템 프롬프트형 기본 성격</label>
+      <label htmlFor="personal-boss-base-prompt">공통 시스템 프롬프트</label>
       <textarea id="personal-boss-base-prompt" className="textarea" maxLength={5_000} value={prompt} disabled={settings.isLoading || saving} onChange={(event) => setPrompt(event.target.value)} placeholder="비워서 추가 기본 성향을 비활성화할 수 있습니다."/>
       <div className="admin-prompt-meta"><small>{prompt.length.toLocaleString("ko-KR")} / 5,000자</small>{settings.data?.updatedAt && <small>마지막 저장 {formatDate(settings.data.updatedAt)}</small>}</div>
       <p className="hint">저장 즉시 새 AI 응답에 적용됩니다. 기존 페르소나 데이터는 다음 재생성 때 갱신됩니다.</p>
@@ -97,6 +97,17 @@ function AdminDashboardView({ onLogout }: { onLogout: () => Promise<void> }) {
     catch (cause) { setMessage(cause instanceof Error ? cause.message : "작업을 실행하지 못했습니다."); }
     finally { setRunning(undefined); }
   };
+  const pruneMeaninglessSessions = async () => {
+    if (!window.confirm("24시간 이상 활동이 없고 프로필·상사·대화·번역 데이터가 전혀 없는 세션을 삭제합니다. 계속하시겠습니까?")) return;
+    setRunning("prune-meaningless-sessions"); setMessage(undefined);
+    try {
+      const result = await adminApi<{ deletedSessionCount: number; deletedStoragePaths: string[] }>("/admin/maintenance/prune-meaningless-sessions", { method: "POST" });
+      setMessage(`무의미 세션 ${result.deletedSessionCount}개를 삭제했습니다. (스토리지 파일 ${result.deletedStoragePaths.length}개)`);
+      await refresh();
+    }
+    catch (cause) { setMessage(cause instanceof Error ? cause.message : "세션 삭제에 실패했습니다."); }
+    finally { setRunning(undefined); }
+  };
   const data = dashboard.data;
 
   if (dashboard.isLoading) return <div className="loading-state"><div><div className="spinner"/><p>운영 현황을 불러오는 중입니다.</p></div></div>;
@@ -119,7 +130,7 @@ function AdminDashboardView({ onLogout }: { onLogout: () => Promise<void> }) {
     <section className="admin-section"><div className="admin-section-title"><Clock3 size={19}/><div><h2>AI Job</h2><p>오래 대기하거나 실패한 작업을 확인합니다.</p></div></div><div className="admin-metric-grid"><Metric label="대기" value={data.jobs.pending}/><Metric label="실행 중" value={data.jobs.running}/><Metric label="실패" value={data.jobs.failed}/><Metric label="최장 대기" value={data.jobs.oldestPendingMinutes === null ? "없음" : `${data.jobs.oldestPendingMinutes}분`}/></div>{data.jobs.failureReasons.length > 0 && <div className="failure-summary" aria-label="Job 실패 원인 요약">{data.jobs.failureReasons.map((item) => <span key={item.reason}>{item.reason} <strong>{item.count}</strong></span>)}</div>}{jobs.isError ? <div className="admin-inline-error"><AlertTriangle size={18}/><span>Job 목록을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void jobs.refetch()}>다시 시도</button></div> : <div className="admin-table-wrap"><table><thead><tr><th>종류</th><th>상태</th><th>시도</th><th>시각</th><th>조치</th></tr></thead><tbody>{jobs.data?.items.map((job) => <tr key={job.id}><td>{job.type}</td><td><span className={`job-status status-${job.status.toLowerCase()}`}>{job.status}</span>{job.errorMessage && <small className="job-error">{job.errorMessage}</small>}</td><td>{job.attempts}/{job.maxAttempts}</td><td>{formatDate(job.updatedAt)}</td><td>{job.status === "FAILED" ? <button className="small-button" disabled={running === job.id} onClick={() => void operation(job.id, `/admin/jobs/${job.id}/retry`)}><Play size={14}/>재시도</button> : "—"}</td></tr>)}</tbody></table></div>}</section>
 
     <section className="admin-grid-two"><div className="admin-section"><div className="admin-section-title"><Database size={19}/><div><h2>최근 세션</h2><p>식별자는 마스킹됩니다.</p></div></div>{sessions.isError ? <div className="admin-inline-error"><AlertTriangle size={18}/><span>세션 목록을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void sessions.refetch()}>다시 시도</button></div> : <div className="admin-table-wrap"><table><thead><tr><th>세션</th><th>마지막 활동</th><th>상사</th><th>대화</th></tr></thead><tbody>{sessions.data?.items.map((session) => <tr key={session.id}><td><code>{session.id}</code></td><td>{formatDate(session.lastSeenAt)}</td><td>{session.bossCount}</td><td>{session.chatMessageCount}</td></tr>)}</tbody></table></div>}</div>
-    <div className="admin-section"><div className="admin-section-title"><ShieldCheck size={19}/><div><h2>유지관리</h2><p>활성 세션은 변경하지 않습니다.</p></div></div><div className="maintenance-actions"><button className="secondary-button" disabled={Boolean(running)} onClick={() => void operation("cleanup", "/admin/maintenance/cleanup")}>만료 데이터 정리</button><button className="secondary-button" disabled={Boolean(running)} onClick={() => void operation("rollup", "/admin/maintenance/rollup")}>Analytics 집계</button></div><h3>최근 실행</h3><ul className="operation-list">{data.recentOperations.map((item) => <li key={item.id}><span>{item.type}</span><strong className={item.status === "SUCCEEDED" ? "success-text" : "error-text"}>{item.status}</strong><time>{formatDate(item.createdAt)}</time></li>)}{data.recentOperations.length === 0 && <li>실행 기록이 없습니다.</li>}</ul></div></section>
+    <div className="admin-section"><div className="admin-section-title"><ShieldCheck size={19}/><div><h2>유지관리</h2><p>최근 활동이나 사용자 입력이 있는 세션은 변경하지 않습니다.</p></div></div><div className="maintenance-actions"><button className="secondary-button" disabled={Boolean(running)} onClick={() => void operation("cleanup", "/admin/maintenance/cleanup")}>만료 데이터 정리</button><button className="secondary-button" disabled={Boolean(running)} onClick={() => void operation("rollup", "/admin/maintenance/rollup")}>Analytics 집계</button><button className="secondary-button" disabled={Boolean(running)} onClick={() => void pruneMeaninglessSessions()}>무의미 세션 삭제</button></div><h3>최근 실행</h3><ul className="operation-list">{data.recentOperations.map((item) => <li key={item.id}><span>{item.type}</span><strong className={item.status === "SUCCEEDED" ? "success-text" : "error-text"}>{item.status}</strong><time>{formatDate(item.createdAt)}</time></li>)}{data.recentOperations.length === 0 && <li>실행 기록이 없습니다.</li>}</ul></div></section>
   </main>;
 }
 

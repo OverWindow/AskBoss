@@ -1,16 +1,17 @@
 import postgres, { type Sql } from "postgres";
-import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, Boss, CompanyResearch, UserProfile } from "../shared.js";
+import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, Boss, CompanyResearch, HrDashboard, UserProfile } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord } from "../types.js";
 import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { MemoryStore } from "./memory-store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 import { toIsoTimestamp } from "../utils/database.js";
+import { computeSurfaceActualGap } from "../utils/hr-aggregation.js";
 
 const camelSession = (r: any): SessionRecord => ({ id: r.id, tokenHash: r.token_hash, createdAt: r.created_at.toISOString(), lastSeenAt: r.last_seen_at.toISOString(), expiresAt: r.expires_at.toISOString() });
 const camelBoss = (r: any): BossRecord => ({
   id: r.id, scope: r.scope, status: r.status, sessionId: r.session_id, alias: r.alias, avatarKey: r.avatar_key, jobFunction: r.job_function,
   yearsOfServiceBand: r.years_of_service_band, rank: r.rank, companyName: r.company_name, ageBand: r.age_band, hierarchyScore: r.hierarchy_score,
-  genderBalanceScore: r.gender_balance_score, companyResearch: r.company_research, persona: r.persona_profile, pki: r.pki_breakdown,
+  companyResearch: r.company_research, persona: r.persona_profile, pki: r.pki_breakdown,
   personaError: r.persona_error, expiresAt: r.expires_at?.toISOString() ?? null,
   personaVersion: Number(r.persona_version ?? 0),
 });
@@ -40,24 +41,24 @@ export class PostgresStore implements Store {
   async findSession(tokenHash: string) { const [r] = await this.sql`select * from sessions where token_hash=${tokenHash} and expires_at > now()`; return r ? camelSession(r) : null; }
   async touchSession(id: string) { await this.sql`update sessions set last_seen_at=now() where id=${id} and last_seen_at<now()-interval '1 minute'`; }
   async deleteSession(id: string) { await this.sql`delete from sessions where id=${id}`; }
-  async getProfile(sessionId: string) { const [r] = await this.sql`select * from user_profiles where session_id=${sessionId}`; return r ? { handle: r.handle, ageBand: r.age_band, yearsOfServiceBand: r.years_of_service_band, rank: r.rank, entryPath: r.entry_path, weaknesses: r.weaknesses } : null; }
+  async getProfile(sessionId: string) { const [r] = await this.sql`select * from user_profiles where session_id=${sessionId}`; return r ? { handle: r.handle, ageBand: r.age_band, yearsOfServiceBand: r.years_of_service_band, rank: r.rank, jobFunction: r.job_function ?? "", entryPath: r.entry_path, weaknesses: r.weaknesses } : null; }
   async isHandleAvailable(handle: string, sessionId?: string) { const [r] = sessionId ? await this.sql`select count(*)::int as count from user_profiles where lower(handle)=lower(${handle}) and session_id<>${sessionId}` : await this.sql`select count(*)::int as count from user_profiles where lower(handle)=lower(${handle})`; return r!.count === 0; }
   async upsertProfile(sessionId: string, p: UserProfile) {
-    const [r] = await this.sql`insert into user_profiles (session_id,handle,age_band,years_of_service_band,rank,entry_path,weaknesses)
-      values (${sessionId},${p.handle},${p.ageBand},${p.yearsOfServiceBand},${p.rank},${p.entryPath},${p.weaknesses})
-      on conflict (session_id) do update set handle=excluded.handle,age_band=excluded.age_band,years_of_service_band=excluded.years_of_service_band,rank=excluded.rank,entry_path=excluded.entry_path,weaknesses=excluded.weaknesses,updated_at=now() returning *`;
-    return { handle: r!.handle, ageBand: r!.age_band, yearsOfServiceBand: r!.years_of_service_band, rank: r!.rank, entryPath: r!.entry_path, weaknesses: r!.weaknesses };
+    const [r] = await this.sql`insert into user_profiles (session_id,handle,age_band,years_of_service_band,rank,job_function,entry_path,weaknesses)
+      values (${sessionId},${p.handle},${p.ageBand},${p.yearsOfServiceBand},${p.rank},${p.jobFunction},${p.entryPath},${p.weaknesses})
+      on conflict (session_id) do update set handle=excluded.handle,age_band=excluded.age_band,years_of_service_band=excluded.years_of_service_band,rank=excluded.rank,job_function=excluded.job_function,entry_path=excluded.entry_path,weaknesses=excluded.weaknesses,updated_at=now() returning *`;
+    return { handle: r!.handle, ageBand: r!.age_band, yearsOfServiceBand: r!.years_of_service_band, rank: r!.rank, jobFunction: r!.job_function ?? "", entryPath: r!.entry_path, weaknesses: r!.weaknesses };
   }
   async listBosses(sessionId: string) { const rows = await this.sql`select * from bosses where scope='GLOBAL' or (session_id=${sessionId} and expires_at>now()) order by case when scope='GLOBAL' then 0 else 1 end, created_at`; return rows.map(camelBoss); }
   async getBoss(sessionId: string, bossId: string) { const [r] = await this.sql`select * from bosses where id=${bossId} and (scope='GLOBAL' or (session_id=${sessionId} and expires_at>now()))`; return r ? camelBoss(r) : null; }
   async createBoss(sessionId: string, b: CreateBossInput, expiresAt: string) {
-    const [r] = await this.sql`insert into bosses (scope,status,session_id,alias,avatar_key,job_function,years_of_service_band,rank,company_name,age_band,hierarchy_score,gender_balance_score,company_research,expires_at)
-      values ('SESSION','DRAFT',${sessionId},${b.alias},${b.avatarKey},${b.jobFunction},${b.yearsOfServiceBand},${b.rank},${b.companyName},${b.ageBand},${b.hierarchyScore},${b.genderBalanceScore},${this.sql.json((b.companyResearch ?? null) as any)},${expiresAt}) returning *`;
+    const [r] = await this.sql`insert into bosses (scope,status,session_id,alias,avatar_key,job_function,years_of_service_band,rank,company_name,age_band,hierarchy_score,company_research,expires_at)
+      values ('SESSION','DRAFT',${sessionId},${b.alias},${b.avatarKey},${b.jobFunction},${b.yearsOfServiceBand},${b.rank},${b.companyName},${b.ageBand},${b.hierarchyScore},${this.sql.json((b.companyResearch ?? null) as any)},${expiresAt}) returning *`;
     return camelBoss(r!);
   }
   async updateBoss(sessionId: string, bossId: string, patch: Partial<CreateBossInput> & Record<string, unknown>) {
     const values: Record<string, unknown> = {};
-    const map: Record<string, string> = { alias: "alias", avatarKey: "avatar_key", jobFunction: "job_function", yearsOfServiceBand: "years_of_service_band", rank: "rank", companyName: "company_name", ageBand: "age_band", hierarchyScore: "hierarchy_score", genderBalanceScore: "gender_balance_score", companyResearch: "company_research" };
+    const map: Record<string, string> = { alias: "alias", avatarKey: "avatar_key", jobFunction: "job_function", yearsOfServiceBand: "years_of_service_band", rank: "rank", companyName: "company_name", ageBand: "age_band", hierarchyScore: "hierarchy_score", companyResearch: "company_research" };
     for (const [key, column] of Object.entries(map)) if (key in patch) values[column] = key === "companyResearch" ? this.sql.json(patch[key] as any) : patch[key];
     values.updated_at = new Date();
     const [r] = await this.sql`update bosses set ${this.sql(values)} where id=${bossId} and session_id=${sessionId} and scope='SESSION' returning *`;
@@ -68,7 +69,7 @@ export class PostgresStore implements Store {
   async deleteBoss(sessionId: string, bossId: string) { await this.sql`delete from bosses where id=${bossId} and session_id=${sessionId} and scope='SESSION'`; }
   async getGlobalBoss() { const [r]=await this.sql`select * from bosses where scope='GLOBAL' order by created_at limit 1`; if(!r)throw new Error("공통 상사를 찾을 수 없습니다."); return camelBoss(r); }
   async updateGlobalBoss(patch: UpdateGlobalBossInput) {
-    const values:Record<string,unknown>={}; const map:Record<string,string>={alias:"alias",avatarKey:"avatar_key",jobFunction:"job_function",yearsOfServiceBand:"years_of_service_band",rank:"rank",companyName:"company_name",ageBand:"age_band",hierarchyScore:"hierarchy_score",genderBalanceScore:"gender_balance_score",companyResearch:"company_research"};
+    const values:Record<string,unknown>={}; const map:Record<string,string>={alias:"alias",avatarKey:"avatar_key",jobFunction:"job_function",yearsOfServiceBand:"years_of_service_band",rank:"rank",companyName:"company_name",ageBand:"age_band",hierarchyScore:"hierarchy_score",companyResearch:"company_research"};
     const source=patch as Record<string,unknown>;
     for(const [key,column] of Object.entries(map))if(key in source)values[column]=key==="companyResearch"&&source[key]!==null?this.sql.json(source[key] as any):source[key];
     values.updated_at=new Date(); const [r]=await this.sql`update bosses set ${this.sql(values)} where scope='GLOBAL' returning *`; if(!r)throw new Error("공통 상사를 찾을 수 없습니다."); return camelBoss(r);
@@ -128,22 +129,53 @@ export class PostgresStore implements Store {
     const hasMore=rows.length>limit; const messages=rows.slice(0,limit).reverse().map((r:any)=>({id:r.id,role:r.role,content:r.content,createdAt:r.created_at.toISOString()})); return {threadId:thread.id,messages,nextCursor:hasMore ? messages[0]?.createdAt ?? null:null};
   }
   async updateThreadSummary(threadId: string, summary: string) { await this.sql`update chat_threads set conversation_summary=${summary},summarized_through=now() where id=${threadId}`; }
-  async createTranslation(i: Omit<TranslationRecord,"id"|"createdAt"|"feedback">) { const [r]=await this.sql`insert into translation_requests(session_id,boss_id,input_text,channel,result,expires_at) values(${i.sessionId},${i.bossId},${i.inputText},${i.channel},${this.sql.json(i.result as any)},${i.expiresAt}) returning *`; return {id:r!.id,sessionId:r!.session_id,bossId:r!.boss_id,inputText:r!.input_text,channel:r!.channel,result:r!.result,feedback:r!.feedback,createdAt:r!.created_at.toISOString(),expiresAt:r!.expires_at.toISOString()}; }
-  async getTranslation(sessionId:string,id:string){const [r]=await this.sql`select * from translation_requests where id=${id} and session_id=${sessionId} and expires_at>now()`;return r?{id:r.id,sessionId:r.session_id,bossId:r.boss_id,inputText:r.input_text,channel:r.channel,result:r.result,feedback:r.feedback,createdAt:r.created_at.toISOString(),expiresAt:r.expires_at.toISOString()} as TranslationRecord:null;}
+  async createTranslation(i: Omit<TranslationRecord,"id"|"createdAt"|"feedback"|"simulationCount">) { const [r]=await this.sql`insert into translation_requests(session_id,boss_id,input_text,channel,result,expires_at) values(${i.sessionId},${i.bossId},${i.inputText},${i.channel},${this.sql.json(i.result as any)},${i.expiresAt}) returning *`; return {id:r!.id,sessionId:r!.session_id,bossId:r!.boss_id,inputText:r!.input_text,channel:r!.channel,result:r!.result,feedback:r!.feedback,simulationCount:r!.simulation_count??0,createdAt:r!.created_at.toISOString(),expiresAt:r!.expires_at.toISOString()}; }
+  async getTranslation(sessionId:string,id:string){const [r]=await this.sql`select * from translation_requests where id=${id} and session_id=${sessionId} and expires_at>now()`;return r?{id:r.id,sessionId:r.session_id,bossId:r.boss_id,inputText:r.input_text,channel:r.channel,result:r.result,feedback:r.feedback,simulationCount:r.simulation_count??0,createdAt:r.created_at.toISOString(),expiresAt:r.expires_at.toISOString()} as TranslationRecord:null;}
   async setTranslationFeedback(sessionId: string,id:string,feedback:"GOOD"|"BAD") { await this.sql`update translation_requests set feedback=${feedback} where id=${id} and session_id=${sessionId}`; }
+  async incrementTranslationSimulation(sessionId:string,id:string) { await this.sql`update translation_requests set simulation_count=simulation_count+1 where id=${id} and session_id=${sessionId} and expires_at>now()`; }
   async listMonologues(sessionId:string,bossId:string,limit:number) { const rows=await this.sql`select content from monologue_history where session_id=${sessionId} and boss_id=${bossId} order by created_at desc limit ${limit}`; return rows.map((r:any)=>r.content); }
   async addMonologue(sessionId:string,bossId:string,content:string) { await this.sql`insert into monologue_history(session_id,boss_id,content) values(${sessionId},${bossId},${content})`; }
-  async trackAnalytics(subjectHash:string,i:AnalyticsEventInput) { await this.sql`insert into analytics_events(anonymous_subject_hash,event_type,feature,user_age_band,boss_age_band,rank_gap_bucket,age_gap_bucket,topic_keywords,persona_confidence_bucket,is_demo,expires_at) values(${subjectHash},${i.eventType},${i.feature},${i.userAgeBand??null},${i.bossAgeBand??null},${i.rankGapBucket??null},${i.ageGapBucket??null},${i.topicKeywords??[]},${i.personaConfidenceBucket??null},${i.isDemo??false},now()+interval '31 days')`; }
-  async getHrDashboard() {
+  async trackAnalytics(subjectHash:string,i:AnalyticsEventInput) { await this.sql`insert into analytics_events(anonymous_subject_hash,event_type,feature,user_age_band,boss_age_band,rank_gap_bucket,age_gap_bucket,same_job_function_bucket,topic_keywords,persona_confidence_bucket,is_demo,expires_at) values(${subjectHash},${i.eventType},${i.feature},${i.userAgeBand??null},${i.bossAgeBand??null},${i.rankGapBucket??null},${i.ageGapBucket??null},${i.sameJobFunctionBucket??null},${i.topicKeywords??[]},${i.personaConfidenceBucket??null},${i.isDemo??false},now()+interval '31 days')`; }
+  async getHrDashboard(): Promise<HrDashboard> {
     const [total] = await this.sql`select count(*)::int value,count(distinct anonymous_subject_hash)::int subjects,coalesce(bool_or(is_demo),false) includes_demo from analytics_events where expires_at>now()`;
     if (!total?.value) return this.demo.getHrDashboard();
-    const rank=await this.sql`select rank_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and rank_gap_bucket is not null group by rank_gap_bucket order by label`;
-    const age=await this.sql`select age_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and age_gap_bucket is not null group by age_gap_bucket order by label`;
-    const time=await this.sql`select extract(hour from occurred_at)::int label,count(*)::int value from analytics_events where expires_at>now() group by 1 order by 1`;
-    const topics=await this.sql`select keyword text,count(*)::int value from analytics_events cross join unnest(topic_keywords) keyword where expires_at>now() group by keyword order by value desc limit 30`;
+    const rank=await this.sql<{label:string;value:number}[]>`select rank_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and rank_gap_bucket is not null group by rank_gap_bucket order by label`;
+    const age=await this.sql<{label:string;value:number}[]>`select age_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and age_gap_bucket is not null group by age_gap_bucket order by label`;
+    const sameJob=await this.sql<{bucket:string;count:number}[]>`select same_job_function_bucket bucket,count(*)::int count from analytics_events where expires_at>now() and same_job_function_bucket is not null group by same_job_function_bucket order by bucket`;
+    const topics=await this.sql<{text:string;value:number}[]>`select keyword text,count(*)::int value from analytics_events cross join unnest(topic_keywords) keyword where expires_at>now() group by keyword order by value desc limit 30`;
     const [feature]=await this.sql`select feature,count(*)::int value from analytics_events where expires_at>now() group by feature order by value desc,feature limit 1`;
-    const hourly=new Map(time.map((row:any)=>[Number(row.label),Number(row.value)]));
-    return {includesDemo:Boolean(total.includes_demo),overview:{totalUses:total.value,activeSubjects:total.subjects,topFeature:feature?.feature??"-",summary:"최근 31일간의 익명 집계입니다. 5명 미만의 소표본 구간도 포함됩니다."},topics,rankGap:rank,ageGap:age,byTime:Array.from({length:24},(_,hour)=>({label:`${hour}시`,value:hourly.get(hour)??0}))};
+    const translationRows = await this.sql<{ session_id:string; input_text: string; boss_id: string; alias: string | null; plain_meaning: string; caution: string | null; gap_score:number|null }[]>`
+      select t.session_id, t.input_text, t.boss_id, b.alias, t.result->>'plainMeaning' as plain_meaning, t.result->>'caution' as caution, (t.result->>'surfaceActualGapScore')::numeric as gap_score
+      from translation_requests t
+      left join bosses b on b.id = t.boss_id
+      where t.expires_at > now()`;
+    const repeatedRows = await this.sql<{ phrase: string; count: number }[]>`
+      select left(input_text,160) phrase, sum(simulation_count)::int count
+      from translation_requests
+      where expires_at > now() and simulation_count > 0
+      group by left(input_text,160)
+      having sum(simulation_count) >= 2
+      order by count desc
+      limit 10`;
+    const gap = computeSurfaceActualGap(translationRows.map((r: any) => ({
+      inputText: r.input_text,
+      plainMeaning: r.plain_meaning,
+      caution: r.caution,
+      bossId: r.boss_id,
+      alias: r.alias,
+      surfaceActualGapScore: r.gap_score===null?null:Number(r.gap_score),
+    })));
+    const sameJobFunctionDistribution = sameJob.map((r: any) => ({ bucket: r.bucket as "SAME" | "DIFF", count: r.count }));
+    return {
+      includesDemo: Boolean(total.includes_demo),
+      overview: { totalUses: total.value, activeSubjects: total.subjects, topFeature: feature?.feature??"-", summary: "최근 31일간의 익명 집계이며 소표본 구간도 포함됩니다." },
+      topics: topics.map((r: any) => ({ text: r.text, value: r.value })),
+      rankGap: rank.map((r: any) => ({ label: r.label, value: r.value })),
+      ageGap: age.map((r: any) => ({ label: r.label, value: r.value })),
+      sameJobFunctionDistribution,
+      surfaceActualGapRate: gap.rate,
+      topRepeatedPhrases: repeatedRows.map((r: any) => ({ phrase: r.phrase, count: Number(r.count) })),
+    };
   }
   async rollupAnalytics(){
     const dimensions=[
@@ -196,6 +228,14 @@ export class PostgresStore implements Store {
       translationCount: Number(row.translationCount ?? row.translation_count ?? 0),
     }));
     return {items,nextCursor:hasMore ? items.at(-1)?.createdAt ?? null:null};
+  }
+  async pruneMeaninglessSessions() {
+    const rows = await this.sql`select s.id from sessions s where s.expires_at>now() and s.last_seen_at<now()-interval '24 hours' and not exists (select 1 from user_profiles p where p.session_id=s.id) and not exists (select 1 from bosses b where b.session_id=s.id) and not exists (select 1 from chat_threads t join chat_messages m on m.thread_id=t.id where t.session_id=s.id) and not exists (select 1 from translation_requests tr where tr.session_id=s.id)`;
+    if (!rows.length) return { deleted: 0, storagePaths: [] };
+    const ids = rows.map((r: any) => r.id);
+    const paths = await this.sql`select storage_path from boss_evidence where session_id in ${this.sql(ids)} and storage_path is not null`;
+    await this.sql`delete from sessions where id in ${this.sql(ids)}`;
+    return { deleted: ids.length, storagePaths: paths.map((r: any) => r.storage_path) };
   }
   async listAdminJobs(status?: string, cursor?: string, limit = 20) {
     const rows = await this.sql`select id,type,status,attempts,max_attempts,error_message,retry_of,created_at as "createdAt",updated_at as "updatedAt" from ai_jobs where (${status ?? null}::text is null or status=${status ?? null}::text) and (${cursor ?? null}::timestamptz is null or created_at<${cursor ?? null}::timestamptz) order by created_at desc limit ${limit + 1}`;

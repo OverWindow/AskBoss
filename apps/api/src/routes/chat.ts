@@ -32,16 +32,17 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     const session = await requireSession(request);
     const bossId = (request.params as { bossId: string }).bossId;
     const body = parse(chatSimulationInputSchema, request.body);
-    const [boss, profile, translation] = await Promise.all([
+    const [boss, profile, translation, globalBoss] = await Promise.all([
       store.getBoss(session.id, bossId),
       store.getProfile(session.id),
       store.getTranslation(session.id, body.translationId),
+      store.getGlobalBoss(),
     ]);
     if (!boss) throw new HttpError(404, "상사를 찾을 수 없습니다.");
     if (!translation || translation.bossId !== bossId) throw new HttpError(404, "번역 결과를 찾을 수 없습니다.", "TRANSLATION_NOT_FOUND");
     const selectedReply = translation.result.replies[body.replyIndex];
     if (!selectedReply) throw new HttpError(400, "추천 답변을 찾을 수 없습니다.", "REPLY_NOT_FOUND");
-    const basePrompt = boss.scope === "SESSION" ? (await store.getPersonalBossDefaults()).prompt : undefined;
+    const basePrompt = (await store.getPersonalBossDefaults()).prompt;
 
     reply.hijack();
     reply.raw.statusCode = 200;
@@ -82,7 +83,7 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     try {
       let content = "";
       const plainStream = new PlainTextStream();
-      for await (const chunk of ai.streamSimulatedBossReaction({ profile, boss, basePrompt, inputText: translation.inputText, reply: selectedReply.text, channel: translation.channel }, controller.signal)) {
+      for await (const chunk of ai.streamSimulatedBossReaction({ profile, boss, basePrompt, globalBoss: boss.scope === "SESSION" ? globalBoss : undefined, inputText: translation.inputText, reply: selectedReply.text, channel: translation.channel }, controller.signal)) {
         if (!chunk) continue;
         const safeChunk = plainStream.push(chunk);
         if (safeChunk) {
@@ -99,6 +100,7 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
       clearTimeout(progressTimer);
       content = toPlainText(content);
       if (!content.trim()) throw new Error("AI returned an empty response");
+      await store.incrementTranslationSimulation(session.id, translation.id);
       writeEvent(reply.raw, "done", { content });
       finished = true;
       reply.raw.end();
@@ -124,9 +126,9 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     const session = await requireSession(request);
     const bossId = (request.params as { bossId: string }).bossId;
     const body = parse(chatInputSchema, request.body);
-    const [boss, profile] = await Promise.all([store.getBoss(session.id, bossId), store.getProfile(session.id)]);
+    const [boss, profile, globalBoss] = await Promise.all([store.getBoss(session.id, bossId), store.getProfile(session.id), store.getGlobalBoss()]);
     if (!boss) throw new HttpError(404, "상사를 찾을 수 없습니다.");
-    const basePrompt = boss.scope === "SESSION" ? (await store.getPersonalBossDefaults()).prompt : undefined;
+    const basePrompt = (await store.getPersonalBossDefaults()).prompt;
 
     const thread = await store.getOrCreateThread(session.id, bossId, body.threadId, sessionExpiry());
     // Capture history before adding the current message so the prompt contains it exactly once.
@@ -173,7 +175,7 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     try {
       let content = "";
       const plainStream = new PlainTextStream();
-      for await (const chunk of ai.streamChatWithBoss({ profile, boss, basePrompt, summary: thread.conversationSummary, messages: previousMessages, message: body.message }, controller.signal)) {
+      for await (const chunk of ai.streamChatWithBoss({ profile, boss, basePrompt, globalPersona: boss.scope === "SESSION" ? globalBoss?.persona : undefined, summary: thread.conversationSummary, messages: previousMessages, message: body.message }, controller.signal)) {
         if (!chunk) continue;
         const safeChunk = plainStream.push(chunk);
         if (safeChunk) {

@@ -12,6 +12,7 @@ export const profileSchema = z.object({
   ageBand: z.number().refine((value) => (AGE_BANDS as readonly number[]).includes(value)),
   yearsOfServiceBand: z.string().min(1, "회사 생활 연차를 선택해 주세요."),
   rank: z.string().min(1, "현재 직급을 선택해 주세요."),
+  jobFunction: z.string().min(1, "내 직무를 선택해 주세요."),
   entryPath: z.enum(ENTRY_PATHS),
   weaknesses: z.array(z.string()).default([]),
 });
@@ -25,7 +26,6 @@ export const bossInputSchema = z.object({
   companyName: z.string().trim().min(1, "회사 이름을 입력해 주세요.").max(120, "회사 이름은 120자 이하로 입력해 주세요."),
   ageBand: z.number().refine((value) => (AGE_BANDS as readonly number[]).includes(value)),
   hierarchyScore: z.number().int("위계도는 정수로 입력해 주세요.").min(0, "위계도는 0 이상이어야 합니다.").max(100, "위계도는 100 이하여야 합니다."),
-  genderBalanceScore: z.number().int("성비는 정수로 입력해 주세요.").min(-100, "성비는 -100 이상이어야 합니다.").max(100, "성비는 100 이하여야 합니다."),
   companyResearch: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
@@ -59,7 +59,6 @@ export const adminGlobalBossPatchSchema = z.object({
   companyName: z.string().trim().min(1).max(120).nullable().optional(),
   ageBand: z.number().refine((value) => (AGE_BANDS as readonly number[]).includes(value)).nullable().optional(),
   hierarchyScore: z.number().int().min(0).max(100).nullable().optional(),
-  genderBalanceScore: z.number().int().min(-100).max(100).nullable().optional(),
   companyResearch: companyResearchSchema.nullable().optional(),
 }).refine((value) => Object.keys(value).length > 0, "수정할 값을 입력해 주세요.");
 export const adminGlobalUploadSignSchema = uploadSignSchema.omit({ bossId: true });

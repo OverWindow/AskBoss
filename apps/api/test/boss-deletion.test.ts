@@ -37,6 +37,7 @@ describe("personal boss deletion", () => {
         tone: "간결",
         caution: "",
         confidence: 0.5,
+        surfaceActualGapScore: 10,
         replies: [
           { text: "확인하겠습니다.", style: "기본", reason: "확인 의사를 전합니다." },
           { text: "바로 확인하겠습니다.", style: "간결", reason: "즉시 대응을 알립니다." },
