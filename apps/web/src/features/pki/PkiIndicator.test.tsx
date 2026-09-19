@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { PkiIndicator } from "./PkiIndicator";
 
@@ -13,7 +13,7 @@ describe("PkiIndicator", () => {
     expect(placeholder).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("explains the weighted score and closes with Escape", () => {
+  it("explains the weighted score and closes with Escape", async () => {
     render(<PkiIndicator boss={personalBoss}/>);
     const info = screen.getByRole("button", { name: "상사 파악도 산정 방식 보기" });
     expect(info).toHaveAttribute("aria-expanded", "false");
@@ -24,6 +24,6 @@ describe("PkiIndicator", () => {
     expect(screen.getByText("최신성")).toBeInTheDocument();
     expect(screen.getByText("68점")).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByRole("dialog", { name: "상사 파악도 산정 방식" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "상사 파악도 산정 방식" })).not.toBeInTheDocument());
   });
 });

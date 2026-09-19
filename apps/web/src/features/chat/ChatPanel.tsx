@@ -183,7 +183,7 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
     setOlderError(undefined);
     setActualMessage(undefined);
     setActualError(undefined);
-    onActivity({ thinking: true, speech: "상사의 반응을 시뮬레이션하고 있습니다…" });
+    onActivity({ thinking: true });
     try {
       let reaction = "";
       await streamBossSimulation(boss.id, { translationId: request.translationId, replyIndex: request.replyIndex }, (event, data) => {
@@ -296,7 +296,7 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
       { id: "stream", role: "assistant", content: "", kind: "CHAT", createdAt: new Date().toISOString() },
     ]);
     setStreaming(true);
-    onActivity({ thinking: true, speech: "생각을 정리하고 있습니다…" });
+    onActivity({ thinking: true });
     const controller = new AbortController();
     requestController.current = controller;
 
@@ -371,7 +371,7 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
     return <div className={`chat-message-block ${message.role}`} key={message.id}>
       {message.kind === "ACTUAL_RESPONSE" && <span className="actual-response-label">실제 답변</span>}
       <div className={`chat-message-row ${message.role}`}>
-        <div className={`chat-message ${message.role}`}>{message.content || "…"}</div>
+        <div className={`chat-message ${message.role}${!message.content ? " is-typing" : ""}`}>{message.content || <span className="chat-typing-indicator" aria-label="상사가 답변을 입력하고 있습니다"><i/><i/><i/></span>}</div>
         {message.role === "user" && message.content && <button className="message-copy-button" type="button" aria-label={copiedMessageId === message.id ? "복사됨" : "메시지 복사"} onClick={() => void copyMessage(message.id, message.content)}>{copiedMessageId === message.id ? <Check size={14}/> : <Copy size={14}/>}</button>}
       </div>
       {coaching?.revisedText && <aside className="chat-coaching-card" aria-label="대화 문장 수정 제안">

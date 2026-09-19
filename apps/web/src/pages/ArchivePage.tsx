@@ -98,9 +98,8 @@ export function ArchiveModal({ open, onClose }: { open: boolean; onClose: () => 
         {archives.hasNextPage && <button className="secondary-button archive-more" type="button" disabled={archives.isFetchingNextPage} onClick={() => void archives.fetchNextPage()}>{archives.isFetchingNextPage ? "불러오는 중…" : "더 보기"}</button>}
       </div>
     </motion.section>
-    <Dialog open={Boolean(deleteTarget)} title="번역 아카이브 삭제" onClose={() => { if (!deleting) { setDeleteTarget(undefined); setDeleteError(undefined); } }}>
+    <Dialog compact open={Boolean(deleteTarget)} title="번역 아카이브 삭제" onClose={() => { if (!deleting) { setDeleteTarget(undefined); setDeleteError(undefined); } }}>
       <p>이 번역과 저장된 시뮬레이션 대화를 영구 삭제합니다. 현재 메인 대화와 이미 생성된 학습 근거는 유지됩니다.</p>
-      <p className="hint">삭제한 아카이브는 복구할 수 없습니다.</p>
       {deleteError && <p className="error-text" role="alert">{deleteError}</p>}
       <div className="archive-delete-actions">
         <button className="secondary-button" type="button" disabled={deleting} onClick={() => { setDeleteTarget(undefined); setDeleteError(undefined); }}>취소</button>

@@ -97,7 +97,7 @@ describe("ArchiveModal", () => {
     renderModal();
     await screen.findByText(summary.inputText);
     fireEvent.click(screen.getByRole("button", { name: "번역 아카이브 삭제" }));
-    expect(screen.getByRole("dialog", { name: "번역 아카이브 삭제" })).toHaveTextContent("복구할 수 없습니다");
+    expect(screen.getByRole("dialog", { name: "번역 아카이브 삭제" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(screen.getByText(summary.inputText)).toBeInTheDocument();
 
