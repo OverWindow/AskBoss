@@ -86,10 +86,11 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
       skipBottomScrollRef.current = false;
       return;
     }
-    window.requestAnimationFrame(() => {
+    const frame = window.requestAnimationFrame(() => {
       const chatList = chatListRef.current;
       if (chatList) chatList.scrollTop = chatList.scrollHeight;
     });
+    return () => window.cancelAnimationFrame(frame);
   }, [messages, active, simulationLoading, actualMessage]);
 
   useLayoutEffect(() => {
