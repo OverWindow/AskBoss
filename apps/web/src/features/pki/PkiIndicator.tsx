@@ -17,7 +17,11 @@ export function PkiIndicator({ boss }: { boss: Boss }) {
     return () => { document.removeEventListener("keydown", onKeyDown); document.removeEventListener("pointerdown", onPointerDown); };
   }, [open]);
 
-  if (boss.scope === "GLOBAL") return null;
+  if (boss.scope === "GLOBAL") return <div className="pki-indicator pki-indicator-placeholder" aria-hidden="true">
+    <div className="pki-row"><span className="pki-label">상사 파악도</span><span>0</span></div>
+    <div className="pki-track"><div className="pki-fill" style={{ width: 0 }}/></div>
+    <div className="pki-note">정보가 더 쌓이면 반응을 더 안정적으로 추정할 수 있어요.</div>
+  </div>;
 
   return <div ref={rootRef} data-tutorial="pki" className="pki-indicator">
     <div className="pki-row"><span className="pki-label">상사 파악도 <button className="pki-info-button" type="button" aria-label="상사 파악도 산정 방식 보기" aria-expanded={open} aria-controls={popoverId} onClick={() => setOpen((value) => !value)}><Info size={15}/></button></span><span>{pki?.score ?? 0}</span></div>
@@ -25,14 +29,12 @@ export function PkiIndicator({ boss }: { boss: Boss }) {
     <div className="pki-note">정보가 더 쌓이면 반응을 더 안정적으로 추정할 수 있어요.</div>
     {open && <div id={popoverId} className="pki-popover" role="dialog" aria-label="상사 파악도 산정 방식">
       <strong>상사 파악도 구성</strong>
-      <p className="pki-formula">정보 충족도 35% + 근거 신뢰도 30% + 상황 다양성 20% + 최신성 15%</p>
       <div className="pki-breakdown">
         <div><span><b>정보 충족도 · 35%</b><small>5개 업무 상황별 관찰이 충분히 쌓였는지 반영합니다.</small></span><b>{pki?.completeness ?? 0}</b></div>
         <div><span><b>근거 신뢰도 · 30%</b><small>페르소나 특성과 연결된 근거 수와 맥락 품질을 반영합니다.</small></span><b>{pki?.evidenceReliability ?? 0}</b></div>
         <div><span><b>상황 다양성 · 20%</b><small>서로 다른 시기와 업무 상황에서 관찰됐는지 반영합니다.</small></span><b>{pki?.diversity ?? 0}</b></div>
         <div><span><b>최신성 · 15%</b><small>최근 관찰일수록 높게 반영하며 시간이 지나면 점차 낮아집니다.</small></span><b>{pki?.freshness ?? 0}</b></div>
       </div>
-      <p className="pki-refresh-note">자료와 설문을 반영해 페르소나를 재생성할 때 다시 집계됩니다.</p>
     </div>}
   </div>;
 }
