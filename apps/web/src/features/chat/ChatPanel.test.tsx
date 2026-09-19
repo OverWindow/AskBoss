@@ -27,6 +27,15 @@ describe("ChatPanel simulations", () => {
   });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
+  it("shows an immediate loading state while a simulation is being prepared", async () => {
+    vi.mocked(streamBossSimulation).mockImplementation(() => new Promise(() => undefined));
+
+    renderPanel({ simulationRequest: { id: "simulation-loading", translationId: "00000000-0000-4000-8000-000000000010", replyIndex: 0, inputText: source.content, reply: reply.content } });
+
+    expect(await screen.findByRole("status", { name: "대화 시뮬레이션 준비 중" })).toHaveTextContent("대화를 준비하고 있어요.");
+    expect(screen.getByLabelText("대화 입력")).toBeDisabled();
+  });
+
   it("turns a simulation into the only persisted conversation and continues on its thread", async () => {
     vi.mocked(streamBossSimulation).mockImplementation(async (_bossId, _body, onEvent) => {
       onEvent("meta", { threadId: "thread-1", messages: [source, reply] });

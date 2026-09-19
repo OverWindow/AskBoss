@@ -44,7 +44,6 @@ export interface Store {
   touchSession(id: string): Promise<void>;
   deleteSession(id: string): Promise<void>;
   getProfile(sessionId: string): Promise<UserProfile | null>;
-  isHandleAvailable(handle: string, sessionId?: string): Promise<boolean>;
   upsertProfile(sessionId: string, profile: UserProfile): Promise<UserProfile>;
   listBosses(sessionId: string): Promise<BossRecord[]>;
   getBoss(sessionId: string, bossId: string): Promise<BossRecord | null>;

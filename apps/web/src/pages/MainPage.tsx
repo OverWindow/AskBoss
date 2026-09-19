@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { DEFAULT_TRANSLATION_EXAMPLES, type ChatMessage } from "@askboss/shared";
 import { AppShell } from "../components/AppShell";
+import { Dialog } from "../components/Dialog";
 import { useSession } from "../features/session/useSession";
 import { useBosses } from "../features/boss/useBosses";
 import { PkiIndicator } from "../features/pki/PkiIndicator";
@@ -33,6 +34,7 @@ export function MainPage() {
   const [speech, setSpeech] = useState("밥은 먹었나?");
   const [thinking, setThinking] = useState(false);
   const [simulationRequest, setSimulationRequest] = useState<ChatSimulationRequest | null>(null);
+  const [pendingSimulation, setPendingSimulation] = useState<ChatSimulationRequest | null>(null);
   const [avatarSpeechIndex, setAvatarSpeechIndex] = useState(-1);
   const [chatState, setChatState] = useState({ hasContent: false, hasUnsavedActualResponse: false, busy: false });
   const [externalChatUpdate, setExternalChatUpdate] = useState<{ threadId: string; archiveId: string; messages: ChatMessage[] } | null>(null);
@@ -76,6 +78,19 @@ export function MainPage() {
     setSpeech(AVATAR_SPEECHES[next]!);
   };
 
+  const startSimulation = (request: ChatSimulationRequest) => {
+    setSimulationRequest(request);
+    setSpeech(request.inputText);
+    setThinking(true);
+    selectTab("chat");
+  };
+
+  const confirmSimulation = () => {
+    if (!pendingSimulation) return;
+    startSimulation(pendingSimulation);
+    setPendingSimulation(null);
+  };
+
   if (session.isLoading || bosses.isLoading) return <div className="loading-state"><div className="boss-loading"><img className="loading-boss-avatar" src="/avatars/boss-male-01-loading.png" alt="모두의 상사 픽셀 아바타" width="150" height="150" fetchPriority="high"/><div className="spinner"/><p>모두의 상사를 부르는 중입니다.</p></div></div>;
   if (session.isError || bosses.isError || !boss) return <div className="empty-state"><div><h1>서비스를 시작하지 못했습니다.</h1><p>API 서버 연결을 확인한 뒤 다시 시도해 주세요.</p></div></div>;
 
@@ -83,7 +98,7 @@ export function MainPage() {
     <AppShell>
     <div className={`interaction-workspace ${ui.mobilePanelExpanded ? "" : "is-mobile-panel-collapsed"}`}>
       <section data-tutorial="workspace" className={`boss-stage ${thinking ? "is-thinking" : ""}`} aria-labelledby="boss-alias">
-        <div aria-live="polite"><AnimatePresence mode="popLayout" initial={false}><motion.div key={`${boss.id}:${speech}`} className="speech-bubble" initial={{ opacity: 0, scale: .97, y: 4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .97, y: -4 }} transition={{ duration: .5, ease: [0.22, 1, 0.36, 1] }}>{speech}</motion.div></AnimatePresence></div>
+        <div aria-live="polite" className="speech-bubble-wrap"><AnimatePresence mode="popLayout" initial={false}><motion.div key={`${boss.id}:${speech}`} className="speech-bubble" initial={{ opacity: 0, scale: .97, y: 4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .97, y: -4 }} transition={{ duration: .5, ease: [0.22, 1, 0.36, 1] }}>{speech}</motion.div></AnimatePresence></div>
         <button className="avatar-frame avatar-button" type="button" onClick={changeAvatarSpeech} aria-label={`${boss.alias}의 한마디 바꾸기`}>
           <AnimatePresence mode="wait" initial={false}><motion.span key={boss.id} className="avatar-transition" initial={{ opacity: 0, scale: .98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.01 }} transition={{ duration: .35, ease: [0.22, 1, 0.36, 1] }}><img className="boss-avatar" src={`/avatars/${boss.avatarKey}.png`} alt={`${boss.alias} 픽셀 아바타`}/><img className="boss-avatar boss-avatar--closed" src={`/avatars/${boss.avatarKey}-closed.png`} alt="" aria-hidden="true"/></motion.span></AnimatePresence>
         </button>
@@ -105,12 +120,16 @@ export function MainPage() {
           </button>
         </header>
         <div id="workspace-dock-body" className="workspace-dock-body">
-          <TranslatorPanel boss={boss} active={ui.activeWorkspaceTab === "translator"} examples={translationExamples.data?.examples ?? DEFAULT_TRANSLATION_EXAMPLES} simulationDisabled={chatState.busy} onSourceMessage={(message) => { setThinking(false); setSpeech(message); }} onActualResponseApplied={(chat) => { if (chat) setExternalChatUpdate(chat); }} onSimulate={(request) => { if (chatState.busy) return false; if ((chatState.hasContent || chatState.hasUnsavedActualResponse) && !window.confirm("현재 대화를 삭제하고 새 시뮬레이션을 시작할까요? 기존 대화는 아카이브에 유지됩니다.")) return false; setSimulationRequest(request); setSpeech(request.inputText); setThinking(true); selectTab("chat"); return true; }}/>
+          <TranslatorPanel boss={boss} active={ui.activeWorkspaceTab === "translator"} examples={translationExamples.data?.examples ?? DEFAULT_TRANSLATION_EXAMPLES} simulationDisabled={chatState.busy} onSourceMessage={(message) => { setThinking(false); setSpeech(message); }} onActualResponseApplied={(chat) => { if (chat) setExternalChatUpdate(chat); }} onSimulate={(request) => { if (chatState.busy) return false; if (chatState.hasContent || chatState.hasUnsavedActualResponse) { setPendingSimulation(request); return true; } startSimulation(request); return true; }}/>
           <ChatPanel boss={boss} active={ui.activeWorkspaceTab === "chat"} simulationRequest={simulationRequest} externalChatUpdate={externalChatUpdate} onActivity={({ thinking: nextThinking, speech: nextSpeech }) => { setThinking(nextThinking); if (nextSpeech) setSpeech(nextSpeech); }} onConversationStateChange={updateChatState} onReset={resetBossSpeech}/>
         </div>
       </aside>
     </div>
     <Tutorial/>
+    <Dialog compact open={Boolean(pendingSimulation)} title="새 시뮬레이션 시작" onClose={() => setPendingSimulation(null)}>
+      <p>현재 대화를 삭제하고 새 시뮬레이션을 시작할까요? 기존 대화는 아카이브에 유지됩니다.</p>
+      <div className="dialog-actions"><button className="secondary-button" type="button" onClick={() => setPendingSimulation(null)}>취소</button><button className="primary-button danger-confirm-button" type="button" onClick={confirmSimulation}>시작하기</button></div>
+    </Dialog>
   </AppShell>
   </motion.div>;
 }

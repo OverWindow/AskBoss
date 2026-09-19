@@ -89,7 +89,6 @@ export class MemoryStore implements Store {
     for (const bossId of bossIds) this.monologues.delete(`${id}:${bossId}`);
   }
   async getProfile(sessionId: string) { return this.profiles.get(sessionId) ?? null; }
-  async isHandleAvailable(handle: string, sessionId?: string) { return ![...this.profiles].some(([id, profile]) => id !== sessionId && profile.handle.toLocaleLowerCase("ko") === handle.toLocaleLowerCase("ko")); }
   async upsertProfile(sessionId: string, profile: UserProfile) { this.profiles.set(sessionId, structuredClone(profile)); return profile; }
   async listBosses(sessionId: string) { return [...this.bosses.values()].filter((row) => row.scope === "GLOBAL" || row.sessionId === sessionId).sort((a, b) => a.scope === "GLOBAL" ? -1 : b.scope === "GLOBAL" ? 1 : a.alias.localeCompare(b.alias, "ko")); }
   async getBoss(sessionId: string, bossId: string) { const row = this.bosses.get(bossId); return row && (row.scope === "GLOBAL" || row.sessionId === sessionId) ? row : null; }

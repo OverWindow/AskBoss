@@ -55,17 +55,18 @@ describe("MainPage workspace", () => {
   });
 
   it("기존 대화가 있으면 새 시뮬레이션 교체를 확인하고 취소 시 유지한다", () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValueOnce(false).mockReturnValueOnce(true);
     render(<MainPage/>);
     fireEvent.click(screen.getByRole("tab", { name: "대화" }));
     fireEvent.click(screen.getByRole("button", { name: "대화 있음" }));
     fireEvent.click(screen.getByRole("tab", { name: "번역" }));
     fireEvent.click(screen.getByRole("button", { name: "추천 답변 시뮬레이션" }));
-    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("dialog", { name: "새 시뮬레이션 시작" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
     expect(screen.getByRole("tab", { name: "번역" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByLabelText("모두의 상사와 대화")).not.toHaveTextContent("이거 언제 되나?");
 
     fireEvent.click(screen.getByRole("button", { name: "추천 답변 시뮬레이션" }));
+    fireEvent.click(screen.getByRole("button", { name: "시작하기" }));
     expect(screen.getByRole("tab", { name: "대화" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByLabelText("모두의 상사와 대화")).toHaveTextContent("이거 언제 되나?");
   });

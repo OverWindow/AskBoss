@@ -84,7 +84,6 @@ export class PostgresStore implements Store {
   async touchSession(id: string) { await this.sql`update sessions set last_seen_at=now() where id=${id} and last_seen_at<now()-interval '1 minute'`; }
   async deleteSession(id: string) { await this.sql.begin(async (sql) => { await sql`update translation_archive_branches b set status='SUPERSEDED',updated_at=now() from chat_threads t where t.archive_branch_id=b.id and t.session_id=${id} and b.status='ACTIVE'`; await sql`delete from sessions where id=${id}`; }); }
   async getProfile(sessionId: string) { const [r] = await this.sql`select * from user_profiles where session_id=${sessionId}`; return r ? { handle: r.handle, ageBand: r.age_band, yearsOfServiceBand: r.years_of_service_band, rank: r.rank, jobFunction: r.job_function ?? "", entryPath: r.entry_path, weaknesses: r.weaknesses } : null; }
-  async isHandleAvailable(handle: string, sessionId?: string) { const [r] = sessionId ? await this.sql`select count(*)::int as count from user_profiles where lower(handle)=lower(${handle}) and session_id<>${sessionId}` : await this.sql`select count(*)::int as count from user_profiles where lower(handle)=lower(${handle})`; return r!.count === 0; }
   async upsertProfile(sessionId: string, p: UserProfile) {
     const [r] = await this.sql`insert into user_profiles (session_id,handle,age_band,years_of_service_band,rank,job_function,entry_path,weaknesses)
       values (${sessionId},${p.handle},${p.ageBand},${p.yearsOfServiceBand},${p.rank},${p.jobFunction},${p.entryPath},${p.weaknesses})

@@ -391,13 +391,17 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
       {history.isError && <p className="error-text" role="alert">이전 대화를 불러오지 못했습니다.</p>}
       {loadingOlder && <p className="chat-history-status" role="status">이전 대화를 불러오는 중…</p>}
       {olderError && <div className="chat-history-error" role="alert"><span>{olderError}</span><button className="small-button" type="button" onClick={() => void loadOlderMessages()}><RefreshCw size={14}/>다시 시도</button></div>}
+      {simulationLoading && messages.length === 0 && <div className="simulation-loading" role="status" aria-label="대화 시뮬레이션 준비 중">
+        <span className="simulation-loading-spinner" aria-hidden="true"/>
+        <div><strong>대화를 준비하고 있어요.</strong><p>상사가 어떻게 반응할지 시뮬레이션하는 중입니다.</p></div>
+      </div>}
       {!history.isLoading && messages.length === 0 && !simulationLoading && <div className="panel-empty"><MessageCircle size={22}/><p>하고 싶은 말을 적어보세요.</p></div>}
       {messages.map(renderMessage)}
       {simulationError && <div className="chat-stream-error" role="alert"><span>{simulationError}</span>{failedSimulation && <button className="small-button" type="button" disabled={simulationLoading} onClick={() => void runSimulation(failedSimulation)}><RefreshCw size={14}/>다시 시도</button>}</div>}
       {error && <div className="chat-stream-error" role="alert"><span>{error}</span>{failedMessage && <button className="small-button" type="button" disabled={streaming} onClick={() => void send(failedMessage)}><RefreshCw size={14}/>다시 시도</button>}</div>}
     </div>
     <div className="chat-composer">
-      <textarea ref={inputRef} className="input chat-input" rows={1} value={text} onChange={(event) => { setText(event.target.value); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 120)}px`; }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} placeholder="할 말을 입력하세요" aria-label="대화 입력"/>
+      <textarea ref={inputRef} className="input chat-input" rows={1} value={text} disabled={busy} onChange={(event) => { setText(event.target.value); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 120)}px`; }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} placeholder="할 말을 입력하세요" aria-label="대화 입력"/>
       <button className="primary-button" type="button" disabled={!text.trim() || busy} onClick={() => void send()} aria-label="보내기"><Send size={18}/></button>
     </div><ActualResponseDialog open={Boolean(actualMessage)} initialValue={actualMessage?.kind === "ACTUAL_RESPONSE" ? actualMessage.content : ""} saving={actualSaving} error={actualError} onClose={() => { setActualMessage(undefined); setActualError(undefined); }} onSubmit={(content) => void saveActualResponse(content)}/>
   </section>;

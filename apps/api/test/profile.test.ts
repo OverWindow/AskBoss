@@ -12,7 +12,7 @@ async function sessionCookie() {
 const profile = (handle: string) => ({ handle, ageBand: 30, yearsOfServiceBand: "3~4년", jobFunction: "개발", rank: "대리", entryPath: "신입", weaknesses: [] });
 
 describe("profile API", () => {
-  it("returns the persisted profile and reports validation and duplicate handle errors", async () => {
+  it("persists the same handle in separate sessions and reports validation errors", async () => {
     const firstCookie = await sessionCookie();
     const secondCookie = await sessionCookie();
     const saved = await app.inject({ method: "PUT", url: "/api/profile", headers: { cookie: firstCookie }, payload: profile("새사용자") });
@@ -20,8 +20,8 @@ describe("profile API", () => {
     expect(saved.json().profile.handle).toBe("새사용자");
 
     const duplicate = await app.inject({ method: "PUT", url: "/api/profile", headers: { cookie: secondCookie }, payload: profile("새사용자") });
-    expect(duplicate.statusCode).toBe(409);
-    expect(duplicate.json().error).toMatchObject({ code: "HANDLE_TAKEN", message: "이미 사용 중인 사용자 ID입니다." });
+    expect(duplicate.statusCode).toBe(200);
+    expect(duplicate.json().profile.handle).toBe("새사용자");
 
     const invalid = await app.inject({ method: "PUT", url: "/api/profile", headers: { cookie: secondCookie }, payload: profile("x") });
     expect(invalid.statusCode).toBe(400);

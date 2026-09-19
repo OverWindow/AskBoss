@@ -46,7 +46,7 @@ describe("SettingsPage profile saving", () => {
     expect(client.getQueryData<{ handle: string }>(["profile"])?.handle).toBe("새이름");
   });
 
-  it("shows local validation and server duplicate errors without a false success message", async () => {
+  it("shows local validation and server errors without a false success message", async () => {
     renderSettings();
     const input = await screen.findByLabelText("사용자 ID");
     fireEvent.change(input, { target: { value: "x" } });
@@ -55,14 +55,14 @@ describe("SettingsPage profile saving", () => {
     expect(mockedApi).not.toHaveBeenCalledWith("/profile", expect.objectContaining({ method: "PUT" }));
 
     mockedApi.mockImplementation(async (path, options) => {
-      if (path === "/profile" && options?.method === "PUT") throw new Error("이미 사용 중인 사용자 ID입니다.");
+      if (path === "/profile" && options?.method === "PUT") throw new Error("내 정보를 저장하지 못했습니다.");
       if (path === "/profile") return { profile: initialProfile } as any;
       return {} as any;
     });
-    fireEvent.change(input, { target: { value: "중복이름" } });
+    fireEvent.change(input, { target: { value: "새이름" } });
     fireEvent.click(screen.getByRole("button", { name: "내 정보 저장" }));
-    expect(await screen.findByText("이미 사용 중인 사용자 ID입니다.")).toBeInTheDocument();
+    expect(await screen.findByText("내 정보를 저장하지 못했습니다.")).toBeInTheDocument();
     expect(screen.queryByText("내 정보를 저장했습니다.")).not.toBeInTheDocument();
-    await waitFor(() => expect(input).toHaveValue("중복이름"));
+    await waitFor(() => expect(input).toHaveValue("새이름"));
   });
 });

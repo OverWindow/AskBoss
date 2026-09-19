@@ -26,6 +26,7 @@ export function Sidebar() {
     if (!confirm("이 세션의 개인 상사와 대화 자료를 초기화할까요? 번역 아카이브는 이 기기에 계속 보관됩니다.")) return;
     await api("/session", { method: "DELETE" });
     sessionStorage.clear();
+    try { localStorage.removeItem(TUTORIAL_STORAGE_KEY); } catch { /* Storage may be unavailable. */ }
     queryClient.clear();
     location.href = "/";
   };
