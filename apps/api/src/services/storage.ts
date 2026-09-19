@@ -6,6 +6,7 @@ import { safeExtension } from "../utils/security.js";
 class StorageService {
   private client:SupabaseClient|null=hasStorage?createClient(env.SUPABASE_URL!,env.SUPABASE_SERVICE_ROLE_KEY!,{auth:{persistSession:false}}):null;
   path(sessionId:string,bossId:string,fileName:string,contentType:string){return `${sessionId}/${bossId}/${randomUUID()}.${safeExtension(fileName,contentType)}`;}
+  globalPath(bossId:string,fileName:string,contentType:string){return `global/${bossId}/${randomUUID()}.${safeExtension(fileName,contentType)}`;}
   async createSignedUpload(path:string){ if(!this.client) return {signedUrl:null,token:null}; const {data,error}=await this.client.storage.from(env.SUPABASE_STORAGE_BUCKET).createSignedUploadUrl(path,{upsert:false}); if(error) throw error; return {signedUrl:data.signedUrl,token:data.token}; }
   async createSignedDownload(path:string){ if(!this.client) return null; const {data,error}=await this.client.storage.from(env.SUPABASE_STORAGE_BUCKET).createSignedUrl(path,300); if(error) throw error; return data.signedUrl; }
   async downloadText(path:string){ if(!this.client) return `[로컬 데모 업로드: ${path}]`; const {data,error}=await this.client.storage.from(env.SUPABASE_STORAGE_BUCKET).download(path); if(error) throw error; return data.text(); }

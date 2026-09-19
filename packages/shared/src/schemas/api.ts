@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AGE_BANDS, ALLOWED_MIME_TYPES, AVATARS, CHANNELS, ENTRY_PATHS } from "../constants/options.js";
+import { companyResearchSchema } from "./ai.js";
 
 export const handleSchema = z.string().trim().min(3).max(20).regex(/^[a-zA-Z0-9_\-가-힣]+$/);
 export const profileSchema = z.object({
@@ -43,3 +44,16 @@ export const surveyAnswerSchema = z.object({ questionId: z.string(), questionSna
 export const surveyAnswersSchema = z.object({ answers: z.array(surveyAnswerSchema).min(1).max(10) });
 export const adminLoginSchema = z.object({ password: z.string().min(1).max(256) });
 export const adminJobStatusSchema = z.enum(["PENDING", "RUNNING", "SUCCEEDED", "FAILED"]);
+export const adminGlobalBossPatchSchema = z.object({
+  alias: z.string().trim().min(1).max(40).optional(),
+  avatarKey: z.enum(AVATARS).optional(),
+  jobFunction: z.string().min(1).nullable().optional(),
+  yearsOfServiceBand: z.string().min(1).nullable().optional(),
+  rank: z.string().min(1).nullable().optional(),
+  companyName: z.string().trim().min(1).max(120).nullable().optional(),
+  ageBand: z.number().refine((value) => (AGE_BANDS as readonly number[]).includes(value)).nullable().optional(),
+  hierarchyScore: z.number().int().min(0).max(100).nullable().optional(),
+  genderBalanceScore: z.number().int().min(-100).max(100).nullable().optional(),
+  companyResearch: companyResearchSchema.nullable().optional(),
+}).refine((value) => Object.keys(value).length > 0, "수정할 값을 입력해 주세요.");
+export const adminGlobalUploadSignSchema = uploadSignSchema.omit({ bossId: true });

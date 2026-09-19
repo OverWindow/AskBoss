@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Activity, AlertTriangle, Bot, Clock3, Database, LogOut, Play, RefreshCw, ShieldCheck, UsersRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link, useLocation } from "react-router-dom";
 import type { AdminCredits, AdminDashboard, AdminJobSummary, AdminSessionSummary } from "@askboss/shared";
 import { api } from "../services/api-client";
+import { GlobalBossAdmin } from "../features/admin/GlobalBossAdmin";
 
 const ADMIN_TIMEOUT_MS = 10_000;
 
@@ -50,7 +52,7 @@ function CreditCard({ title, bucket }: { title: string; bucket: AdminCredits["to
   return <article className="credit-card"><span>{title}</span><strong>{formatNumber(bucket.remaining)}</strong><small>{formatNumber(bucket.used)} 사용 / {formatNumber(bucket.quota)} 할당</small><div className="credit-track"><i style={{ width: `${percent}%` }}/></div>{bucket.renewalDate && <small>갱신 {formatDate(bucket.renewalDate)}</small>}</article>;
 }
 
-function AdminDashboardView({ onLogout }: { onLogout: () => void }) {
+function AdminDashboardView({ onLogout }: { onLogout: () => Promise<void> }) {
   const cache = useQueryClient();
   const dashboard = useQuery({ queryKey: ["admin", "dashboard"], queryFn: () => adminApi<AdminDashboard>("/admin/dashboard"), refetchInterval: 30_000, retry: 1 });
   const credits = useQuery({ queryKey: ["admin", "credits"], queryFn: () => adminApi<AdminCredits>("/admin/credits"), refetchInterval: 60_000, retry: 1 });
@@ -66,10 +68,6 @@ function AdminDashboardView({ onLogout }: { onLogout: () => void }) {
     catch (cause) { setMessage(cause instanceof Error ? cause.message : "작업을 실행하지 못했습니다."); }
     finally { setRunning(undefined); }
   };
-  const logout = async () => {
-    try { await adminApi("/admin/logout", { method: "POST" }); }
-    finally { cache.removeQueries({ queryKey: ["admin"] }); onLogout(); }
-  };
   const data = dashboard.data;
 
   if (dashboard.isLoading) return <div className="loading-state"><div><div className="spinner"/><p>운영 현황을 불러오는 중입니다.</p></div></div>;
@@ -78,7 +76,7 @@ function AdminDashboardView({ onLogout }: { onLogout: () => void }) {
   const totalCredits = credits.data?.total;
   const lowCredits = totalCredits && totalCredits.quota > 0 && totalCredits.remaining / totalCredits.quota < .2;
   return <main className="admin-page">
-    <header className="admin-topbar"><div><p className="panel-kicker">ASKBOSS OPERATIONS</p><h1>운영 관리자</h1><p>마지막 집계 {formatDate(data.generatedAt)}</p></div><div className="admin-top-actions"><button className="secondary-button" onClick={() => void refresh()}><RefreshCw size={16}/>새로고침</button><button className="text-button" onClick={() => void logout()}><LogOut size={16}/>로그아웃</button></div></header>
+    <header className="admin-topbar"><div><p className="panel-kicker">ASKBOSS OPERATIONS</p><h1>운영 관리자</h1><p>마지막 집계 {formatDate(data.generatedAt)}</p></div><div className="admin-top-actions"><Link className="secondary-button" to="/admin/global-boss"><Bot size={16}/>모두의 상사 관리</Link><button className="secondary-button" onClick={() => void refresh()}><RefreshCw size={16}/>새로고침</button><button className="text-button" onClick={() => void onLogout()}><LogOut size={16}/>로그아웃</button></div></header>
     {message && <div className="admin-notice" role="status">{message}</div>}
     {(data.jobs.failed > 0 || lowCredits) && <section className="admin-alert"><AlertTriangle size={19}/><div><strong>확인이 필요한 항목이 있습니다.</strong><p>{data.jobs.failed > 0 ? `실패한 AI Job ${data.jobs.failed}개` : ""}{data.jobs.failed > 0 && lowCredits ? " · " : ""}{lowCredits ? "AI 크레딧 20% 미만" : ""}</p></div></section>}
 
@@ -96,9 +94,11 @@ function AdminDashboardView({ onLogout }: { onLogout: () => void }) {
 
 export function AdminPage() {
   const cache = useQueryClient();
+  const location = useLocation();
   const auth = useQuery({ queryKey: ["admin", "auth"], queryFn: () => adminApi<{ authenticated: boolean; expiresAt: string | null }>("/admin/auth"), retry: false });
+  const logout = async () => { try { await adminApi("/admin/logout", { method: "POST" }); } finally { cache.removeQueries({ queryKey: ["admin"] }); cache.setQueryData(["admin", "auth"], { authenticated: false, expiresAt: null }); } };
   if (auth.isLoading) return <div className="loading-state"><div><div className="spinner"/><p>관리자 연결을 확인하는 중입니다.</p></div></div>;
   if (auth.isError) return <AdminConnectionError onRetry={() => void auth.refetch()}/>;
   if (!auth.data?.authenticated) return <AdminLogin onSuccess={() => void cache.invalidateQueries({ queryKey: ["admin", "auth"] })}/>;
-  return <AdminDashboardView onLogout={() => void cache.invalidateQueries({ queryKey: ["admin", "auth"] })}/>;
+  return location.pathname === "/admin/global-boss" ? <GlobalBossAdmin onLogout={logout}/> : <AdminDashboardView onLogout={logout}/>;
 }

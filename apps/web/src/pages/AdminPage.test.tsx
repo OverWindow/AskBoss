@@ -1,11 +1,16 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminPage } from "./AdminPage";
 import { api } from "../services/api-client";
 
 vi.mock("../services/api-client", () => ({ api: vi.fn() }));
 const mockedApi = vi.mocked(api);
+
+function renderAdmin(client: QueryClient, entry = "/admin") {
+  return render(<MemoryRouter initialEntries={[entry]}><QueryClientProvider client={client}><AdminPage/></QueryClientProvider></MemoryRouter>);
+}
 
 describe("AdminPage", () => {
   beforeEach(() => {
@@ -23,7 +28,7 @@ describe("AdminPage", () => {
 
   it("moves from the password screen to the operations dashboard", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={client}><AdminPage/></QueryClientProvider>);
+    renderAdmin(client);
     expect(await screen.findByRole("heading", { name: "관리자 로그인" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("관리자 비밀번호"), { target: { value: "correct-horse-battery-staple" } });
     fireEvent.click(screen.getByRole("button", { name: "로그인" }));
@@ -34,9 +39,21 @@ describe("AdminPage", () => {
   it("shows a recoverable connection error instead of an endless auth spinner", async () => {
     mockedApi.mockRejectedValueOnce(new Error("offline"));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={client}><AdminPage/></QueryClientProvider>);
+    renderAdmin(client);
     expect(await screen.findByRole("heading", { name: "API 연결에 실패했습니다." })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(await screen.findByRole("heading", { name: "관리자 로그인" })).toBeInTheDocument();
+  });
+
+  it("shows a recoverable error when the global boss detail cannot be loaded", async () => {
+    mockedApi.mockImplementation(async (path: string) => {
+      if (path === "/admin/auth") return { authenticated: true, expiresAt: "2026-09-19T10:00:00Z" } as any;
+      if (path === "/admin/global-boss") throw new Error("offline");
+      return {} as any;
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderAdmin(client, "/admin/global-boss");
+    expect(await screen.findByText("모두의 상사 정보를 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
   });
 });

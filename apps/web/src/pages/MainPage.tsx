@@ -94,11 +94,11 @@ export function MainPage() {
 
   return <AppShell>
     <div className={`interaction-workspace ${ui.translatorPanelOpen ? "has-translator-panel" : ""} ${ui.chatPanelOpen ? "has-chat-panel" : ""}`}>
-      <button ref={translatorTrigger} className={`workspace-tool-trigger translator-trigger ${ui.translatorPanelOpen ? "is-active" : ""}`} type="button" title="번역" aria-label={ui.translatorPanelOpen ? "번역 패널 닫기" : "번역 패널 열기"} aria-controls="translator-panel" aria-expanded={ui.translatorPanelOpen} onClick={() => togglePanel("translator")}><Languages size={21}/><span>번역</span></button>
-      <button ref={chatTrigger} className={`workspace-tool-trigger chat-trigger ${ui.chatPanelOpen ? "is-active" : ""}`} type="button" title="대화" aria-label={ui.chatPanelOpen ? "대화 패널 닫기" : "대화 패널 열기"} aria-controls="chat-panel" aria-expanded={ui.chatPanelOpen} onClick={() => togglePanel("chat")}><MessageCircle size={21}/><span>대화</span></button>
+      {!ui.translatorPanelOpen && <button ref={translatorTrigger} data-tutorial="translate" className="workspace-tool-trigger translator-trigger" type="button" title="번역" aria-label="번역 패널 열기" aria-controls="translator-panel" aria-expanded="false" onClick={() => togglePanel("translator")}><Languages size={21}/><span>번역</span></button>}
+      {!ui.chatPanelOpen && <button ref={chatTrigger} data-tutorial="chat" className="workspace-tool-trigger chat-trigger" type="button" title="대화" aria-label="대화 패널 열기" aria-controls="chat-panel" aria-expanded="false" onClick={() => togglePanel("chat")}><MessageCircle size={21}/><span>대화</span></button>}
 
       <TranslatorPanel boss={boss} open={ui.translatorPanelOpen} onClose={() => closePanel("translator")} onSourceMessage={(message) => { setThinking(false); setSpeech(message); }}/>
-      <section className={`boss-stage ${thinking ? "is-thinking" : ""}`} aria-labelledby="boss-alias">
+      <section data-tutorial="workspace" className={`boss-stage ${thinking ? "is-thinking" : ""}`} aria-labelledby="boss-alias">
         <div className="speech-bubble" aria-live="polite">“{speech}”</div>
         <div className="avatar-frame"><img className="boss-avatar" src={`/avatars/${boss.avatarKey}.png`} alt={`${boss.alias} 픽셀 아바타`}/><span className="thinking-indicator" aria-hidden="true"><i/><i/><i/></span></div>
         <h1 id="boss-alias" className="boss-alias">{boss.alias}</h1>

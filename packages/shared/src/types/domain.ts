@@ -53,6 +53,7 @@ export interface Boss {
   persona: BossPersona | null;
   pki: PkiBreakdown | null;
   personaError?: string | null;
+  personaVersion?: number;
 }
 
 export interface UserProfile {
@@ -99,10 +100,36 @@ export interface TranslationResult {
 
 export interface AdminOperation {
   id: string;
-  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP";
+  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD";
   status: "SUCCEEDED" | "FAILED";
   detail: Record<string, number | string | boolean | null>;
   createdAt: string;
+}
+
+export interface AdminGlobalEvidence {
+  id: string;
+  bossId: string;
+  type: "TEXT" | "TXT" | "IMAGE" | "SURVEY";
+  status: "PENDING" | "PROCESSING" | "READY" | "FAILED";
+  sourceName: string | null;
+  rawText: string | null;
+  parsedData: unknown;
+  errorMessage: string | null;
+  observedAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminGlobalSurveyAnswer {
+  questionId: string;
+  questionSnapshot: Record<string, unknown>;
+  selectedOption: string | null;
+  freeText: string | null;
+}
+
+export interface AdminGlobalBossDetail {
+  boss: Boss;
+  evidence: AdminGlobalEvidence[];
+  surveyAnswers: AdminGlobalSurveyAnswer[];
 }
 
 export interface AdminDashboard {

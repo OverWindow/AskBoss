@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, BossPersona } from "../shared.js";
-import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
-import type { CreateBossInput, Store } from "./store.js";
+import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
+import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 
 const globalPersona: BossPersona = {
@@ -18,6 +18,7 @@ const globalBoss: BossRecord = {
   id: "00000000-0000-4000-8000-000000000001", scope: "GLOBAL", status: "READY", sessionId: null, alias: "모두의 상사", avatarKey: "boss-male-01",
   jobFunction: null, yearsOfServiceBand: null, rank: "팀장", companyName: null, ageBand: 40, hierarchyScore: 55, genderBalanceScore: 0,
   companyResearch: null, persona: globalPersona, pki: null, personaError: null, expiresAt: null,
+  personaVersion: 1,
 };
 
 export class MemoryStore implements Store {
@@ -27,6 +28,9 @@ export class MemoryStore implements Store {
   company = new Map<string, { result: CompanyResearch; expiresAt: number }>();
   uploads = new Map<string, UploadIntentRecord>();
   evidence = new Map<string, EvidenceRecord>();
+  globalEvidence = new Map<string, GlobalEvidenceRecord>();
+  globalUploads = new Map<string, GlobalUploadIntentRecord>();
+  globalSurveys = new Map<string, SurveyAnswerRecord>();
   surveys = new Map<string, SurveyAnswerRecord[]>();
   jobs = new Map<string, JobRecord>();
   threads = new Map<string, ChatThreadRecord>();
@@ -53,26 +57,40 @@ export class MemoryStore implements Store {
   async listBosses(sessionId: string) { return [...this.bosses.values()].filter((row) => row.scope === "GLOBAL" || row.sessionId === sessionId).sort((a, b) => a.scope === "GLOBAL" ? -1 : b.scope === "GLOBAL" ? 1 : a.alias.localeCompare(b.alias, "ko")); }
   async getBoss(sessionId: string, bossId: string) { const row = this.bosses.get(bossId); return row && (row.scope === "GLOBAL" || row.sessionId === sessionId) ? row : null; }
   async createBoss(sessionId: string, input: CreateBossInput, expiresAt: string) {
-    const row: BossRecord = { id: randomUUID(), scope: "SESSION", status: "DRAFT", sessionId, ...input, companyResearch: input.companyResearch ?? null, persona: null, pki: null, personaError: null, expiresAt };
+    const row: BossRecord = { id: randomUUID(), scope: "SESSION", status: "DRAFT", sessionId, ...input, companyResearch: input.companyResearch ?? null, persona: null, pki: null, personaError: null, personaVersion: 0, expiresAt };
     this.bosses.set(row.id, row); return row;
   }
   async updateBoss(sessionId: string, bossId: string, patch: Partial<CreateBossInput> & Record<string, unknown>) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); Object.assign(row, patch); return row; }
   async setBossPersona(sessionId: string, bossId: string, persona: any, pki: any) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); Object.assign(row, { persona, pki, status: "READY", personaError: null }); }
   async setBossStatus(sessionId: string, bossId: string, status: BossRecord["status"], error: string | null = null) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); row.status = status; row.personaError = error; }
   async deleteBoss(sessionId: string, bossId: string) { const row = await this.getBoss(sessionId, bossId); if (!row || row.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); this.bosses.delete(bossId); }
+  async getGlobalBoss() { return this.bosses.get(globalBoss.id)!; }
+  async updateGlobalBoss(patch: UpdateGlobalBossInput) { const row = await this.getGlobalBoss(); Object.assign(row, patch); return row; }
+  async setGlobalBossPersona(persona: unknown, pki: unknown) { const row = await this.getGlobalBoss(); Object.assign(row, { persona, pki, status: "READY", personaError: null, personaVersion: (row.personaVersion ?? 0) + 1 }); }
   async getCompanyResearch(name: string) { const hit = this.company.get(name); return hit && hit.expiresAt > Date.now() ? hit.result : null; }
   async saveCompanyResearch(name: string, result: CompanyResearch) { this.company.set(name, { result, expiresAt: Date.now() + 7 * 86_400_000 }); }
   async createUploadIntent(input: Omit<UploadIntentRecord, "id" | "completedAt">) { const row = { ...input, id: randomUUID(), completedAt: null }; this.uploads.set(row.id, row); return row; }
   async getUploadIntent(sessionId: string, id: string) { const row = this.uploads.get(id); return row?.sessionId === sessionId && Date.parse(row.expiresAt) > Date.now() ? row : null; }
   async completeUploadIntent(sessionId: string, id: string) { const row = await this.getUploadIntent(sessionId, id); if (!row) throw new Error("업로드 정보를 찾을 수 없습니다."); row.completedAt = new Date().toISOString(); }
+  async createGlobalUploadIntent(input: Omit<GlobalUploadIntentRecord, "id" | "completedAt">) { const row = { ...input, id: randomUUID(), completedAt: null }; this.globalUploads.set(row.id, row); return row; }
+  async getGlobalUploadIntent(id: string) { const row = this.globalUploads.get(id); return row && Date.parse(row.expiresAt) > Date.now() ? row : null; }
+  async completeGlobalUploadIntent(id: string) { const row = await this.getGlobalUploadIntent(id); if (!row) throw new Error("업로드 정보를 찾을 수 없습니다."); row.completedAt = new Date().toISOString(); }
   async createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">) { const row = { ...input, id: randomUUID(), createdAt: new Date().toISOString() }; this.evidence.set(row.id, row); return row; }
   async getEvidence(sessionId: string, id: string) { const row = this.evidence.get(id); return row?.sessionId === sessionId ? row : null; }
   async listEvidence(sessionId: string, bossId: string) { return [...this.evidence.values()].filter((row) => row.sessionId === sessionId && row.bossId === bossId); }
   async updateEvidence(sessionId: string, id: string, patch: Partial<EvidenceRecord>) { const row = await this.getEvidence(sessionId, id); if (!row) throw new Error("근거를 찾을 수 없습니다."); Object.assign(row, patch); }
+  async createGlobalEvidence(input: Omit<GlobalEvidenceRecord, "id" | "createdAt">) { const row = { ...input, id: randomUUID(), createdAt: new Date().toISOString() }; this.globalEvidence.set(row.id, row); return row; }
+  async getGlobalEvidence(id: string) { return this.globalEvidence.get(id) ?? null; }
+  async listGlobalEvidence() { return [...this.globalEvidence.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
+  async updateGlobalEvidence(id: string, patch: Partial<GlobalEvidenceRecord>) { const row = await this.getGlobalEvidence(id); if (!row) throw new Error("근거를 찾을 수 없습니다."); Object.assign(row, patch); }
+  async deleteGlobalEvidence(id: string) { this.globalEvidence.delete(id); }
   async upsertSurveyAnswers(sessionId: string, bossId: string, answers: SurveyAnswerRecord[]) { const boss = await this.getBoss(sessionId, bossId); if (!boss || boss.scope === "GLOBAL") throw new Error("상사를 찾을 수 없습니다."); this.surveys.set(bossId, structuredClone(answers)); }
   async listSurveyAnswers(sessionId: string, bossId: string) { const boss = await this.getBoss(sessionId, bossId); return boss ? this.surveys.get(bossId) ?? [] : []; }
+  async upsertGlobalSurveyAnswers(answers: SurveyAnswerRecord[]) { for (const answer of answers) this.globalSurveys.set(answer.questionId, structuredClone(answer)); }
+  async listGlobalSurveyAnswers() { return [...this.globalSurveys.values()]; }
   async createJob(input: Pick<JobRecord, "sessionId" | "bossId" | "type" | "payload">) { const now = new Date().toISOString(); const row: JobRecord = { ...input, id: randomUUID(), status: "PENDING", result: null, errorMessage: null, attempts: 0, maxAttempts: 3, leaseUntil: null, retryOf: null, createdAt: now, updatedAt: now }; this.jobs.set(row.id, row); return row; }
   async getJob(sessionId: string, id: string) { const row = this.jobs.get(id); return row?.sessionId === sessionId ? row : null; }
+  async getJobById(id: string) { return this.jobs.get(id) ?? null; }
   async claimJob(id: string) { const row = this.jobs.get(id); if (!row || !(["PENDING", "RUNNING"].includes(row.status)) || (row.status === "RUNNING" && row.leaseUntil && Date.parse(row.leaseUntil) > Date.now())) return null; row.status = "RUNNING"; row.attempts += 1; row.leaseUntil = new Date(Date.now() + 2 * 60_000).toISOString(); row.updatedAt = new Date().toISOString(); return row; }
   async listRunnableJobs(limit: number) { return [...this.jobs.values()].filter((row) => row.status === "PENDING" || (row.status === "RUNNING" && row.leaseUntil && Date.parse(row.leaseUntil) <= Date.now())).slice(0, limit); }
   async completeJob(id: string, result: unknown) { const row = this.jobs.get(id); if (row) Object.assign(row, { status: "SUCCEEDED", result, errorMessage: null, leaseUntil: null, updatedAt: new Date().toISOString() }); }
@@ -98,7 +116,7 @@ export class MemoryStore implements Store {
     };
   }
   async rollupAnalytics(){return 0;}
-  async cleanupExpired() { const now = Date.now(); const expired = [...this.sessions.values()].filter((row) => Date.parse(row.expiresAt) <= now); const uploads = [...this.uploads.values()].filter((row) => Date.parse(row.expiresAt) <= now && !row.completedAt).map((row) => row.storagePath); for (const session of expired) await this.deleteSession(session.id); for (const [key,row] of this.adminSessions) if (Date.parse(row.expiresAt) <= now) this.adminSessions.delete(key); return { sessions: expired.length, uploads }; }
+  async cleanupExpired() { const now = Date.now(); const expired = [...this.sessions.values()].filter((row) => Date.parse(row.expiresAt) <= now); const sessionUploads = [...this.uploads.values()].filter((row) => Date.parse(row.expiresAt) <= now && !row.completedAt); const globalUploads = [...this.globalUploads.values()].filter((row) => Date.parse(row.expiresAt) <= now && !row.completedAt); const uploads = [...sessionUploads, ...globalUploads].map((row) => row.storagePath); for (const session of expired) await this.deleteSession(session.id); for (const row of sessionUploads) this.uploads.delete(row.id); for (const row of globalUploads) this.globalUploads.delete(row.id); for (const [key,row] of this.adminSessions) if (Date.parse(row.expiresAt) <= now) this.adminSessions.delete(key); return { sessions: expired.length, uploads }; }
 
   async createAdminSession(tokenHash: string, ipHash: string, expiresAt: string) { const now = new Date().toISOString(); const row: AdminSessionRecord = { id: randomUUID(), tokenHash, ipHash, createdAt: now, lastSeenAt: now, expiresAt }; this.adminSessions.set(tokenHash, row); return row; }
   async findAdminSession(tokenHash: string) { const row = this.adminSessions.get(tokenHash); if (!row || Date.parse(row.expiresAt) <= Date.now()) return null; row.lastSeenAt = new Date().toISOString(); return row; }
@@ -116,7 +134,7 @@ export class MemoryStore implements Store {
     const pending = [...this.jobs.values()].filter((job) => job.status === "PENDING").sort((a,b) => a.createdAt.localeCompare(b.createdAt))[0];
     const featureUsage = [...this.analytics.filter((row) => Date.parse(row.occurredAt) >= day).reduce((map,row) => map.set(row.feature,(map.get(row.feature) ?? 0) + 1),new Map<string,number>())].map(([feature,value]) => ({ feature, value }));
     const failureReasons = summarizeJobFailures([...this.jobs.values()].filter((job) => job.status === "FAILED").map((job) => job.errorMessage));
-    return { generatedAt: new Date(now).toISOString(), sessions: { total: live.length, active15m: live.filter((row) => Date.parse(row.lastSeenAt) >= now - 15 * 60_000).length, new24h: live.filter((row) => Date.parse(row.createdAt) >= day).length, expiring1h: live.filter((row) => Date.parse(row.expiresAt) <= now + 60 * 60_000).length }, usage: { personalBosses: [...this.bosses.values()].filter((row) => row.scope === "SESSION").length, chatMessages24h: [...this.threads.values()].flatMap((row) => row.messages).filter((row) => Date.parse(row.createdAt) >= day).length, translations24h: [...this.translations.values()].filter((row) => Date.parse(row.createdAt) >= day).length }, jobs: { ...counts, oldestPendingMinutes: pending ? Math.floor((now - Date.parse(pending.createdAt)) / 60_000) : null, failureReasons }, uploads: { expiredIncomplete: [...this.uploads.values()].filter((row) => !row.completedAt && Date.parse(row.expiresAt) <= now).length }, featureUsage, recentOperations: this.adminOperations.slice(-10).reverse() };
+    return { generatedAt: new Date(now).toISOString(), sessions: { total: live.length, active15m: live.filter((row) => Date.parse(row.lastSeenAt) >= now - 15 * 60_000).length, new24h: live.filter((row) => Date.parse(row.createdAt) >= day).length, expiring1h: live.filter((row) => Date.parse(row.expiresAt) <= now + 60 * 60_000).length }, usage: { personalBosses: [...this.bosses.values()].filter((row) => row.scope === "SESSION").length, chatMessages24h: [...this.threads.values()].flatMap((row) => row.messages).filter((row) => Date.parse(row.createdAt) >= day).length, translations24h: [...this.translations.values()].filter((row) => Date.parse(row.createdAt) >= day).length }, jobs: { ...counts, oldestPendingMinutes: pending ? Math.floor((now - Date.parse(pending.createdAt)) / 60_000) : null, failureReasons }, uploads: { expiredIncomplete: [...this.uploads.values(), ...this.globalUploads.values()].filter((row) => !row.completedAt && Date.parse(row.expiresAt) <= now).length }, featureUsage, recentOperations: this.adminOperations.slice(-10).reverse() };
   }
   async listAdminSessions(cursor?: string, limit = 20) {
     const rows = [...this.sessions.values()].filter((row) => Date.parse(row.expiresAt) > Date.now() && (!cursor || row.createdAt < cursor)).sort((a,b) => b.createdAt.localeCompare(a.createdAt)); const page = rows.slice(0,limit);

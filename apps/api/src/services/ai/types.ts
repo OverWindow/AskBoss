@@ -1,5 +1,5 @@
 import type { Boss, BossPersona, BossSurveyQuestion, CompanyResearch, TranslationResult, UserProfile } from "../../shared.js";
-import type { ChatMessageRecord, EvidenceRecord, SurveyAnswerRecord } from "../../types.js";
+import type { ChatMessageRecord, EvidenceRecord, GlobalEvidenceRecord, SurveyAnswerRecord } from "../../types.js";
 
 export interface BossChatInput {
   profile: UserProfile | null;
@@ -12,7 +12,7 @@ export interface BossChatInput {
 export interface AiService {
   researchCompany(name: string): Promise<CompanyResearch>;
   extractEvidence(input: { content: string; kind: string }): Promise<{ observations: any[] }>;
-  buildPersona(input: { profile: UserProfile | null; boss: Boss; evidence: EvidenceRecord[]; survey: SurveyAnswerRecord[] }): Promise<BossPersona>;
+  buildPersona(input: { profile: UserProfile | null; boss: Boss; evidence: Array<EvidenceRecord | GlobalEvidenceRecord>; survey: SurveyAnswerRecord[] }): Promise<BossPersona>;
   generateSurvey(boss: Boss): Promise<BossSurveyQuestion[]>;
   streamChatWithBoss(input: BossChatInput, signal?: AbortSignal): AsyncIterable<string>;
   translateBossMessage(input: { profile: UserProfile | null; boss: Boss; inputText: string; channel: string }, signal?: AbortSignal): Promise<TranslationResult>;

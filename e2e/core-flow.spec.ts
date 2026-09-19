@@ -23,9 +23,12 @@ test.describe("메인 인터랙션", () => {
 
     await page.getByRole("button", { name: "번역 패널 열기" }).click();
     await expect(translatorPanel).toBeVisible();
+    await expect(page.getByRole("button", { name: "번역 패널 열기" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "대화 패널 열기" })).toBeVisible();
     await page.getByRole("button", { name: "대화 패널 열기" }).click();
     await expect(translatorPanel).toBeVisible();
     await expect(chatPanel).toBeVisible();
+    await expect(page.getByRole("button", { name: "대화 패널 열기" })).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
     const after = await avatar.boundingBox();
@@ -55,10 +58,13 @@ test("모바일에서는 아바타를 유지하고 한 패널만 연다", async 
   await page.getByRole("button", { name: "번역 패널 열기" }).click();
   await expect(avatar).toBeVisible();
   await expect(translatorPanel).toBeVisible();
+  await expect(page.getByRole("button", { name: "번역 패널 열기" })).toHaveCount(0);
   await page.getByRole("button", { name: "대화 패널 열기" }).click();
   await expect(avatar).toBeVisible();
   await expect(translatorPanel).toBeHidden();
   await expect(chatPanel).toBeVisible();
+  await expect(page.getByRole("button", { name: "번역 패널 열기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "대화 패널 열기" })).toHaveCount(0);
 });
 
 test("관리자 비밀번호 로그인 후 운영 현황을 확인할 수 있다", async ({ page }) => {
@@ -69,4 +75,10 @@ test("관리자 비밀번호 로그인 후 운영 현황을 확인할 수 있다
   await expect(page.getByRole("heading", { name: "운영 관리자" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "세션 현황" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "AI 상태와 크레딧" })).toBeVisible();
+  await page.getByRole("link", { name: "모두의 상사 관리" }).click();
+  await expect(page.getByRole("heading", { name: "모두의 상사 관리" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "기본 정보" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "관찰 자료" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "상황 설문" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "페르소나 반영" })).toBeVisible();
 });

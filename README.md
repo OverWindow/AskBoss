@@ -25,7 +25,7 @@ openssl rand -hex 32    # ADMIN_SESSION_SECRET
 
 ## 데이터베이스
 
-`supabase/migrations`의 `0001`부터 `0005`까지 순서대로 적용하고 `boss-evidence` Bucket이 private인지 확인합니다. `0005_admin_operations.sql`은 관리자 세션·로그인 시도·운영 작업 기록과 Job 재시도 연결을 추가합니다. HR 데모 데이터는 `pnpm seed:hr`로 생성합니다.
+`supabase/migrations`의 `0001`부터 `0006`까지 순서대로 적용하고 `boss-evidence` Bucket이 private인지 확인합니다. `0005_admin_operations.sql`은 관리자 세션·로그인 시도·운영 작업 기록과 Job 재시도 연결을, `0006_global_boss_admin.sql`은 모두의 상사 관찰 자료·설문·업로드 저장소를 추가합니다. HR 데모 데이터는 `pnpm seed:hr`로 생성합니다.
 
 ## 배포
 

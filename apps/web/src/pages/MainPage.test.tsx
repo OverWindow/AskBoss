@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MainPage } from "./MainPage";
 import { useUiStore } from "../stores/ui-store";
@@ -40,23 +40,32 @@ describe("MainPage workspace", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("keeps only one panel open below desktop width and closes the last panel with Escape", () => {
+  it("hides only the active mobile trigger and restores it with focus after Escape", async () => {
     render(<MainPage/>);
     fireEvent.click(screen.getByRole("button", { name: "번역 패널 열기" }));
     expect(screen.getByLabelText("상사의 말 번역")).toHaveAttribute("data-open", "true");
+    expect(screen.queryByRole("button", { name: "번역 패널 열기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "대화 패널 열기" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "대화 패널 열기" }));
     expect(screen.getByLabelText("상사의 말 번역")).toHaveAttribute("data-open", "false");
     expect(screen.getByLabelText("모두의 상사와 대화")).toHaveAttribute("data-open", "true");
+    expect(screen.getByRole("button", { name: "번역 패널 열기" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "대화 패널 열기" })).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(screen.getByLabelText("모두의 상사와 대화")).toHaveAttribute("data-open", "false");
+    await waitFor(() => expect(screen.getByRole("button", { name: "대화 패널 열기" })).toHaveFocus());
   });
 
   it("allows both panels to open independently on desktop", () => {
     mockViewport(true);
     render(<MainPage/>);
     fireEvent.click(screen.getByRole("button", { name: "번역 패널 열기" }));
+    expect(screen.queryByRole("button", { name: "번역 패널 열기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "대화 패널 열기" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "대화 패널 열기" }));
     expect(screen.getByLabelText("상사의 말 번역")).toHaveAttribute("data-open", "true");
     expect(screen.getByLabelText("모두의 상사와 대화")).toHaveAttribute("data-open", "true");
+    expect(screen.queryByRole("button", { name: "번역 패널 열기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "대화 패널 열기" })).not.toBeInTheDocument();
   });
 });

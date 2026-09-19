@@ -1,10 +1,10 @@
 import { OBSERVATION_CATEGORIES, type BossPersona, type PkiBreakdown } from "../shared.js";
-import type { EvidenceRecord } from "../types.js";
+import type { EvidenceRecord, GlobalEvidenceRecord } from "../types.js";
 
 const clamp=(value:number)=>Math.max(0,Math.min(1,value));
 const daysSince=(date:string)=>Math.max(0,(Date.now()-Date.parse(date))/86_400_000);
 
-export function calculatePki(evidence:EvidenceRecord[],persona:BossPersona):PkiBreakdown {
+export function calculatePki(evidence:Array<EvidenceRecord | GlobalEvidenceRecord>,persona:BossPersona):PkiBreakdown {
   const ready=evidence.filter((item)=>item.status==="READY");
   const observations=ready.flatMap((item)=>(item.parsedData?.observations??[]).map((observation:any)=>({...observation,evidenceId:item.id,fallbackDate:item.observedAt??item.createdAt})));
   const counts=OBSERVATION_CATEGORIES.map((category)=>observations.filter((o)=>o.category===category).length);

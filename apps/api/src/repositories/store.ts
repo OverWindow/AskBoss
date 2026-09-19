@@ -1,9 +1,22 @@
 import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary } from "../shared.js";
-import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
+import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 
 export interface CreateBossInput {
   alias: string; avatarKey: string; jobFunction: string; yearsOfServiceBand: string; rank: string; companyName: string;
   ageBand: number; hierarchyScore: number; genderBalanceScore: number; companyResearch?: CompanyResearch | null;
+}
+
+export interface UpdateGlobalBossInput {
+  alias?: string;
+  avatarKey?: string;
+  jobFunction?: string | null;
+  yearsOfServiceBand?: string | null;
+  rank?: string | null;
+  companyName?: string | null;
+  ageBand?: number | null;
+  hierarchyScore?: number | null;
+  genderBalanceScore?: number | null;
+  companyResearch?: CompanyResearch | null;
 }
 
 export interface Store {
@@ -21,19 +34,33 @@ export interface Store {
   setBossPersona(sessionId: string, bossId: string, persona: unknown, pki: unknown): Promise<void>;
   setBossStatus(sessionId: string, bossId: string, status: BossRecord["status"], error?: string | null): Promise<void>;
   deleteBoss(sessionId: string, bossId: string): Promise<void>;
+  getGlobalBoss(): Promise<BossRecord>;
+  updateGlobalBoss(patch: UpdateGlobalBossInput): Promise<BossRecord>;
+  setGlobalBossPersona(persona: unknown, pki: unknown): Promise<void>;
   getCompanyResearch(normalizedName: string): Promise<CompanyResearch | null>;
   saveCompanyResearch(normalizedName: string, result: CompanyResearch): Promise<void>;
   createUploadIntent(input: Omit<UploadIntentRecord, "id" | "completedAt">): Promise<UploadIntentRecord>;
   getUploadIntent(sessionId: string, id: string): Promise<UploadIntentRecord | null>;
   completeUploadIntent(sessionId: string, id: string): Promise<void>;
+  createGlobalUploadIntent(input: Omit<GlobalUploadIntentRecord, "id" | "completedAt">): Promise<GlobalUploadIntentRecord>;
+  getGlobalUploadIntent(id: string): Promise<GlobalUploadIntentRecord | null>;
+  completeGlobalUploadIntent(id: string): Promise<void>;
   createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">): Promise<EvidenceRecord>;
   getEvidence(sessionId: string, id: string): Promise<EvidenceRecord | null>;
   listEvidence(sessionId: string, bossId: string): Promise<EvidenceRecord[]>;
   updateEvidence(sessionId: string, id: string, patch: Partial<EvidenceRecord>): Promise<void>;
+  createGlobalEvidence(input: Omit<GlobalEvidenceRecord, "id" | "createdAt">): Promise<GlobalEvidenceRecord>;
+  getGlobalEvidence(id: string): Promise<GlobalEvidenceRecord | null>;
+  listGlobalEvidence(): Promise<GlobalEvidenceRecord[]>;
+  updateGlobalEvidence(id: string, patch: Partial<GlobalEvidenceRecord>): Promise<void>;
+  deleteGlobalEvidence(id: string): Promise<void>;
   upsertSurveyAnswers(sessionId: string, bossId: string, answers: SurveyAnswerRecord[]): Promise<void>;
   listSurveyAnswers(sessionId: string, bossId: string): Promise<SurveyAnswerRecord[]>;
+  upsertGlobalSurveyAnswers(answers: SurveyAnswerRecord[]): Promise<void>;
+  listGlobalSurveyAnswers(): Promise<SurveyAnswerRecord[]>;
   createJob(input: Pick<JobRecord, "sessionId" | "bossId" | "type" | "payload">): Promise<JobRecord>;
   getJob(sessionId: string, id: string): Promise<JobRecord | null>;
+  getJobById(id: string): Promise<JobRecord | null>;
   claimJob(id: string): Promise<JobRecord | null>;
   listRunnableJobs(limit: number): Promise<JobRecord[]>;
   completeJob(id: string, result: unknown): Promise<void>;
