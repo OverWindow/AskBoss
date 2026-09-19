@@ -40,10 +40,10 @@ export function HrDemoPage() {
   return <motion.div className="hr-layout" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ duration: .3, ease: "easeOut" }}>
     <aside className="hr-nav">
       <img className="hr-brand-logo" src="/image.png" alt={SERVICE_NAME} />
-      <Link to="/"><ChevronLeft size={15} style={{ verticalAlign: "middle" }} /> 사용자 화면</Link>
       {SECTIONS.map((section) => <a key={section.id} href={`#${section.id}`} className={activeSection === section.id ? "is-active" : ""} onClick={scrollTo(section.id)}>{section.label}</a>)}
     </aside>
     <div className="hr-content">
+      <header id="overview" className="hr-page-header"><div className="settings-header-row"><Link className="settings-back-button" to="/" aria-label="사용자 화면으로 돌아가기"><ChevronLeft size={19}/></Link><h1>조직 커뮤니케이션 인사이트</h1></div></header>
       <div className="hr-dataset-tabs" role="tablist" aria-label="HR 데이터 선택">
         <button type="button" role="tab" aria-selected={dataset === "actual"} className={dataset === "actual" ? "is-active" : ""} onClick={() => setDataset("actual")}>실제 익명 집계</button>
         <button type="button" role="tab" aria-selected={dataset === "mock"} className={dataset === "mock" ? "is-active" : ""} onClick={() => setDataset("mock")}>가상 데모</button>

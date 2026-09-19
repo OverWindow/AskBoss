@@ -73,7 +73,7 @@ export function Sidebar() {
         <div className="nav-divider"/>
         <button className="nav-link" type="button" title="아카이브" onClick={() => ui.set({ archiveOpen: true, mobileNavOpen: false, settingsOpen: false })}><Archive size={19}/><span className="hide-collapsed">아카이브</span></button>
         <Link className="nav-link" to="/hr-demo" title="HR 데모"><BarChart3 size={19}/><span className="hide-collapsed">HR 데모</span></Link>
-        <button className="sidebar-user" onClick={() => ui.set({ settingsOpen: !ui.settingsOpen })} title={profile ? `@${profile.handle}` : "사용자 설정"}><UserRound size={19}/><span className="hide-collapsed">{profile ? `@${profile.handle}` : "사용자 설정"}</span></button>
+        <button className="sidebar-user" onClick={() => ui.set({ settingsOpen: !ui.settingsOpen })} title={profile ? profile.handle : "사용자 설정"}><UserRound size={19}/><span className="hide-collapsed">{profile ? profile.handle : "사용자 설정"}</span></button>
         <AnimatePresence>{ui.settingsOpen && <motion.div className="profile-menu" initial={{ opacity: 0, y: 8, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: .97 }} transition={{ duration: .2, ease: [0.22, 1, 0.36, 1] }}><Link to="/settings" onClick={() => ui.set({ settingsOpen: false })}>내 정보 · 상사 관리</Link><button onClick={() => { try { localStorage.removeItem(TUTORIAL_STORAGE_KEY); } catch { /* Storage may be unavailable. */ } ui.set({ tutorialOpen: true, settingsOpen: false }); navigate("/"); }}>튜토리얼 다시 보기</button><button className="danger-button" onClick={reset}>세션 데이터 초기화</button></motion.div>}</AnimatePresence>
       </div>
     </aside>
