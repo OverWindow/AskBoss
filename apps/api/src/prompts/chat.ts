@@ -10,8 +10,12 @@ ${plainTextOnly}
 
 export const buildBossChatMessages = (input: BossChatInput) => {
   const { message, basePrompt, globalPersona, ...context } = input;
+  const promptContext = {
+    ...context,
+    messages: context.messages.map(({ coaching: _coaching, ...chatMessage }) => chatMessage),
+  };
   return [
     { role: "system" as const, content: bossSystemPrompt(input.boss.scope, basePrompt, input.boss.scope === "SESSION" ? globalPersona : undefined) },
-    { role: "user" as const, content: `${chatPrompt(context)}\n사용자: ${message}\n상사:` },
+    { role: "user" as const, content: `${chatPrompt(promptContext)}\n사용자: ${message}\n상사:` },
   ] as const;
 };

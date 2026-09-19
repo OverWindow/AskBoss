@@ -1,4 +1,4 @@
-import type { BossPersona, BossSurveyQuestion, CompanyResearch, TranslationResult } from "../../shared.js";
+import type { BossPersona, BossSurveyQuestion, ChatMessageCoaching, CompanyResearch, TranslationResult } from "../../shared.js";
 import { OBSERVATION_CATEGORIES } from "../../shared.js";
 import type { AiService } from "./types.js";
 
@@ -14,6 +14,13 @@ export class FakeAiService implements AiService {
     const message=input.message as string;
     const content=message.includes("늦") ? "현재 진행 상황부터 간단히 정리해서 알려주세요. 남은 일정도 같이 봅시다." : "좋아요. 결론과 다음에 할 일을 먼저 말해주면 더 빨리 판단할 수 있어요.";
     for(const chunk of content.match(/.{1,12}/gu)??[content]){if(signal?.aborted)throw signal.reason;yield chunk;}
+  }
+  async reviewUserMessage(input: any): Promise<ChatMessageCoaching> {
+    const inappropriate = /(닥쳐|꺼져|멍청|병신|내 알 바 아니|니가 알아서 해|네가 알아서 해)/u.test(input.message);
+    const highlyAmbiguous = /(이거|그거).*(그때|나중에).*(할게요|하겠습니다|해둘게요)/u.test(input.message);
+    if (inappropriate) return { shouldSuggest: true, reason: "상대가 심각한 무시나 책임 전가로 받아들일 가능성이 높습니다.", revisedText: "제가 확인한 범위와 필요한 조치를 정리해서 다시 말씀드리겠습니다." };
+    if (highlyAmbiguous) return { shouldSuggest: true, reason: "업무 대상과 완료 시점이 불분명해 서로 다르게 이해할 가능성이 높습니다.", revisedText: "해당 자료는 오늘 오후 3시까지 확인한 뒤 결과를 공유드리겠습니다." };
+    return { shouldSuggest: false, reason: null, revisedText: null };
   }
   async *streamSimulatedBossReaction(input:any, signal?:AbortSignal) {
     const content = input.reply.includes("오후") ? "좋아. 오후에는 꼭 결과로 공유해." : "알겠어. 말한 일정대로 진행하고 변동 생기면 바로 알려줘.";

@@ -1,6 +1,7 @@
-import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminPersonalBossPage, AdminSessionPage, ChatMessageKind, HrDashboard, TranslationArchiveDetail, TranslationArchiveSummary } from "../shared.js";
+import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminPersonalBossPage, AdminSessionPage, ChatMessageCoaching, ChatMessageKind, HrDashboard, TranslationArchiveDetail, TranslationArchiveSummary } from "../shared.js";
 import type { AdminAiPromptSettings, AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalBossDefaults, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, PersonalBossDefaults, SessionRecord, SurveyAnswerRecord, TranslationExamplesSettings, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { ArchiveCursor } from "../utils/archive-cursor.js";
+import type { ChatCursor } from "../utils/chat-cursor.js";
 
 export interface CreateBossInput {
   alias: string; avatarKey: string; jobFunction: string; yearsOfServiceBand: string; rank: string; companyName: string;
@@ -29,6 +30,12 @@ export interface AdminPersonalBossPromptContext {
     previousMessages: ChatMessageRecord[];
     latestQuestion: ChatMessageRecord;
   } | null;
+}
+
+export interface ChatMessageCoachingContext {
+  conversationSummary: string | null;
+  previousMessages: ChatMessageRecord[];
+  message: ChatMessageRecord;
 }
 
 export interface Store {
@@ -76,6 +83,8 @@ export interface Store {
   getJob(sessionId: string, id: string): Promise<JobRecord | null>;
   getJobById(id: string): Promise<JobRecord | null>;
   claimJob(id: string): Promise<JobRecord | null>;
+  renewJobLease(id: string): Promise<void>;
+  deferJob(id: string): Promise<void>;
   listRunnableJobs(limit: number): Promise<JobRecord[]>;
   completeJob(id: string, result: unknown): Promise<void>;
   failJob(id: string, error: string, retry: boolean): Promise<void>;
@@ -84,7 +93,9 @@ export interface Store {
   replaceChatWithSimulation(sessionId: string, bossId: string, archiveId: string, replyIndex: number, source: string, reply: string, expiresAt: string): Promise<{ threadId: string; archiveId: string; messages: ChatMessageRecord[]; usesActualResponse: boolean }>;
   resetChat(sessionId: string, bossId: string): Promise<void>;
   addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string, kind?: ChatMessageKind): Promise<ChatMessageRecord>;
-  listChatMessages(sessionId: string, bossId: string, cursor?: string, limit?: number): Promise<{ threadId: string | null; archiveId: string | null; messages: ChatMessageRecord[]; nextCursor: string | null }>;
+  getChatMessageCoachingContext(sessionId: string, bossId: string, messageId: string): Promise<ChatMessageCoachingContext | null>;
+  setChatMessageCoaching(sessionId: string, bossId: string, messageId: string, coaching: ChatMessageCoaching): Promise<ChatMessageRecord | null>;
+  listChatMessages(sessionId: string, bossId: string, cursor?: ChatCursor, limit?: number): Promise<{ threadId: string | null; archiveId: string | null; messages: ChatMessageRecord[]; nextCursor: string | null }>;
   updateThreadSummary(threadId: string, summary: string): Promise<void>;
   createTranslation(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback" | "simulationCount">): Promise<TranslationRecord>;
   createTranslationWithArchive(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback" | "simulationCount">, ownerHash: string, boss: BossRecord): Promise<{ translation: TranslationRecord; archive: TranslationArchiveDetail }>;

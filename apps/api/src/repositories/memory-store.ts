@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminPersonalBossPage, type AdminSessionPage, type AdminSessionSummary, type BossPersona, type ChatMessageKind, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationArchiveDetail, type TranslationExamplesSettings } from "../shared.js";
+import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminPersonalBossPage, type AdminSessionPage, type AdminSessionSummary, type BossPersona, type ChatMessageCoaching, type ChatMessageKind, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationArchiveDetail, type TranslationExamplesSettings } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationArchiveRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
-import type { AdminPersonalBossPromptContext, CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
+import type { AdminPersonalBossPromptContext, ChatMessageCoachingContext, CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 import { computeTopRepeatedPhrases } from "../utils/hr-aggregation.js";
 import { buildActualResponseEvidence } from "../utils/actual-response.js";
+import { encodeChatCursor, InvalidChatCursorError, type ChatCursor } from "../utils/chat-cursor.js";
 import { encodeArchiveCursor, type ArchiveCursor } from "../utils/archive-cursor.js";
 import { getMockHrDashboard } from "../services/hr-mock.js";
 
@@ -146,7 +147,9 @@ export class MemoryStore implements Store {
   async createJob(input: Pick<JobRecord, "sessionId" | "bossId" | "type" | "payload">) { const now = new Date().toISOString(); const row: JobRecord = { ...input, id: randomUUID(), status: "PENDING", result: null, errorMessage: null, attempts: 0, maxAttempts: 3, leaseUntil: null, retryOf: null, createdAt: now, updatedAt: now }; this.jobs.set(row.id, row); return row; }
   async getJob(sessionId: string, id: string) { const row = this.jobs.get(id); return row?.sessionId === sessionId ? row : null; }
   async getJobById(id: string) { return this.jobs.get(id) ?? null; }
-  async claimJob(id: string) { const row = this.jobs.get(id); if (!row || !(["PENDING", "RUNNING"].includes(row.status)) || (row.status === "RUNNING" && row.leaseUntil && Date.parse(row.leaseUntil) > Date.now())) return null; row.status = "RUNNING"; row.attempts += 1; row.leaseUntil = new Date(Date.now() + 2 * 60_000).toISOString(); row.updatedAt = new Date().toISOString(); return row; }
+  async claimJob(id: string) { const row = this.jobs.get(id); if (!row || !(["PENDING", "RUNNING"].includes(row.status)) || (row.status === "RUNNING" && row.leaseUntil && Date.parse(row.leaseUntil) > Date.now())) return null; row.status = "RUNNING"; row.attempts += 1; row.leaseUntil = new Date(Date.now() + 90_000).toISOString(); row.updatedAt = new Date().toISOString(); return row; }
+  async renewJobLease(id: string) { const row = this.jobs.get(id); if (row?.status === "RUNNING") { row.leaseUntil = new Date(Date.now() + 90_000).toISOString(); row.updatedAt = new Date().toISOString(); } }
+  async deferJob(id: string) { const row = this.jobs.get(id); if (row?.status === "RUNNING") Object.assign(row, { status: "PENDING", attempts: Math.max(0, row.attempts - 1), leaseUntil: null, updatedAt: new Date().toISOString() }); }
   async listRunnableJobs(limit: number) { return [...this.jobs.values()].filter((row) => row.status === "PENDING" || (row.status === "RUNNING" && row.leaseUntil && Date.parse(row.leaseUntil) <= Date.now())).slice(0, limit); }
   async completeJob(id: string, result: unknown) { const row = this.jobs.get(id); if (row) Object.assign(row, { status: "SUCCEEDED", result, errorMessage: null, leaseUntil: null, updatedAt: new Date().toISOString() }); }
   async failJob(id: string, error: string, retry: boolean) { const row = this.jobs.get(id); if (row) Object.assign(row, { status: retry && row.attempts < row.maxAttempts ? "PENDING" : "FAILED", errorMessage: error, leaseUntil: null, updatedAt: new Date().toISOString() }); }
@@ -155,7 +158,42 @@ export class MemoryStore implements Store {
   async replaceChatWithSimulation(sessionId: string, bossId: string, archiveId: string, replyIndex: number, source: string, reply: string, expiresAt: string) { const archive = this.archives.get(archiveId); if (!archive || archive.sourceSessionId !== sessionId) throw new Error("아카이브를 찾을 수 없습니다."); await this.resetChat(sessionId, bossId); archive.updatedAt = new Date().toISOString(); const usesActualResponse = archive.actualResponse?.replyIndex === replyIndex; const now = new Date().toISOString(); const branch = { id: randomUUID(), kind: usesActualResponse ? "ACTUAL" as const : "PREDICTED" as const, status: "ACTIVE" as const, replyIndex, messages: [] as ChatMessageRecord[], createdAt: now, updatedAt: now }; archive.branches.unshift(branch); const thread: ChatThreadRecord = { id: randomUUID(), sessionId, bossId, conversationSummary: null, messages: [], archiveId, archiveBranchId: branch.id, createdAt: now, expiresAt }; this.threads.set(thread.id, thread); const sourceMessage = await this.addChatMessage(thread.id, "assistant", source, "SIMULATION_SOURCE"); const replyMessage = await this.addChatMessage(thread.id, "user", reply, "SIMULATION_REPLY"); const messages = [sourceMessage, replyMessage]; if (usesActualResponse) messages.push(await this.addChatMessage(thread.id, "assistant", archive.actualResponse!.content, "ACTUAL_RESPONSE")); return { threadId: thread.id, archiveId, messages, usesActualResponse }; }
   async resetChat(sessionId: string, bossId: string) { for (const [id, thread] of this.threads) if (thread.sessionId === sessionId && thread.bossId === bossId) { const archive = thread.archiveId ? this.archives.get(thread.archiveId) : null; const branch = archive?.branches.find((item) => item.id === thread.archiveBranchId); if (branch && branch.status === "ACTIVE") { branch.status = "SUPERSEDED"; branch.updatedAt = new Date().toISOString(); } this.threads.delete(id); } }
   async addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string, kind: ChatMessageKind = "CHAT") { const row: ChatMessageRecord = { id: randomUUID(), role, content, kind, createdAt: new Date().toISOString() }; const thread = this.threads.get(threadId); if (!thread) throw new Error("대화를 찾을 수 없습니다."); thread.messages.push(row); const archive = thread.archiveId ? this.archives.get(thread.archiveId) : null; const branch = archive?.branches.find((item) => item.id === thread.archiveBranchId); if (branch) { branch.messages.push(structuredClone(row)); branch.updatedAt = row.createdAt; archive!.updatedAt = row.createdAt; } return row; }
-  async listChatMessages(sessionId: string, bossId: string, cursor?: string, limit = 50) { const thread = [...this.threads.values()].find((row) => row.sessionId === sessionId && row.bossId === bossId); if (!thread) return { threadId: null, archiveId: null, messages: [], nextCursor: null }; const filtered = cursor ? thread.messages.filter((message) => message.createdAt < cursor) : thread.messages; const messages = filtered.slice(-limit); return { threadId: thread.id, archiveId: thread.archiveId ?? null, messages, nextCursor: filtered.length > limit ? messages[0]?.createdAt ?? null : null }; }
+  async getChatMessageCoachingContext(sessionId: string, bossId: string, messageId: string): Promise<ChatMessageCoachingContext | null> {
+    const thread = [...this.threads.values()].find((row) => row.sessionId === sessionId && row.bossId === bossId && Date.parse(row.expiresAt) > Date.now());
+    if (!thread) return null;
+    const index = thread.messages.findIndex((message) => message.id === messageId);
+    if (index < 0) return null;
+    return {
+      conversationSummary: thread.conversationSummary,
+      previousMessages: structuredClone(thread.messages.slice(Math.max(0, index - 19), index)),
+      message: structuredClone(thread.messages[index]!),
+    };
+  }
+  async setChatMessageCoaching(sessionId: string, bossId: string, messageId: string, coaching: ChatMessageCoaching) {
+    const context = await this.getChatMessageCoachingContext(sessionId, bossId, messageId);
+    if (!context) return null;
+    const thread = [...this.threads.values()].find((row) => row.sessionId === sessionId && row.bossId === bossId && Date.parse(row.expiresAt) > Date.now())!;
+    const message = thread.messages.find((item) => item.id === messageId)!;
+    message.coaching = structuredClone(coaching);
+    return structuredClone(message);
+  }
+  async listChatMessages(sessionId: string, bossId: string, cursor?: ChatCursor, limit = 50) {
+    const thread = [...this.threads.values()].find((row) => row.sessionId === sessionId && row.bossId === bossId);
+    if (!thread) {
+      if (cursor) throw new InvalidChatCursorError();
+      return { threadId: null, archiveId: null, messages: [], nextCursor: null };
+    }
+    const cursorIndex = cursor ? thread.messages.findIndex((message) => message.id === cursor.id) : thread.messages.length;
+    if (cursor && cursorIndex < 0) throw new InvalidChatCursorError();
+    const filtered = thread.messages.slice(0, cursorIndex);
+    const messages = filtered.slice(-limit);
+    return {
+      threadId: thread.id,
+      archiveId: thread.archiveId ?? null,
+      messages,
+      nextCursor: filtered.length > limit && messages[0] ? encodeChatCursor({ id: messages[0].id }) : null,
+    };
+  }
   async updateThreadSummary(threadId: string, summary: string) { const row = this.threads.get(threadId); if (row) row.conversationSummary = summary; }
   async createTranslation(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback" | "simulationCount">) { const row: TranslationRecord = { ...input, id: randomUUID(), feedback: null, simulationCount: 0, createdAt: new Date().toISOString() }; this.translations.set(row.id, row); return row; }
   async createTranslationWithArchive(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback" | "simulationCount">, ownerHash: string, boss: BossRecord) { const translation = await this.createTranslation(input); const now = translation.createdAt; const archive: TranslationArchiveRecord = { id: randomUUID(), ownerHash, translationId: translation.id, sourceSessionId: input.sessionId, boss: { id: boss.id, alias: boss.alias, avatarKey: boss.avatarKey, scope: boss.scope }, inputText: input.inputText, channel: input.channel, result: structuredClone(input.result), lastCopiedReplyIndex: null, actualResponse: null, branchCount: 0, branches: [], createdAt: now, updatedAt: now }; this.archives.set(archive.id, archive); return { translation, archive: publicArchive(archive) }; }

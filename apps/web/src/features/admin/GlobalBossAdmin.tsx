@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Bot, FileText, Image, LogOut, RefreshCw, Save, Settings2, Trash2, Upload } from "lucide-react";
 import { AGE_BANDS, AVATARS, BOSS_RANKS, BOSS_TENURE_BANDS, JOB_FUNCTIONS, type AdminGlobalBossDetail, type Boss, type BossSurveyQuestion, type CompanyResearch, type GlobalBossDefaults, type GlobalBossPromptPreview } from "@askboss/shared";
+import { EvidenceUploadProgressList } from "../../components/EvidenceUploadProgressList";
 import { api } from "../../services/api-client";
-import { uploadToSignedUrl } from "../../services/upload-client";
+import { IMAGE_UPLOAD_CONCURRENCY,mapWithConcurrency,prepareEvidenceFile,prepareEvidenceImageBatch,type EvidenceUploadProgress,uploadToSignedUrl } from "../../services/upload-client";
 
 const TIMEOUT = 60_000;
 const READ_TIMEOUT = 12_000;
@@ -38,6 +39,7 @@ export function GlobalBossAdmin({ onLogout }: Props) {
   const [answers, setAnswers] = useState<Record<string, { selectedOption: string | null; freeText: string }>>({});
   const [busy, setBusy] = useState<string>();
   const [message, setMessage] = useState("");
+  const [uploadItems, setUploadItems] = useState<EvidenceUploadProgress[]>([]);
 
   useEffect(() => { if (!boss && detail.data?.boss) setBoss(detail.data.boss); }, [boss, detail.data?.boss]);
   useEffect(() => { if (typeof promptSettings.data?.prompt === "string") setGlobalPrompt(promptSettings.data.prompt); }, [promptSettings.data?.prompt]);
@@ -80,14 +82,44 @@ export function GlobalBossAdmin({ onLogout }: Props) {
     finally { setBusy(undefined); }
   };
   const uploadFile = async (file: File) => {
-    setBusy("evidence"); setMessage(`${file.name} 업로드 중…`);
+    setBusy("evidence"); setMessage(`${file.name} 검증 중…`); setUploadItems([]);
     try {
-      const { upload } = await adminApi<{ upload: { intentId: string; signedUrl: string | null; token: string | null } }>("/admin/global-boss/uploads/sign", { method: "POST", body: JSON.stringify({ fileName: file.name, contentType: file.type, size: file.size }) });
-      if (upload.signedUrl) await uploadToSignedUrl(upload.signedUrl, file, upload.token);
-      await adminApi("/admin/global-boss/evidence", { method: "POST", body: JSON.stringify({ type: file.type === "text/plain" ? "TXT" : "IMAGE", uploadIntentId: upload.intentId }) });
+      const prepared = prepareEvidenceFile(file);
+      const { upload } = await adminApi<{ upload: { intentId: string; signedUrl: string | null; token: string | null } }>("/admin/global-boss/uploads/sign", { method: "POST", body: JSON.stringify({ fileName: prepared.file.name, contentType: prepared.contentType, size: prepared.file.size }) });
+      if (upload.signedUrl) { setMessage(`${file.name} 저장소에 업로드 중…`); await uploadToSignedUrl(upload.signedUrl, prepared.file, upload.token); }
+      setMessage(`${file.name} 분석 목록에 등록 중…`);
+      await adminApi("/admin/global-boss/evidence", { method: "POST", body: JSON.stringify({ type: prepared.contentType === "text/plain" ? "TXT" : "IMAGE", uploadIntentId: upload.intentId }) });
       setMessage(`${file.name}을 분석 목록에 추가했습니다.`); await detail.refetch();
     } catch (error) { setMessage(error instanceof Error ? error.message : "파일을 추가하지 못했습니다."); }
     finally { setBusy(undefined); }
+  };
+  const updateUploadItem = (id: string, patch: Partial<EvidenceUploadProgress>) => setUploadItems((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item));
+  const uploadImages = async (files: File[]) => {
+    if (!files.length) return;
+    setMessage("");
+    let batch;
+    try { batch = prepareEvidenceImageBatch(files); }
+    catch (error) { setUploadItems([]); setMessage(error instanceof Error ? error.message : "이미지를 선택하지 못했습니다."); return; }
+    setUploadItems(batch.map((item) => ({ id: item.id, name: item.source.name, status: item.error ? "FAILED" : "VALIDATING", error: item.error })));
+    const valid = batch.filter((item): item is typeof item & { prepared: NonNullable<typeof item.prepared> } => Boolean(item.prepared));
+    if (!valid.length) { setMessage("업로드할 수 있는 이미지가 없습니다. 파일별 오류를 확인해 주세요."); return; }
+    setBusy("evidence");
+    try {
+      const results = await mapWithConcurrency(valid, IMAGE_UPLOAD_CONCURRENCY, async (item) => {
+        updateUploadItem(item.id, { status: "UPLOADING", error: null });
+        const { upload } = await adminApi<{ upload: { intentId: string; signedUrl: string | null; token: string | null } }>("/admin/global-boss/uploads/sign", { method: "POST", body: JSON.stringify({ fileName: item.prepared.file.name, contentType: item.prepared.contentType, size: item.prepared.file.size }) });
+        if (upload.signedUrl) await uploadToSignedUrl(upload.signedUrl, item.prepared.file, upload.token);
+        updateUploadItem(item.id, { status: "REGISTERING" });
+        await adminApi("/admin/global-boss/evidence", { method: "POST", body: JSON.stringify({ type: "IMAGE", uploadIntentId: upload.intentId }) });
+        updateUploadItem(item.id, { status: "SUCCEEDED" });
+        return item.id;
+      });
+      const succeeded = results.filter((result) => result.status === "fulfilled").length;
+      results.forEach((result, index) => { if (result.status === "rejected") updateUploadItem(valid[index]!.id, { status: "FAILED", error: result.reason instanceof Error ? result.reason.message : "이미지를 추가하지 못했습니다." }); });
+      const failed = batch.length - succeeded;
+      setMessage(failed ? `${succeeded}장 등록 완료 · ${failed}장 실패 — 실패한 파일만 다시 선택해 주세요.` : `이미지 ${succeeded}장을 분석 목록에 추가했습니다.`);
+      if (succeeded) await detail.refetch();
+    } finally { setBusy(undefined); }
   };
   const deleteEvidence = async (id: string) => {
     if (!window.confirm("이 관찰 자료를 삭제할까요? 다음 재생성부터 제외됩니다.")) return;
@@ -109,13 +141,15 @@ export function GlobalBossAdmin({ onLogout }: Props) {
     finally { setBusy(undefined); }
   };
   const waitForJob = async (jobId: string) => {
-    for (let attempt = 0; attempt < 120; attempt++) {
-      const { job } = await adminApi<{ job: { status: string; errorMessage?: string } }>(`/admin/jobs/${jobId}`);
+    const deadline = Date.now() + 8 * 60_000;
+    while (Date.now() < deadline) {
+      const { job } = await adminApi<{ job: { status: string; errorMessage?: string; attempts?: number } }>(`/admin/jobs/${jobId}`);
       if (job.status === "SUCCEEDED") return;
       if (job.status === "FAILED") throw new Error(job.errorMessage ?? "페르소나 재생성에 실패했습니다.");
+      if ((job.attempts ?? 0) > 1) setMessage("일시적인 지연으로 페르소나 생성을 자동 재시도하고 있습니다…");
       await new Promise((resolve) => window.setTimeout(resolve, 1_000));
     }
-    throw new Error("재생성이 예상보다 오래 걸리고 있습니다. Job 목록에서 상태를 확인해 주세요.");
+    throw new Error("재생성이 계속 진행 중입니다. 잠시 후 다시 시도하거나 Job 목록에서 상태를 확인해 주세요.");
   };
   const rebuild = async () => {
     setBusy("rebuild"); setMessage("기존 페르소나를 유지한 채 새 버전을 만들고 있습니다…");
@@ -166,7 +200,8 @@ export function GlobalBossAdmin({ onLogout }: Props) {
 
     <section className="admin-section"><div className="admin-section-title"><FileText/><div><h2>관찰 자료</h2><p>카톡 대화 붙여넣기와 TXT·이미지 자료를 영구 보관합니다.</p></div></div>
       <div className="admin-evidence-input"><textarea className="textarea" value={textEvidence} onChange={(event) => setTextEvidence(event.target.value)} placeholder="대화 내용을 붙여넣으세요."/><button className="primary-button" disabled={!textEvidence.trim() || Boolean(busy)} onClick={() => void addTextEvidence()}><Upload size={16}/>텍스트 추가</button></div>
-      <div className="admin-upload-actions"><label className="secondary-button"><FileText size={16}/>TXT 업로드<input hidden type="file" accept=".txt,text/plain" onChange={(event) => { const file=event.target.files?.[0];if(file)void uploadFile(file);event.currentTarget.value=""; }}/></label><label className="secondary-button"><Image size={16}/>이미지 업로드<input hidden type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" onChange={(event) => { const file=event.target.files?.[0];if(file)void uploadFile(file);event.currentTarget.value=""; }}/></label></div>
+      <div className="admin-upload-actions"><label className="secondary-button"><FileText size={16}/>TXT 업로드<input hidden disabled={Boolean(busy)} type="file" accept=".txt,text/plain" onChange={(event) => { const file=event.target.files?.[0];if(file)void uploadFile(file);event.currentTarget.value=""; }}/></label><label className="secondary-button"><Image size={16}/>이미지 업로드 (최대 5장)<input hidden multiple disabled={Boolean(busy)} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" onChange={(event) => { const files=Array.from(event.target.files??[]);event.currentTarget.value="";if(files.length)void uploadImages(files); }}/></label></div>
+      <EvidenceUploadProgressList items={uploadItems}/>
       <div className="admin-evidence-list">{evidence.map((item) => <article key={item.id}><div><strong>{item.sourceName ?? item.type}</strong><span className={`job-status status-${item.status.toLowerCase()}`}>{item.status}</span><small>{new Date(item.createdAt).toLocaleString("ko-KR")}</small>{item.rawText && <p>{item.rawText}</p>}{item.errorMessage && <p className="error-text">{item.errorMessage}</p>}</div><button className="icon-button" aria-label={`${item.sourceName ?? item.type} 삭제`} disabled={busy === item.id} onClick={() => void deleteEvidence(item.id)}><Trash2 size={16}/></button></article>)}{!evidence.length && <p className="hint">등록된 관찰 자료가 없습니다.</p>}</div>
     </section>
 

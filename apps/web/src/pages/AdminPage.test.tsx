@@ -95,6 +95,60 @@ describe("AdminPage", () => {
     expect(screen.getByText(/실제 사용자 데이터는 포함하지 않습니다/)).toBeInTheDocument();
   });
 
+  it("uploads up to five global-boss images independently and keeps successful files when one fails", async () => {
+    let signCount = 0;
+    const registered: string[] = [];
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}", { status: 200 }));
+    mockedApi.mockImplementation(async (path: string, options: RequestInit = {}) => {
+      if (path === "/admin/auth") return { authenticated: true, expiresAt: "2026-09-19T10:00:00Z" } as any;
+      if (path === "/admin/global-boss") return { boss: { id: "00000000-0000-4000-8000-000000000001", scope: "GLOBAL", status: "READY", alias: "모두의 상사", avatarKey: "boss-male-01", jobFunction: null, yearsOfServiceBand: null, rank: "팀장", companyName: null, ageBand: 40, hierarchyScore: 55, companyResearch: null, persona: null, pki: null, personaVersion: 1 }, evidence: [], surveyAnswers: [] } as any;
+      if (path === "/admin/global-boss-defaults") return { prompt: "", updatedAt: null } as any;
+      if (path === "/admin/global-boss/prompt-preview") return { messages: [], sources: [], usesMockUserData: true } as any;
+      if (path === "/admin/global-boss/uploads/sign") {
+        signCount += 1;
+        if (signCount === 2) throw new Error("두 번째 파일 업로드 실패");
+        return { upload: { intentId: `00000000-0000-4000-8000-00000000000${signCount}`, signedUrl: `https://storage.example/${signCount}`, token: `token-${signCount}` } } as any;
+      }
+      if (path === "/admin/global-boss/evidence" && options.method === "POST") { registered.push(JSON.parse(String(options.body)).uploadIntentId); return { jobId: `job-${registered.length}` } as any; }
+      return {} as any;
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderAdmin(client, "/admin/global-boss");
+    const input = await screen.findByLabelText("이미지 업로드 (최대 5장)");
+    const files = Array.from({ length: 5 }, (_, index) => new File([String(index)], `${index + 1}.png`, { type: "image/png" }));
+
+    fireEvent.change(input, { target: { files } });
+
+    expect(await screen.findByText(/4장 등록 완료 · 1장 실패/)).toBeInTheDocument();
+    expect(screen.getAllByText("등록 완료")).toHaveLength(4);
+    expect(screen.getByText("등록 실패")).toBeInTheDocument();
+    expect(screen.getByText("두 번째 파일 업로드 실패")).toBeInTheDocument();
+    expect(registered).toHaveLength(4);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    fetchMock.mockRestore();
+  });
+
+  it("rejects six selected images before requesting an upload URL", async () => {
+    let signCount = 0;
+    mockedApi.mockImplementation(async (path: string) => {
+      if (path === "/admin/auth") return { authenticated: true, expiresAt: "2026-09-19T10:00:00Z" } as any;
+      if (path === "/admin/global-boss") return { boss: { id: "00000000-0000-4000-8000-000000000001", scope: "GLOBAL", status: "READY", alias: "모두의 상사", avatarKey: "boss-male-01", jobFunction: null, yearsOfServiceBand: null, rank: "팀장", companyName: null, ageBand: 40, hierarchyScore: 55, companyResearch: null, persona: null, pki: null, personaVersion: 1 }, evidence: [], surveyAnswers: [] } as any;
+      if (path === "/admin/global-boss-defaults") return { prompt: "", updatedAt: null } as any;
+      if (path === "/admin/global-boss/prompt-preview") return { messages: [], sources: [], usesMockUserData: true } as any;
+      if (path === "/admin/global-boss/uploads/sign") { signCount += 1; return {} as any; }
+      return {} as any;
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderAdmin(client, "/admin/global-boss");
+    const input = await screen.findByLabelText("이미지 업로드 (최대 5장)");
+    const files = Array.from({ length: 6 }, (_, index) => new File([String(index)], `${index + 1}.png`, { type: "image/png" }));
+
+    fireEvent.change(input, { target: { files } });
+
+    expect(await screen.findByText("이미지는 한 번에 최대 5장까지 업로드할 수 있습니다.")).toBeInTheDocument();
+    expect(signCount).toBe(0);
+  });
+
   it("edits the shared translation and onboarding prompt instructions together", async () => {
     let prompts = { translation: "기존 번역 지침", onboarding: { companyResearch: "기존 회사 조사 지침", evidenceExtraction: "기존 자료 추출 지침", surveyGeneration: "기존 질문 생성 지침", personaGeneration: "기존 페르소나 지침" }, updatedAt: null as string | null };
     mockedApi.mockImplementation(async (path: string, options: RequestInit = {}) => {

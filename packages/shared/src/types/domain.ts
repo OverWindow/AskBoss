@@ -101,11 +101,18 @@ export interface TranslationResult {
 
 export type ChatMessageKind = "CHAT" | "SIMULATION_SOURCE" | "SIMULATION_REPLY" | "SIMULATION_REACTION" | "ACTUAL_RESPONSE";
 
+export interface ChatMessageCoaching {
+  shouldSuggest: boolean;
+  reason: string | null;
+  revisedText: string | null;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   kind: ChatMessageKind;
+  coaching?: ChatMessageCoaching | null;
   createdAt: string;
 }
 

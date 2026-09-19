@@ -2,6 +2,8 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app";
 import { ai } from "../src/services/ai";
 import { store } from "../src/repositories";
+import { MemoryStore } from "../src/repositories/memory-store";
+import { decodeChatCursor, encodeChatCursor } from "../src/utils/chat-cursor";
 
 const app = buildApp();
 afterAll(() => app.close());
@@ -24,6 +26,62 @@ describe("chat SSE", () => {
     const history = await app.inject({ method: "GET", url: `/api/bosses/${bossId}/chat`, headers: { cookie } });
     expect(history.statusCode).toBe(200);
     expect(history.json().messages.map((message: any) => message.role)).toEqual(["user", "assistant"]);
+  });
+
+  it("paginates every saved chat bubble without gaps and rejects foreign cursors", async () => {
+    const session = await app.inject({ method: "POST", url: "/api/session" });
+    const sessionId = session.json().session.id as string;
+    const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
+    const bossId = "00000000-0000-4000-8000-000000000001";
+    const thread = await store.getOrCreateThread(sessionId, bossId, undefined, new Date(Date.now() + 86_400_000).toISOString());
+    const saved: Awaited<ReturnType<typeof store.addChatMessage>>[] = [];
+    for (let index = 1; index <= 56; index += 1) saved.push(await store.addChatMessage(thread.id, index % 2 ? "user" : "assistant", `메시지 ${index}`));
+
+    const first = await app.inject({ method: "GET", url: `/api/bosses/${bossId}/chat?limit=50`, headers: { cookie } });
+    expect(first.statusCode).toBe(200);
+    expect(first.json().messages).toHaveLength(50);
+    expect(first.json().messages[0].content).toBe("메시지 7");
+    expect(first.json().nextCursor).toEqual(expect.any(String));
+
+    const second = await app.inject({ method: "GET", url: `/api/bosses/${bossId}/chat?limit=50&cursor=${encodeURIComponent(first.json().nextCursor)}`, headers: { cookie } });
+    expect(second.statusCode).toBe(200);
+    expect(second.json().messages.map((message: any) => message.content)).toEqual(saved.slice(0, 6).map((message) => message.content));
+    expect(second.json().nextCursor).toBeNull();
+    expect(new Set([...second.json().messages, ...first.json().messages].map((message: any) => message.id)).size).toBe(56);
+
+    const malformed = await app.inject({ method: "GET", url: `/api/bosses/${bossId}/chat?cursor=not-a-cursor`, headers: { cookie } });
+    expect(malformed.statusCode).toBe(400);
+    expect(malformed.json().error.code).toBe("INVALID_CURSOR");
+
+    const otherSession = await app.inject({ method: "POST", url: "/api/session" });
+    const otherThread = await store.getOrCreateThread(otherSession.json().session.id, bossId, undefined, new Date(Date.now() + 86_400_000).toISOString());
+    const otherMessage = await store.addChatMessage(otherThread.id, "user", "다른 세션의 메시지");
+    const foreign = encodeChatCursor({ id: otherMessage.id });
+    const foreignCursor = await app.inject({ method: "GET", url: `/api/bosses/${bossId}/chat?cursor=${encodeURIComponent(foreign)}`, headers: { cookie } });
+    expect(foreignCursor.statusCode).toBe(400);
+    expect(foreignCursor.json().error.code).toBe("INVALID_CURSOR");
+
+    await store.deleteSession(sessionId);
+    await store.deleteSession(otherSession.json().session.id);
+  });
+
+  it("keeps pagination stable when messages share the same timestamp", async () => {
+    const memory = new MemoryStore();
+    const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
+    const session = await memory.createSession("same-timestamp", expiresAt);
+    const boss = await memory.getGlobalBoss();
+    const thread = await memory.getOrCreateThread(session.id, boss.id, undefined, expiresAt);
+    const messages: Awaited<ReturnType<typeof memory.addChatMessage>>[] = [];
+    for (let index = 1; index <= 5; index += 1) {
+      const message = await memory.addChatMessage(thread.id, "user", `동시 메시지 ${index}`);
+      message.createdAt = "2026-01-01T00:00:00.000Z";
+      messages.push(message);
+    }
+
+    const first = await memory.listChatMessages(session.id, boss.id, undefined, 2);
+    const second = await memory.listChatMessages(session.id, boss.id, decodeChatCursor(first.nextCursor!)!, 2);
+    const third = await memory.listChatMessages(session.id, boss.id, decodeChatCursor(second.nextCursor!)!, 2);
+    expect([...third.messages, ...second.messages, ...first.messages].map((message) => message.id)).toEqual(messages.map((message) => message.id));
   });
 
   it("emits an error and does not persist a partial assistant reply", async () => {

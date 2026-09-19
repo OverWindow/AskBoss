@@ -1,5 +1,6 @@
 import type { ServerResponse } from "node:http";
 import type { FastifyPluginAsync } from "fastify";
+import { z } from "zod";
 import { chatInputSchema, chatSimulationInputSchema } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { requireSession, sessionExpiry } from "../services/session.js";
@@ -9,6 +10,7 @@ import { HttpError } from "../utils/http.js";
 import { parse } from "../utils/validation.js";
 import { PlainTextStream, toPlainText } from "../utils/plain-text.js";
 import { getBossPromptContext } from "../services/boss-prompt-context.js";
+import { decodeChatCursor, InvalidChatCursorError, type ChatCursor } from "../utils/chat-cursor.js";
 
 const FIRST_DELTA_TIMEOUT_MS = 30_000;
 const DELTA_IDLE_TIMEOUT_MS = 25_000;
@@ -27,7 +29,44 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     const bossId = (request.params as { bossId: string }).bossId;
     if (!(await store.getBoss(session.id, bossId))) throw new HttpError(404, "상사를 찾을 수 없습니다.");
     const query = request.query as { cursor?: string; limit?: string };
-    return store.listChatMessages(session.id, bossId, query.cursor, Math.min(Number(query.limit) || 50, 100));
+    let cursor: ChatCursor | undefined;
+    if (query.cursor) {
+      cursor = decodeChatCursor(query.cursor) ?? undefined;
+      if (!cursor) throw new HttpError(400, "올바르지 않은 대화 커서입니다.", "INVALID_CURSOR");
+    }
+    const requestedLimit = Number(query.limit ?? 50);
+    const limit = Number.isInteger(requestedLimit) ? Math.max(1, Math.min(requestedLimit, 100)) : 50;
+    try {
+      return await store.listChatMessages(session.id, bossId, cursor, limit);
+    } catch (error) {
+      if (error instanceof InvalidChatCursorError) throw new HttpError(400, "올바르지 않은 대화 커서입니다.", "INVALID_CURSOR");
+      throw error;
+    }
+  });
+
+  app.post("/bosses/:bossId/chat/messages/:messageId/coaching", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request) => {
+    const session = await requireSession(request);
+    const { bossId, messageId } = parse(z.object({ bossId: z.string().uuid(), messageId: z.string().uuid() }), request.params);
+    const [boss, profile, context] = await Promise.all([
+      store.getBoss(session.id, bossId),
+      store.getProfile(session.id),
+      store.getChatMessageCoachingContext(session.id, bossId, messageId),
+    ]);
+    if (!boss || !context) throw new HttpError(404, "대화 메시지를 찾을 수 없습니다.", "CHAT_MESSAGE_NOT_FOUND");
+    if (context.message.role !== "user" || context.message.kind !== "CHAT") {
+      throw new HttpError(400, "일반 사용자 대화만 문장 코칭을 받을 수 있습니다.", "COACHING_UNSUPPORTED_MESSAGE");
+    }
+    if (context.message.coaching) return { coaching: context.message.coaching };
+    const coaching = await ai.reviewUserMessage({
+      profile,
+      boss,
+      summary: context.conversationSummary,
+      messages: context.previousMessages,
+      message: context.message.content,
+    }, AbortSignal.timeout(30_000));
+    const saved = await store.setChatMessageCoaching(session.id, bossId, messageId, coaching);
+    if (!saved) throw new HttpError(404, "대화 메시지를 찾을 수 없습니다.", "CHAT_MESSAGE_NOT_FOUND");
+    return { coaching: saved.coaching };
   });
 
   app.delete("/bosses/:bossId/chat", async (request, reply) => {

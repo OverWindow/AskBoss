@@ -1,11 +1,12 @@
 import postgres, { type Sql } from "postgres";
-import type { AdminAiPromptSettings, AdminDashboard, AdminJobSummary, AdminOperation, AdminPersonalBossPage, AdminSessionPage, AdminSessionSummary, Boss, ChatMessageKind, CompanyResearch, HrDashboard, TranslationArchiveBranch, TranslationArchiveDetail, TranslationArchiveSummary, TranslationExamples, UserProfile } from "../shared.js";
+import type { AdminAiPromptSettings, AdminDashboard, AdminJobSummary, AdminOperation, AdminPersonalBossPage, AdminSessionPage, AdminSessionSummary, Boss, ChatMessageCoaching, ChatMessageKind, CompanyResearch, HrDashboard, TranslationArchiveBranch, TranslationArchiveDetail, TranslationArchiveSummary, TranslationExamples, UserProfile } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord } from "../types.js";
-import type { AdminPersonalBossPromptContext, CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
+import type { AdminPersonalBossPromptContext, ChatMessageCoachingContext, CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 import { toIsoTimestamp } from "../utils/database.js";
 import { computeSurfaceActualGap } from "../utils/hr-aggregation.js";
 import { buildActualResponseEvidence } from "../utils/actual-response.js";
+import { encodeChatCursor, InvalidChatCursorError, type ChatCursor } from "../utils/chat-cursor.js";
 import { encodeArchiveCursor, type ArchiveCursor } from "../utils/archive-cursor.js";
 import { getMockHrDashboard } from "../services/hr-mock.js";
 
@@ -23,6 +24,7 @@ const camelChatMessage = (r: any): ChatMessageRecord => ({
   role: r.role,
   content: r.content,
   kind: r.kind ?? "CHAT",
+  coaching: r.coaching_review ?? null,
   createdAt: r.created_at.toISOString(),
 });
 const camelGlobalEvidence = (r: any): GlobalEvidenceRecord => ({ id:r.id,bossId:r.boss_id,type:r.type,status:r.status,sourceName:r.source_name,rawText:r.raw_text,storagePath:r.storage_path,parsedData:r.parsed_data,observedAt:r.observed_at?.toISOString()??null,createdAt:r.created_at.toISOString(),errorMessage:r.error_message??null });
@@ -152,7 +154,9 @@ export class PostgresStore implements Store {
   async createJob(i: Pick<JobRecord,"sessionId"|"bossId"|"type"|"payload">) { const [r] = await this.sql`insert into ai_jobs(session_id,boss_id,type,payload) values(${i.sessionId},${i.bossId},${i.type},${this.sql.json(i.payload)}) returning *`; return camelJob(r); }
   async getJob(sessionId: string, id: string) { const [r] = await this.sql`select * from ai_jobs where id=${id} and session_id=${sessionId}`; return r ? camelJob(r) : null; }
   async getJobById(id:string){const [r]=await this.sql`select * from ai_jobs where id=${id}`;return r?camelJob(r):null;}
-  async claimJob(id: string) { const [r] = await this.sql`update ai_jobs set status='RUNNING',attempts=attempts+1,lease_until=now()+interval '2 minutes',updated_at=now() where id=${id} and (status='PENDING' or (status='RUNNING' and lease_until<=now())) returning *`; return r ? camelJob(r) : null; }
+  async claimJob(id: string) { const [r] = await this.sql`update ai_jobs set status='RUNNING',attempts=attempts+1,lease_until=now()+interval '90 seconds',updated_at=now() where id=${id} and (status='PENDING' or (status='RUNNING' and lease_until<=now())) returning *`; return r ? camelJob(r) : null; }
+  async renewJobLease(id:string){await this.sql`update ai_jobs set lease_until=now()+interval '90 seconds',updated_at=now() where id=${id} and status='RUNNING'`;}
+  async deferJob(id:string){await this.sql`update ai_jobs set status='PENDING',attempts=greatest(attempts-1,0),lease_until=null,updated_at=now() where id=${id} and status='RUNNING'`;}
   async listRunnableJobs(limit: number) { const rows = await this.sql`select * from ai_jobs where status='PENDING' or (status='RUNNING' and lease_until<=now()) order by created_at limit ${limit}`; return rows.map(camelJob); }
   async completeJob(id: string, result: unknown) { await this.sql`update ai_jobs set status='SUCCEEDED',result=${this.sql.json(result as any)},error_message=null,lease_until=null,completed_at=now(),updated_at=now() where id=${id}`; }
   async failJob(id: string, error: string, retry: boolean) { await this.sql`update ai_jobs set status=case when ${retry} and attempts<max_attempts then 'PENDING' else 'FAILED' end,error_message=${error},lease_until=null,updated_at=now() where id=${id}`; }
@@ -183,10 +187,48 @@ export class PostgresStore implements Store {
   }); }
   async resetChat(sessionId: string, bossId: string) { await this.sql.begin(async (sql) => { await sql`update translation_archive_branches b set status='SUPERSEDED',updated_at=now() from chat_threads t where t.archive_branch_id=b.id and t.session_id=${sessionId} and t.boss_id=${bossId} and b.status='ACTIVE'`; await sql`delete from chat_threads where session_id=${sessionId} and boss_id=${bossId}`; }); }
   async addChatMessage(threadId: string, role: ChatMessageRecord["role"], content: string, kind: ChatMessageKind = "CHAT") { return this.sql.begin(async (sql) => { const [thread] = await sql`select * from chat_threads where id=${threadId}`; if (!thread) throw new Error("대화를 찾을 수 없습니다."); const [r] = await sql`insert into chat_messages(thread_id,role,content,kind) values(${threadId},${role},${content},${kind}) returning *`; if (thread.archive_branch_id) { const [position] = await sql`select count(*)::int value from translation_archive_messages where branch_id=${thread.archive_branch_id}`; await sql`insert into translation_archive_messages(branch_id,role,content,kind,position,created_at) values(${thread.archive_branch_id},${role},${content},${kind},${position!.value},${r!.created_at})`; await sql`update translation_archive_branches set updated_at=now() where id=${thread.archive_branch_id}`; await sql`update translation_archives set updated_at=now() where id=${thread.archive_id}`; } return camelChatMessage(r); }); }
-  async listChatMessages(sessionId: string, bossId: string, cursor?: string, limit=50) {
-    const [thread] = await this.sql`select * from chat_threads where session_id=${sessionId} and boss_id=${bossId} order by created_at desc limit 1`; if (!thread) return { threadId:null,archiveId:null,messages:[],nextCursor:null };
-    const rows = cursor ? await this.sql`select * from chat_messages where thread_id=${thread.id} and created_at<${cursor} order by created_at desc,id desc limit ${limit+1}` : await this.sql`select * from chat_messages where thread_id=${thread.id} order by created_at desc,id desc limit ${limit+1}`;
-    const hasMore=rows.length>limit; const messages=rows.slice(0,limit).reverse().map(camelChatMessage); return {threadId:thread.id,archiveId:thread.archive_id,messages,nextCursor:hasMore ? messages[0]?.createdAt ?? null:null};
+  async getChatMessageCoachingContext(sessionId: string, bossId: string, messageId: string): Promise<ChatMessageCoachingContext | null> {
+    const [target] = await this.sql`
+      select m.*,t.conversation_summary
+      from chat_messages m
+      join chat_threads t on t.id=m.thread_id
+      where m.id=${messageId} and t.session_id=${sessionId} and t.boss_id=${bossId} and t.expires_at>now()
+    `;
+    if (!target) return null;
+    const previous = await this.sql`
+      select m.* from chat_messages m
+      where m.thread_id=${target.thread_id}
+        and (m.created_at<${target.created_at} or (m.created_at=${target.created_at} and m.id<${target.id}))
+      order by m.created_at desc,m.id desc limit 19
+    `;
+    return {
+      conversationSummary: target.conversation_summary,
+      previousMessages: previous.reverse().map(camelChatMessage),
+      message: camelChatMessage(target),
+    };
+  }
+  async setChatMessageCoaching(sessionId: string, bossId: string, messageId: string, coaching: ChatMessageCoaching) {
+    const [row] = await this.sql`
+      update chat_messages m set coaching_review=${this.sql.json(coaching as any)}
+      from chat_threads t
+      where m.id=${messageId} and m.thread_id=t.id and t.session_id=${sessionId} and t.boss_id=${bossId} and t.expires_at>now()
+      returning m.*
+    `;
+    return row ? camelChatMessage(row) : null;
+  }
+  async listChatMessages(sessionId: string, bossId: string, cursor?: ChatCursor, limit=50) {
+    const [thread] = await this.sql`select * from chat_threads where session_id=${sessionId} and boss_id=${bossId} order by created_at desc limit 1`; if (!thread) { if(cursor)throw new InvalidChatCursorError(); return { threadId:null,archiveId:null,messages:[],nextCursor:null }; }
+    let rows;
+    if (cursor) {
+      const [cursorRow] = await this.sql`select id,created_at from chat_messages where id=${cursor.id} and thread_id=${thread.id}`;
+      if (!cursorRow) throw new InvalidChatCursorError();
+      rows = await this.sql`select * from chat_messages where thread_id=${thread.id} and (created_at<${cursorRow.created_at} or (created_at=${cursorRow.created_at} and id<${cursorRow.id})) order by created_at desc,id desc limit ${limit+1}`;
+    } else {
+      rows = await this.sql`select * from chat_messages where thread_id=${thread.id} order by created_at desc,id desc limit ${limit+1}`;
+    }
+    const hasMore=rows.length>limit;
+    const messages=rows.slice(0,limit).reverse().map(camelChatMessage);
+    return {threadId:thread.id,archiveId:thread.archive_id,messages,nextCursor:hasMore&&messages[0]?encodeChatCursor({id:messages[0].id}):null};
   }
   async updateThreadSummary(threadId: string, summary: string) { await this.sql`update chat_threads set conversation_summary=${summary},summarized_through=now() where id=${threadId}`; }
   async createTranslation(i: Omit<TranslationRecord,"id"|"createdAt"|"feedback"|"simulationCount">) { const [r]=await this.sql`insert into translation_requests(session_id,boss_id,input_text,channel,result,expires_at) values(${i.sessionId},${i.bossId},${i.inputText},${i.channel},${this.sql.json(i.result as any)},${i.expiresAt}) returning *`; return {id:r!.id,sessionId:r!.session_id,bossId:r!.boss_id,inputText:r!.input_text,channel:r!.channel,result:r!.result,feedback:r!.feedback,simulationCount:r!.simulation_count??0,createdAt:r!.created_at.toISOString(),expiresAt:r!.expires_at.toISOString()}; }

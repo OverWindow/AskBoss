@@ -121,4 +121,100 @@ describe("ChatPanel simulations", () => {
     fireEvent.click(screen.getByRole("button", { name: "메시지 복사" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(reply.content));
   });
+
+  it("shows a copy-only coaching card below the matching user bubble", async () => {
+    const messageId = "00000000-0000-4000-8000-000000000201";
+    const revisedText = "제가 확인한 범위를 먼저 정리하고 필요한 부분을 다시 여쭙겠습니다.";
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (String(path).endsWith(`/messages/${messageId}/coaching`)) return { coaching: { shouldSuggest: true, reason: "책임을 피하는 표현으로 들릴 수 있습니다.", revisedText } } as any;
+      return { threadId: null, archiveId: null, messages: [] } as any;
+    });
+    vi.mocked(streamBossChat).mockImplementation(async (_bossId, _body, onEvent) => {
+      onEvent("meta", { threadId: "thread-1", messageId });
+      onEvent("delta", { text: "확인해서 알려주세요." });
+      onEvent("done", { message: { id: "assistant-1", role: "assistant", kind: "CHAT", content: "확인해서 알려주세요.", createdAt: "2026-01-01T00:00:01.000Z" } });
+    });
+    renderPanel();
+
+    await screen.findByText("하고 싶은 말을 적어보세요.");
+    fireEvent.change(screen.getByLabelText("대화 입력"), { target: { value: "몰라요. 알아서 하세요." } });
+    fireEvent.click(screen.getByRole("button", { name: "보내기" }));
+
+    const card = await screen.findByLabelText("대화 문장 수정 제안");
+    expect(card.closest(".chat-message-block")).toContainElement(screen.getByText("몰라요. 알아서 하세요."));
+    expect(card).toHaveTextContent(revisedText);
+    fireEvent.click(screen.getByRole("button", { name: "수정본 복사" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(revisedText));
+    expect(screen.getByRole("button", { name: "수정본 복사됨" })).toBeInTheDocument();
+  });
+
+  it("does not render coaching metadata on simulation replies", async () => {
+    vi.mocked(api).mockResolvedValue({ threadId: "thread-1", archiveId: "archive-1", messages: [{ ...reply, coaching: { shouldSuggest: true, reason: "표현을 바꿔보세요.", revisedText: "수정한 답변입니다." } }] } as any);
+    renderPanel();
+    expect(await screen.findByText(reply.content)).toBeInTheDocument();
+    expect(screen.queryByLabelText("대화 문장 수정 제안")).not.toBeInTheDocument();
+  });
+
+  it("automatically prepends older bubbles at the top without moving the visible position", async () => {
+    let scrollHeight = 600;
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(() => scrollHeight);
+    const current = {
+      id: "message-current",
+      role: "user",
+      kind: "CHAT",
+      content: "현재 보이던 메시지",
+      coaching: { shouldSuggest: true, reason: "오해할 수 있습니다.", revisedText: "현재 보이던 수정 제안" },
+      createdAt: "2026-01-01T00:01:00.000Z",
+    };
+    const older = { id: "message-older", role: "assistant", kind: "CHAT", content: "가장 오래된 메시지", createdAt: "2026-01-01T00:00:00.000Z" };
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (String(path).includes("cursor=cursor-1")) {
+        scrollHeight = 900;
+        return { threadId: "thread-1", archiveId: null, messages: [older, current], nextCursor: null } as any;
+      }
+      return { threadId: "thread-1", archiveId: null, messages: [current], nextCursor: "cursor-1" } as any;
+    });
+    const { container } = renderPanel();
+
+    expect(await screen.findByText(current.content)).toBeInTheDocument();
+    expect(screen.getByText("현재 보이던 수정 제안")).toBeInTheDocument();
+    const list = container.querySelector(".chat-list") as HTMLDivElement;
+    await waitFor(() => expect(list.scrollTop).toBe(600));
+    list.scrollTop = 10;
+    fireEvent.scroll(list);
+
+    expect(await screen.findByText(older.content)).toBeInTheDocument();
+    expect(screen.getAllByText(current.content)).toHaveLength(1);
+    expect(screen.getByText("현재 보이던 수정 제안")).toBeInTheDocument();
+    await waitFor(() => expect(list.scrollTop).toBe(310));
+    expect(api).toHaveBeenCalledWith(`/bosses/${boss.id}/chat?cursor=cursor-1&limit=50`, expect.objectContaining({ signal: expect.any(AbortSignal) }));
+  });
+
+  it("keeps current bubbles when older history fails and retries from the top notice", async () => {
+    let attempts = 0;
+    const current = { id: "message-current", role: "assistant", kind: "CHAT", content: "유지할 메시지", createdAt: "2026-01-01T00:01:00.000Z" };
+    const older = { id: "message-older", role: "user", kind: "CHAT", content: "재시도로 불러온 메시지", createdAt: "2026-01-01T00:00:00.000Z" };
+    vi.mocked(api).mockImplementation(async (path) => {
+      if (String(path).includes("cursor=cursor-1")) {
+        attempts += 1;
+        if (attempts === 1) throw new Error("이전 대화 요청 실패");
+        return { threadId: "thread-1", archiveId: null, messages: [older], nextCursor: null } as any;
+      }
+      return { threadId: "thread-1", archiveId: null, messages: [current], nextCursor: "cursor-1" } as any;
+    });
+    const { container } = renderPanel();
+
+    expect(await screen.findByText(current.content)).toBeInTheDocument();
+    const list = container.querySelector(".chat-list") as HTMLDivElement;
+    list.scrollTop = 0;
+    fireEvent.scroll(list);
+    expect(await screen.findByText("이전 대화 요청 실패")).toBeInTheDocument();
+    expect(screen.getByText(current.content)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByText(older.content)).toBeInTheDocument();
+    expect(screen.getByText(current.content)).toBeInTheDocument();
+  });
 });

@@ -153,7 +153,7 @@ test("HR Demo는 모바일에서도 실제 집계와 명시된 Mock 데이터를
   await page.goto("/hr-demo");
   await expect(page.getByRole("tab", { name: "실제 익명 집계" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "실제 익명 집계" })).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("tab", { name: "Mock 데모" }).click();
+  await page.getByRole("tab", { name: "가상 데모" }).click();
   await expect(page.getByText("모든 수치와 문구가 제품 시연용 가상 데이터이며 실제 사용자 정보가 아닙니다.")).toBeVisible();
   await expect(page.getByText("4,872")).toBeVisible();
   await expect(page.getByText("이거 언제까지 가능해?")).toBeVisible();
