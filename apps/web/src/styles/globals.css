@@ -74,6 +74,17 @@
   .workspace-tool-trigger>span{display:none}
 }
 
+/* Boss onboarding interactions */
+.onboarding-home-button{color:var(--hr-accent)}
+.onboarding-step input:focus-visible,.onboarding-step textarea:focus-visible{box-shadow:none}
+.onboarding-nav-button{border:1px solid var(--hr-accent);border-radius:11px;background:var(--hr-accent);color:#fff;min-height:44px;padding:10px 16px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:750;transition:background .18s ease,transform .18s ease}
+.onboarding-nav-button:hover{background:#151d55;transform:translateY(-1px)}
+.onboarding-step .avatar-option{position:relative;isolation:isolate;border-color:transparent!important}
+.onboarding-step .avatar-selection{position:absolute;inset:0;border:2px solid var(--hr-accent);border-radius:12px;z-index:-1;box-shadow:0 6px 18px rgba(30,40,107,.12)}
+.onboarding-step .avatar-option img{display:block;transition:transform .24s cubic-bezier(.2,.8,.2,1),filter .24s ease}
+.onboarding-step .avatar-option:hover img{transform:translateY(-7px);filter:drop-shadow(0 10px 8px rgba(33,34,50,.16))}
+@media(prefers-reduced-motion:reduce){.onboarding-nav-button,.onboarding-step .avatar-option img{transition:none}.onboarding-nav-button:hover,.onboarding-step .avatar-option:hover img{transform:none}}
+
 /* Admin operations */
 .admin-login-page{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at top,#fff 0%,#f4f7fa 68%)}
 .admin-login-card{width:min(420px,100%);padding:38px;border:1px solid var(--hr-border);border-radius:20px;background:#fff;box-shadow:0 24px 70px rgba(33,34,50,.1);display:grid;gap:14px}
