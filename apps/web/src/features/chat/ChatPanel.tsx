@@ -40,7 +40,7 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
   const [failedMessage, setFailedMessage] = useState<string>();
   const [copiedMessageId, setCopiedMessageId] = useState<string>();
   const chatListRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const requestController = useRef<AbortController | undefined>(undefined);
   const simulationController = useRef<AbortController | undefined>(undefined);
   const history = useQuery({
@@ -122,8 +122,8 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
     }
   };
 
-  const renderMessage = (id: string, role: Message["role"], content: string) => <div key={id} className={`chat-message ${role}`}>
-    {content || "…"}
+  const renderMessage = (id: string, role: Message["role"], content: string) => <div key={id} className={`chat-message-row ${role}`}>
+    <div className={`chat-message ${role}`}>{content || "…"}</div>
     {content && <button className="message-copy-button" type="button" aria-label={copiedMessageId === id ? "복사됨" : "메시지 복사"} onClick={() => void copyMessage(id, content)}>{copiedMessageId === id ? <Check size={14}/> : <Copy size={14}/>}</button>}
   </div>;
 
@@ -131,6 +131,9 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
     const message = (retryMessage ?? text).trim();
     if (!message || streaming || simulationLoading) return;
     setText("");
+    window.requestAnimationFrame(() => {
+      if (inputRef.current) inputRef.current.style.height = "auto";
+    });
     setError(undefined);
     setFailedMessage(undefined);
     setMessages((old) => [
@@ -182,7 +185,7 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity }: ChatP
       {error && <div className="chat-stream-error" role="alert"><span>{error}</span>{failedMessage && <button className="small-button" type="button" disabled={streaming} onClick={() => void send(failedMessage)}><RefreshCw size={14}/>다시 시도</button>}</div>}
     </div>
     <div className="chat-composer">
-      <input ref={inputRef} className="input" value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) void send(); }} placeholder="할 말을 입력하세요" aria-label="대화 입력"/>
+      <textarea ref={inputRef} className="input chat-input" rows={1} value={text} onChange={(event) => { setText(event.target.value); event.target.style.height = "auto"; event.target.style.height = `${Math.min(event.target.scrollHeight, 120)}px`; }} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send(); } }} placeholder="할 말을 입력하세요" aria-label="대화 입력"/>
       <button className="primary-button" type="button" disabled={!text.trim() || streaming || simulationLoading} onClick={() => void send()} aria-label="보내기"><Send size={18}/></button>
     </div>
   </section>;

@@ -135,10 +135,15 @@
 .workspace-panel-title h2{display:flex;align-items:center;gap:8px;margin:3px 0 0;font-size:1.05rem;letter-spacing:-.025em}
 .workspace-tab-panel .chat-list{min-height:0;flex:1;overflow:auto;padding:18px}
 .workspace-tab-panel .chat-composer{padding:14px 16px 16px;background:#fff}
+.chat-composer{align-items:flex-end}.chat-input{min-height:46px;max-height:120px;resize:none;overflow-y:auto;line-height:1.45}
 .workspace-tab-panel .chat-list{overscroll-behavior:contain}
-.chat-message{position:relative;padding-right:38px;overflow-wrap:anywhere}
-.message-copy-button{position:absolute;top:7px;right:7px;width:26px;height:26px;border:0;border-radius:7px;display:grid;place-items:center;background:transparent;color:inherit;opacity:.58}
+.chat-message-row{max-width:90%;display:flex;align-items:center;gap:5px}
+.chat-message-row.user{align-self:flex-end;flex-direction:row-reverse}.chat-message-row.assistant{align-self:flex-start}
+.chat-message-row .chat-message{max-width:100%;align-self:auto;overflow-wrap:anywhere}
+.message-copy-button{width:28px;height:28px;flex:none;border:0;border-radius:7px;display:grid;place-items:center;background:transparent;color:var(--hr-muted);opacity:.58}
 .message-copy-button:hover,.message-copy-button:focus-visible{opacity:1;background:rgba(127,127,127,.14)}
+.reply-simulation-button{border:1px solid var(--hr-border);border-radius:9px;background:#fff;padding:8px 11px;display:inline-flex;align-items:center;gap:6px;color:var(--hr-primary);font-size:.76rem;font-weight:750}
+.reply-simulation-button:hover,.reply-simulation-button:focus-visible,.reply-simulation-button.is-selected{border-color:var(--hr-accent);background:rgba(78,141,124,.08)}
 .translation-examples{display:flex;flex-wrap:wrap;gap:7px}
 .translation-examples button{border:1px solid var(--hr-border);border-radius:999px;background:#fff;padding:7px 10px;color:var(--hr-primary);font-size:.76rem;text-align:left}
 .translation-examples button:hover,.translation-examples button:focus-visible{border-color:var(--hr-accent);background:rgba(78,141,124,.06)}

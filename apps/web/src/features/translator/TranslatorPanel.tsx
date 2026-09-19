@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Languages, RefreshCw, ThumbsDown, ThumbsUp } from "lucide-react";
+import { Languages, MessageCircle, RefreshCw } from "lucide-react";
 import type { Boss, TranslationResult } from "@askboss/shared";
 import { CHANNELS } from "@askboss/shared";
 import { api } from "../../services/api-client";
@@ -21,7 +21,6 @@ export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: T
   const [translationId, setTranslationId] = useState<string>();
   const [translatedInputText, setTranslatedInputText] = useState("");
   const [loading, setLoading] = useState(false);
-  const [feedback, setFeedback] = useState<string>();
   const [selectedReplyIndex, setSelectedReplyIndex] = useState<number>();
   const [error, setError] = useState<string>();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -32,7 +31,7 @@ export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: T
   }, [active]);
 
   useEffect(() => {
-    setText(""); setResult(null); setTranslationId(undefined); setTranslatedInputText(""); setFeedback(undefined); setSelectedReplyIndex(undefined); setError(undefined);
+    setText(""); setResult(null); setTranslationId(undefined); setTranslatedInputText(""); setSelectedReplyIndex(undefined); setError(undefined);
     return () => requestController.current?.abort();
   }, [boss.id]);
 
@@ -41,7 +40,6 @@ export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: T
     if (!inputText || loading) return;
     setLoading(true);
     setError(undefined);
-    setFeedback(undefined);
     setSelectedReplyIndex(undefined);
     onSourceMessage(inputText);
     const controller = new AbortController();
@@ -64,16 +62,6 @@ export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: T
     }
   };
 
-  const rate = async (value: "GOOD" | "BAD") => {
-    if (!translationId) return;
-    try {
-      await api(`/translations/${translationId}/feedback`, { method: "POST", body: JSON.stringify({ feedback: value }) });
-      setFeedback(value);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "의견을 저장하지 못했습니다.");
-    }
-  };
-
   const simulate = (replyIndex: number) => {
     if (!translationId || !result) return;
     const reply = result.replies[replyIndex];
@@ -92,7 +80,7 @@ export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: T
       {result && <div className="translation-result">
         <section className="result-section"><h3>쉽게 말하면</h3><p>{result.plainMeaning}</p></section>
         <section className="result-section"><h3>가능성이 높은 의도</h3><ul>{result.likelyIntent.map((item) => <li key={item}>{item}</li>)}</ul></section>
-        <section className="result-section"><h3>답변 추천</h3>{result.replies.map((reply, index) => <div className="reply-option" key={reply.style}><div className="reply-style">{index + 1}안 · {reply.style}</div><p>{reply.text}</p><label className="reply-simulation"><input type="checkbox" checked={selectedReplyIndex === index} disabled={!translationId} onChange={(event) => { if (event.target.checked) simulate(index); else setSelectedReplyIndex(undefined); }}/><small>이 답변으로 대화를 시뮬레이션해 볼게요.</small></label>{index === 0 && <div className="feedback"><span>이 답변 괜찮나요?</span><button className="icon-button" type="button" aria-label="좋아요" disabled={Boolean(feedback)} onClick={() => void rate("GOOD")}><ThumbsUp size={17}/></button><button className="icon-button" type="button" aria-label="별로예요" disabled={Boolean(feedback)} onClick={() => void rate("BAD")}><ThumbsDown size={17}/></button>{feedback && <span>의견을 반영했어요.</span>}</div>}</div>)}</section>
+        <section className="result-section"><h3>답변 추천</h3>{result.replies.map((reply, index) => <div className="reply-option" key={reply.style}><div className="reply-style">{reply.style}</div><p>{reply.text}</p><button className={`reply-simulation-button${selectedReplyIndex === index ? " is-selected" : ""}`} type="button" disabled={!translationId} onClick={() => simulate(index)}><MessageCircle size={15}/>이 답변으로 대화를 시뮬레이션해 볼게요.</button></div>)}</section>
       </div>}
     </div>
   </section>;
