@@ -5,6 +5,7 @@ import { useSession } from "../features/session/useSession";
 import { useBosses } from "../features/boss/useBosses";
 import { PkiIndicator } from "../features/pki/PkiIndicator";
 import { ChatPanel } from "../features/chat/ChatPanel";
+import type { ChatSimulationRequest } from "../features/chat/simulation-types";
 import { TranslatorPanel } from "../features/translator/TranslatorPanel";
 import { Tutorial } from "../features/tutorial/Tutorial";
 import { api } from "../services/api-client";
@@ -19,12 +20,15 @@ export function MainPage() {
   const boss = useMemo(() => bosses.data?.find((item) => item.id === ui.selectedBossId) ?? bosses.data?.[0], [bosses.data, ui.selectedBossId]);
   const [speech, setSpeech] = useState("○○씨, 밥은 먹었나?");
   const [thinking, setThinking] = useState(false);
+  const [simulationRequest, setSimulationRequest] = useState<ChatSimulationRequest | null>(null);
   const translatorTrigger = useRef<HTMLButtonElement>(null);
   const chatTrigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (boss && !ui.selectedBossId) ui.set({ selectedBossId: boss.id });
   }, [boss, ui.selectedBossId]);
+
+  useEffect(() => { setSimulationRequest(null); }, [boss?.id]);
 
   useEffect(() => {
     if (!boss || thinking || ui.chatPanelOpen || ui.translatorPanelOpen) return;
@@ -97,7 +101,7 @@ export function MainPage() {
       {!ui.translatorPanelOpen && <button ref={translatorTrigger} data-tutorial="translate" className="workspace-tool-trigger translator-trigger" type="button" title="번역" aria-label="번역 패널 열기" aria-controls="translator-panel" aria-expanded="false" onClick={() => togglePanel("translator")}><Languages size={21}/><span>번역</span></button>}
       {!ui.chatPanelOpen && <button ref={chatTrigger} data-tutorial="chat" className="workspace-tool-trigger chat-trigger" type="button" title="대화" aria-label="대화 패널 열기" aria-controls="chat-panel" aria-expanded="false" onClick={() => togglePanel("chat")}><MessageCircle size={21}/><span>대화</span></button>}
 
-      <TranslatorPanel boss={boss} open={ui.translatorPanelOpen} onClose={() => closePanel("translator")} onSourceMessage={(message) => { setThinking(false); setSpeech(message); }}/>
+      <TranslatorPanel boss={boss} open={ui.translatorPanelOpen} onClose={() => closePanel("translator")} onSourceMessage={(message) => { setThinking(false); setSpeech(message); }} onSimulate={(request) => { setSimulationRequest(request); setSpeech(request.inputText); setThinking(true); ui.set({ translatorPanelOpen: false, chatPanelOpen: true, lastOpenedPanel: "chat" }); }}/>
       <section data-tutorial="workspace" className={`boss-stage ${thinking ? "is-thinking" : ""}`} aria-labelledby="boss-alias">
         <div className="speech-bubble" aria-live="polite">“{speech}”</div>
         <div className="avatar-frame">
@@ -110,7 +114,7 @@ export function MainPage() {
         <PkiIndicator boss={boss}/>
         {boss.status === "FAILED" && <p className="error-text">Persona 생성에 실패했습니다. 입력 정보는 저장되어 있습니다.</p>}
       </section>
-      <ChatPanel boss={boss} open={ui.chatPanelOpen} onClose={() => closePanel("chat")} onActivity={({ thinking: nextThinking, speech: nextSpeech }) => { setThinking(nextThinking); if (nextSpeech) setSpeech(nextSpeech); }}/>
+      <ChatPanel boss={boss} open={ui.chatPanelOpen} simulationRequest={simulationRequest} onClose={() => closePanel("chat")} onActivity={({ thinking: nextThinking, speech: nextSpeech }) => { setThinking(nextThinking); if (nextSpeech) setSpeech(nextSpeech); }}/>
     </div>
     <Tutorial/>
   </AppShell>;

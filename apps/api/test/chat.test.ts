@@ -42,4 +42,37 @@ describe("chat SSE", () => {
     const history = await app.inject({ method: "GET", url: `/api/bosses/${bossId}/chat`, headers: { cookie } });
     expect(history.json().messages.map((message: any) => message.role)).toEqual(["user"]);
   });
+
+  it("streams a translated reply simulation without creating chat history", async () => {
+    const session = await app.inject({ method: "POST", url: "/api/session" });
+    const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
+    const bossId = "00000000-0000-4000-8000-000000000001";
+    const translated = await app.inject({ method: "POST", url: `/api/bosses/${bossId}/translate`, headers: { cookie }, payload: { inputText: "이거 언제 되나?", channel: "사내 메신저" } });
+    const { translationId, result } = translated.json();
+
+    const stream = await app.inject({ method: "POST", url: `/api/bosses/${bossId}/chat/simulate`, headers: { cookie, accept: "text/event-stream" }, payload: { translationId, replyIndex: 1 } });
+    expect(stream.statusCode).toBe(200);
+    expect([...stream.body.matchAll(/^event: (\w+)/gm)].map((match) => match[1])).toEqual(expect.arrayContaining(["meta", "delta", "done"]));
+    expect(stream.body).toContain("이거 언제 되나?");
+    expect(stream.body).toContain(result.replies[1].text);
+
+    const history = await app.inject({ method: "GET", url: `/api/bosses/${bossId}/chat`, headers: { cookie } });
+    expect(history.json()).toMatchObject({ threadId: null, messages: [] });
+  });
+
+  it("does not persist partial simulation content when the provider fails", async () => {
+    vi.spyOn(ai, "streamSimulatedBossReaction").mockImplementation(async function* () {
+      yield "부분 반응";
+      throw new Error("provider disconnected");
+    });
+    const session = await app.inject({ method: "POST", url: "/api/session" });
+    const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
+    const bossId = "00000000-0000-4000-8000-000000000001";
+    const translated = await app.inject({ method: "POST", url: `/api/bosses/${bossId}/translate`, headers: { cookie }, payload: { inputText: "확인했나?", channel: "사내 메신저" } });
+
+    const stream = await app.inject({ method: "POST", url: `/api/bosses/${bossId}/chat/simulate`, headers: { cookie, accept: "text/event-stream" }, payload: { translationId: translated.json().translationId, replyIndex: 0 } });
+    expect([...stream.body.matchAll(/^event: (\w+)/gm)].map((match) => match[1])).toEqual(["meta", "delta", "error"]);
+    const history = await app.inject({ method: "GET", url: `/api/bosses/${bossId}/chat`, headers: { cookie } });
+    expect(history.json()).toMatchObject({ threadId: null, messages: [] });
+  });
 });

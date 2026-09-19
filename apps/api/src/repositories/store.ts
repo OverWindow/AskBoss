@@ -1,5 +1,5 @@
 import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary } from "../shared.js";
-import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
+import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, PersonalBossDefaults, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 
 export interface CreateBossInput {
   alias: string; avatarKey: string; jobFunction: string; yearsOfServiceBand: string; rank: string; companyName: string;
@@ -71,6 +71,7 @@ export interface Store {
   listChatMessages(sessionId: string, bossId: string, cursor?: string, limit?: number): Promise<{ threadId: string | null; messages: ChatMessageRecord[]; nextCursor: string | null }>;
   updateThreadSummary(threadId: string, summary: string): Promise<void>;
   createTranslation(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback">): Promise<TranslationRecord>;
+  getTranslation(sessionId: string, id: string): Promise<TranslationRecord | null>;
   setTranslationFeedback(sessionId: string, id: string, feedback: "GOOD" | "BAD"): Promise<void>;
   listMonologues(sessionId: string, bossId: string, limit: number): Promise<string[]>;
   addMonologue(sessionId: string, bossId: string, content: string): Promise<void>;
@@ -87,5 +88,7 @@ export interface Store {
   getAdminDashboard(): Promise<AdminDashboard>;
   listAdminSessions(cursor?: string, limit?: number): Promise<{ items: AdminSessionSummary[]; nextCursor: string | null }>;
   listAdminJobs(status?: string, cursor?: string, limit?: number): Promise<{ items: AdminJobSummary[]; nextCursor: string | null }>;
+  getPersonalBossDefaults(): Promise<PersonalBossDefaults>;
+  updatePersonalBossDefaults(prompt: string): Promise<PersonalBossDefaults>;
   recordAdminOperation(type: AdminOperation["type"], status: AdminOperation["status"], detail: AdminOperation["detail"]): Promise<AdminOperation>;
 }

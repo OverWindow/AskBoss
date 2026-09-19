@@ -1,4 +1,4 @@
-import type { AdminOperation, Boss, BossPersona, CompanyResearch, PkiBreakdown, TranslationResult, UserProfile } from "./shared.js";
+import type { AdminOperation, Boss, BossPersona, CompanyResearch, PersonalBossDefaults, PkiBreakdown, TranslationResult, UserProfile } from "./shared.js";
 
 export interface SessionRecord { id: string; tokenHash: string; createdAt: string; lastSeenAt: string; expiresAt: string }
 export interface EvidenceRecord { id: string; bossId: string; sessionId: string; type: string; status: string; rawText: string | null; storagePath: string | null; parsedData: any; observedAt: string | null; createdAt: string; expiresAt: string; errorMessage?: string | null }
@@ -17,3 +17,4 @@ export interface BossRecord extends Boss { sessionId: string | null; expiresAt: 
 export interface PersonaBuildResult { persona: BossPersona; pki: PkiBreakdown }
 export type { CompanyResearch, UserProfile };
 export type { AdminOperation };
+export type { PersonalBossDefaults };

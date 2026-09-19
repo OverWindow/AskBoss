@@ -98,9 +98,14 @@ export interface TranslationResult {
   replies: [{ text: string; style: string; reason: string }, { text: string; style: string; reason: string }, { text: string; style: string; reason: string }];
 }
 
+export interface PersonalBossDefaults {
+  prompt: string;
+  updatedAt: string;
+}
+
 export interface AdminOperation {
   id: string;
-  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD";
+  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD" | "PERSONAL_BOSS_DEFAULTS_UPDATE";
   status: "SUCCEEDED" | "FAILED";
   detail: Record<string, number | string | boolean | null>;
   createdAt: string;

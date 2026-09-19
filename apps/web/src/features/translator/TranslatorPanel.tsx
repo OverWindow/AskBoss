@@ -3,21 +3,25 @@ import { Languages, RefreshCw, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import type { Boss, TranslationResult } from "@askboss/shared";
 import { CHANNELS } from "@askboss/shared";
 import { api } from "../../services/api-client";
+import type { ChatSimulationRequest } from "../chat/simulation-types";
 
 interface TranslatorPanelProps {
   boss: Boss;
   open: boolean;
   onClose: () => void;
   onSourceMessage: (message: string) => void;
+  onSimulate: (request: ChatSimulationRequest) => void;
 }
 
-export function TranslatorPanel({ boss, open, onClose, onSourceMessage }: TranslatorPanelProps) {
+export function TranslatorPanel({ boss, open, onClose, onSourceMessage, onSimulate }: TranslatorPanelProps) {
   const [text, setText] = useState("");
   const [channel, setChannel] = useState<string>(CHANNELS[0]);
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [translationId, setTranslationId] = useState<string>();
+  const [translatedInputText, setTranslatedInputText] = useState("");
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<string>();
+  const [selectedReplyIndex, setSelectedReplyIndex] = useState<number>();
   const [error, setError] = useState<string>();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const requestController = useRef<AbortController | undefined>(undefined);
@@ -26,7 +30,10 @@ export function TranslatorPanel({ boss, open, onClose, onSourceMessage }: Transl
     if (open) window.requestAnimationFrame(() => textareaRef.current?.focus({ preventScroll: true }));
   }, [open]);
 
-  useEffect(() => () => requestController.current?.abort(), [boss.id]);
+  useEffect(() => {
+    setText(""); setResult(null); setTranslationId(undefined); setTranslatedInputText(""); setFeedback(undefined); setSelectedReplyIndex(undefined); setError(undefined);
+    return () => requestController.current?.abort();
+  }, [boss.id]);
 
   const translate = async () => {
     const inputText = text.trim();
@@ -34,6 +41,7 @@ export function TranslatorPanel({ boss, open, onClose, onSourceMessage }: Transl
     setLoading(true);
     setError(undefined);
     setFeedback(undefined);
+    setSelectedReplyIndex(undefined);
     onSourceMessage(inputText);
     const controller = new AbortController();
     requestController.current = controller;
@@ -46,6 +54,7 @@ export function TranslatorPanel({ boss, open, onClose, onSourceMessage }: Transl
       });
       setResult(data.result);
       setTranslationId(data.translationId);
+      setTranslatedInputText(inputText);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "번역하지 못했습니다.");
     } finally {
@@ -64,6 +73,14 @@ export function TranslatorPanel({ boss, open, onClose, onSourceMessage }: Transl
     }
   };
 
+  const simulate = (replyIndex: number) => {
+    if (!translationId || !result) return;
+    const reply = result.replies[replyIndex];
+    if (!reply) return;
+    setSelectedReplyIndex(replyIndex);
+    onSimulate({ id: crypto.randomUUID(), translationId, replyIndex, inputText: translatedInputText, reply: reply.text });
+  };
+
   return <section id="translator-panel" className={`workspace-panel translator-panel ${open ? "is-open" : ""}`} aria-label="상사의 말 번역" aria-hidden={!open} aria-busy={loading}>
     <header className="workspace-panel-header">
       <div><span className="panel-kicker">TRANSLATOR</span><h2><Languages size={18}/>상사의 말 번역</h2></div>
@@ -77,7 +94,7 @@ export function TranslatorPanel({ boss, open, onClose, onSourceMessage }: Transl
       {result && <div className="translation-result">
         <section className="result-section"><h3>쉽게 말하면</h3><p>{result.plainMeaning}</p><div className="hint">{result.tone}</div>{result.caution && <p className="hint">{result.caution}</p>}</section>
         <section className="result-section"><h3>가능성이 높은 의도</h3><ul>{result.likelyIntent.map((item) => <li key={item}>{item}</li>)}</ul></section>
-        <section className="result-section"><h3>답변 추천</h3>{result.replies.map((reply, index) => <div className="reply-option" key={reply.style}><div className="reply-style">{index + 1}안 · {reply.style}</div><p>{reply.text}</p><div className="hint">{reply.reason}</div>{index === 0 && <div className="feedback"><span>이 답변 괜찮나요?</span><button className="icon-button" type="button" aria-label="좋아요" disabled={Boolean(feedback)} onClick={() => void rate("GOOD")}><ThumbsUp size={17}/></button><button className="icon-button" type="button" aria-label="별로예요" disabled={Boolean(feedback)} onClick={() => void rate("BAD")}><ThumbsDown size={17}/></button>{feedback && <span>의견을 반영했어요.</span>}</div>}</div>)}</section>
+        <section className="result-section"><h3>답변 추천</h3>{result.replies.map((reply, index) => <div className="reply-option" key={reply.style}><div className="reply-style">{index + 1}안 · {reply.style}</div><p>{reply.text}</p><div className="hint">{reply.reason}</div><label className="reply-simulation"><input type="checkbox" checked={selectedReplyIndex === index} disabled={!translationId} onChange={(event) => { if (event.target.checked) simulate(index); else setSelectedReplyIndex(undefined); }}/><small>이 답변으로 대화를 시뮬레이션해 볼게요.</small></label>{index === 0 && <div className="feedback"><span>이 답변 괜찮나요?</span><button className="icon-button" type="button" aria-label="좋아요" disabled={Boolean(feedback)} onClick={() => void rate("GOOD")}><ThumbsUp size={17}/></button><button className="icon-button" type="button" aria-label="별로예요" disabled={Boolean(feedback)} onClick={() => void rate("BAD")}><ThumbsDown size={17}/></button>{feedback && <span>의견을 반영했어요.</span>}</div>}</div>)}</section>
       </div>}
     </div>
   </section>;

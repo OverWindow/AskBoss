@@ -18,7 +18,8 @@ export class ChatStreamError extends Error {
   }
 }
 
-export async function streamBossChat(
+async function streamBossResponse(
+  endpoint: "chat" | "chat/simulate",
   bossId: string,
   body: unknown,
   onEvent: (event: string, data: any) => void,
@@ -49,7 +50,7 @@ export async function streamBossChat(
 
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
   try {
-    const response = await fetch(`${base}/bosses/${bossId}/chat`, {
+    const response = await fetch(`${base}/bosses/${bossId}/${endpoint}`, {
       method: "POST",
       credentials: "include",
       headers: { "content-type": "application/json", accept: "text/event-stream" },
@@ -116,4 +117,12 @@ export async function streamBossChat(
     options.signal?.removeEventListener("abort", onExternalAbort);
     if (reader && !completed) await reader.cancel().catch(() => undefined);
   }
+}
+
+export function streamBossChat(bossId: string, body: unknown, onEvent: (event: string, data: any) => void, options: ChatStreamOptions = {}) {
+  return streamBossResponse("chat", bossId, body, onEvent, options);
+}
+
+export function streamBossSimulation(bossId: string, body: unknown, onEvent: (event: string, data: any) => void, options: ChatStreamOptions = {}) {
+  return streamBossResponse("chat/simulate", bossId, body, onEvent, options);
 }

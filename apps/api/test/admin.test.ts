@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
 import { env } from "../src/config/env";
 import { store } from "../src/repositories";
+import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT } from "@askboss/shared";
 
 const app = buildApp();
 const origin = "http://localhost:5173";
@@ -103,5 +104,24 @@ describe("admin API", () => {
 
     const dashboard = await app.inject({ method: "GET", url: "/api/admin/dashboard", headers: { cookie } });
     expect(dashboard.json().recentOperations.map((item: any) => item.type)).toEqual(expect.arrayContaining(["JOB_RETRY", "CLEANUP", "ANALYTICS_ROLLUP"]));
+  });
+
+  it("reads and updates the personal boss default without exposing its text in audit logs", async () => {
+    const login = await app.inject({ method: "POST", url: "/api/admin/login", headers: { origin, "x-forwarded-for": "10.0.0.40" }, payload: { password: env.ADMIN_PASSWORD } });
+    const cookie = String(login.headers["set-cookie"]).split(";")[0]!;
+    const initial = await app.inject({ method: "GET", url: "/api/admin/personal-boss-defaults", headers: { cookie } });
+    expect(initial.statusCode).toBe(200);
+    expect(initial.json().prompt).toBe(DEFAULT_PERSONAL_BOSS_BASE_PROMPT);
+
+    const prompt = "테스트용 비공개 기본 성격 문구";
+    const updated = await app.inject({ method: "PUT", url: "/api/admin/personal-boss-defaults", headers: { cookie, origin }, payload: { prompt } });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({ prompt, updatedAt: expect.any(String) });
+
+    const dashboard = await app.inject({ method: "GET", url: "/api/admin/dashboard", headers: { cookie } });
+    const operation = dashboard.json().recentOperations.find((item: any) => item.type === "PERSONAL_BOSS_DEFAULTS_UPDATE");
+    expect(operation.detail).toEqual({ enabled: true, promptLength: prompt.length });
+    expect(JSON.stringify(operation)).not.toContain(prompt);
+    await store.updatePersonalBossDefaults(DEFAULT_PERSONAL_BOSS_BASE_PROMPT);
   });
 });

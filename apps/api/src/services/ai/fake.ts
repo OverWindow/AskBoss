@@ -15,6 +15,10 @@ export class FakeAiService implements AiService {
     const content=message.includes("늦") ? "현재 진행 상황부터 간단히 정리해서 알려주세요. 남은 일정도 같이 봅시다." : "좋아요. 결론과 다음에 할 일을 먼저 말해주면 더 빨리 판단할 수 있어요.";
     for(const chunk of content.match(/.{1,12}/gu)??[content]){if(signal?.aborted)throw signal.reason;yield chunk;}
   }
+  async *streamSimulatedBossReaction(input:any, signal?:AbortSignal) {
+    const content = input.reply.includes("오후") ? "좋아. 오후에는 꼭 결과로 공유해." : "알겠어. 말한 일정대로 진행하고 변동 생기면 바로 알려줘.";
+    for(const chunk of content.match(/.{1,12}/gu)??[content]){if(signal?.aborted)throw signal.reason;yield chunk;}
+  }
   async translateBossMessage(_input:any): Promise<TranslationResult> { return {plainMeaning:"완성을 기다리기보다 현재 진행 상황과 남은 일정을 먼저 공유해 달라는 뜻에 가깝습니다.",likelyIntent:["진행 상황 확인","일정 지연 여부 확인","추가 지시 필요 여부 판단"],tone:"확인을 재촉하는 실무적 표현",caution:"표현만으로 실제 의도를 단정할 수는 없습니다.",confidence:0.72,replies:[{text:"네, 현재까지 진행된 내용과 남은 일정을 정리해서 먼저 공유드리겠습니다.",style:"무난하게",reason:"상태와 다음 행동을 함께 전달합니다."},{text:"현재 약 70% 진행됐고, 오늘 오후 중 공유드리겠습니다.",style:"간결하게",reason:"진행률과 시점을 바로 답합니다."},{text:"네 팀장님. 진행 상황과 남은 작업을 함께 정리해 먼저 공유드리겠습니다.",style:"조금 더 부드럽게",reason:"확인 의도를 존중하면서 부담 없이 답합니다."}]}; }
   async generateMonologue(input:any) { const options=["밥은 먹고 하는 건가?","오늘따라 조용하네.","이거 금방 끝나는 거 맞지?","커피 한잔하고 다시 보자고."]; return options.find((v)=>!input.previous.includes(v)) ?? "잠깐 쉬었다 하지."; }
   async generateHrSummary(_data:unknown) { return "최근에는 모호한 업무 지시와 보고 타이밍에 관한 사용이 많았습니다. 직급 차이가 큰 그룹에서 답변 추천 기능의 이용이 상대적으로 높았습니다."; }

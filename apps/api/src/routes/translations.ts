@@ -17,6 +17,7 @@ export const translationRoutes: FastifyPluginAsync = async (app) => {
     const bossId = (request.params as { bossId: string }).bossId;
     const [boss, profile] = await Promise.all([store.getBoss(session.id, bossId), store.getProfile(session.id)]);
     if (!boss) throw new HttpError(404, "상사를 찾을 수 없습니다.");
+    const basePrompt = boss.scope === "SESSION" ? (await store.getPersonalBossDefaults()).prompt : undefined;
 
     const controller = new AbortController();
     let timedOut = false;
@@ -28,7 +29,7 @@ export const translationRoutes: FastifyPluginAsync = async (app) => {
     request.raw.once("aborted", onClientAbort);
 
     try {
-      const result = await ai.translateBossMessage({ profile, boss, ...body }, controller.signal);
+      const result = await ai.translateBossMessage({ profile, boss, basePrompt, ...body }, controller.signal);
       const row = await store.createTranslation({ sessionId: session.id, bossId, inputText: body.inputText, channel: body.channel, result, expiresAt: sessionExpiry() });
       void track(session.id, "TRANSLATE", profile, boss, { topicKeywords: topics(body.inputText) }).catch((error) => request.log.warn(error, "translation analytics failed"));
       return { translationId: row.id, result };

@@ -39,10 +39,12 @@ export const evidenceSchema = z.discriminatedUnion("type", [
 
 export const translationInputSchema = z.object({ inputText: z.string().trim().min(1).max(5_000), channel: z.enum(CHANNELS) });
 export const chatInputSchema = z.object({ threadId: z.string().uuid().optional(), message: z.string().trim().min(1).max(5_000) });
+export const chatSimulationInputSchema = z.object({ translationId: z.string().uuid(), replyIndex: z.number().int().min(0).max(2) });
 export const feedbackSchema = z.object({ feedback: z.enum(["GOOD", "BAD"]) });
 export const surveyAnswerSchema = z.object({ questionId: z.string(), questionSnapshot: z.record(z.string(), z.unknown()), selectedOption: z.string().nullable(), freeText: z.string().max(2_000).nullable() });
 export const surveyAnswersSchema = z.object({ answers: z.array(surveyAnswerSchema).min(1).max(10) });
 export const adminLoginSchema = z.object({ password: z.string().min(1).max(256) });
+export const adminPersonalBossDefaultsSchema = z.object({ prompt: z.string().trim().max(5_000) });
 export const adminJobStatusSchema = z.enum(["PENDING", "RUNNING", "SUCCEEDED", "FAILED"]);
 export const adminGlobalBossPatchSchema = z.object({
   alias: z.string().trim().min(1).max(40).optional(),

@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { Activity, AlertTriangle, Bot, Clock3, Database, LogOut, Play, RefreshCw, ShieldCheck, UsersRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Activity, AlertTriangle, Bot, Clock3, Database, LogOut, Play, RefreshCw, Settings2, ShieldCheck, UsersRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
-import type { AdminCredits, AdminDashboard, AdminJobSummary, AdminSessionSummary } from "@askboss/shared";
+import type { AdminCredits, AdminDashboard, AdminJobSummary, AdminSessionSummary, PersonalBossDefaults } from "@askboss/shared";
 import { api } from "../services/api-client";
 import { GlobalBossAdmin } from "../features/admin/GlobalBossAdmin";
 
@@ -52,6 +52,35 @@ function CreditCard({ title, bucket }: { title: string; bucket: AdminCredits["to
   return <article className="credit-card"><span>{title}</span><strong>{formatNumber(bucket.remaining)}</strong><small>{formatNumber(bucket.used)} 사용 / {formatNumber(bucket.quota)} 할당</small><div className="credit-track"><i style={{ width: `${percent}%` }}/></div>{bucket.renewalDate && <small>갱신 {formatDate(bucket.renewalDate)}</small>}</article>;
 }
 
+function PersonalBossDefaultsCard() {
+  const settings = useQuery({ queryKey: ["admin", "personal-boss-defaults"], queryFn: () => adminApi<PersonalBossDefaults>("/admin/personal-boss-defaults"), retry: 1 });
+  const [prompt, setPrompt] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string>();
+
+  useEffect(() => { if (typeof settings.data?.prompt === "string") setPrompt(settings.data.prompt); }, [settings.data]);
+
+  const save = async () => {
+    setSaving(true); setMessage(undefined);
+    try {
+      const saved = await adminApi<PersonalBossDefaults>("/admin/personal-boss-defaults", { method: "PUT", body: JSON.stringify({ prompt }) });
+      setPrompt(saved.prompt); setMessage(saved.prompt ? "개인 상사 기본 성격을 저장했습니다." : "개인 상사 기본 성격을 비활성화했습니다."); await settings.refetch();
+    } catch (cause) { setMessage(cause instanceof Error ? cause.message : "기본 성격을 저장하지 못했습니다."); }
+    finally { setSaving(false); }
+  };
+
+  return <section className="admin-section"><div className="admin-section-title"><Settings2 size={19}/><div><h2>개인 상사 공통 기본 성격</h2><p>모든 기존·신규 개인 상사의 페르소나, 번역, 대화, 혼잣말에 적용됩니다. 모두의 상사는 제외됩니다.</p></div></div>
+    {settings.isError ? <div className="admin-inline-error"><AlertTriangle size={18}/><span>기본 성격을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void settings.refetch()}>다시 시도</button></div> : <div className="admin-prompt-form">
+      <label htmlFor="personal-boss-base-prompt">시스템 프롬프트형 기본 성격</label>
+      <textarea id="personal-boss-base-prompt" className="textarea" maxLength={5_000} value={prompt} disabled={settings.isLoading || saving} onChange={(event) => setPrompt(event.target.value)} placeholder="비워서 추가 기본 성향을 비활성화할 수 있습니다."/>
+      <div className="admin-prompt-meta"><small>{prompt.length.toLocaleString("ko-KR")} / 5,000자</small>{settings.data?.updatedAt && <small>마지막 저장 {formatDate(settings.data.updatedAt)}</small>}</div>
+      <p className="hint">저장 즉시 새 AI 응답에 적용됩니다. 기존 페르소나 데이터는 다음 재생성 때 갱신됩니다.</p>
+      <div className="admin-form-actions"><button className="primary-button" type="button" disabled={settings.isLoading || saving} onClick={() => void save()}>{saving ? "저장 중…" : "기본 성격 저장"}</button></div>
+      {message && <p className="settings-message" role="status">{message}</p>}
+    </div>}
+  </section>;
+}
+
 function AdminDashboardView({ onLogout }: { onLogout: () => Promise<void> }) {
   const cache = useQueryClient();
   const dashboard = useQuery({ queryKey: ["admin", "dashboard"], queryFn: () => adminApi<AdminDashboard>("/admin/dashboard"), refetchInterval: 30_000, retry: 1 });
@@ -84,6 +113,8 @@ function AdminDashboardView({ onLogout }: { onLogout: () => Promise<void> }) {
     <section className="admin-section"><div className="admin-section-title"><Activity size={19}/><div><h2>24시간 사용량</h2><p>원문 없이 기능 호출만 집계합니다.</p></div></div><div className="admin-metric-grid"><Metric label="개인 상사" value={data.usage.personalBosses}/><Metric label="대화 메시지" value={data.usage.chatMessages24h}/><Metric label="번역" value={data.usage.translations24h}/><Metric label="만료 미완료 업로드" value={data.uploads.expiredIncomplete}/></div></section>
 
     <section className="admin-section"><div className="admin-section-title"><Bot size={19}/><div><h2>AI 상태와 크레딧</h2><p>{credits.data ? `${credits.data.latencyMs}ms · ${credits.data.models.mode === "live" ? "실 API" : "데모"}` : credits.isError ? "조회 실패" : "조회 중"}</p></div></div>{credits.data?.available ? <div className="credit-grid"><CreditCard title="월별 크레딧" bucket={credits.data.monthly}/><CreditCard title="충전 크레딧" bucket={credits.data.purchased}/><CreditCard title="전체 크레딧" bucket={credits.data.total}/></div> : <div className="admin-inline-error"><AlertTriangle size={18}/><span>{credits.isError ? "크레딧 API에 연결하지 못했습니다." : credits.data?.error ?? "크레딧을 조회하는 중입니다."}</span>{credits.isError && <button className="small-button" type="button" onClick={() => void credits.refetch()}>다시 시도</button>}</div>}<div className="model-status"><span className={credits.data?.models.ok ? "status-ok" : "status-error"}/><strong>{credits.data?.models.ok ? "필수 모델 정상" : "필수 모델 확인 필요"}</strong>{credits.data?.models.missing.length ? <small>누락: {credits.data.models.missing.join(", ")}</small> : null}</div></section>
+
+    <PersonalBossDefaultsCard/>
 
     <section className="admin-section"><div className="admin-section-title"><Clock3 size={19}/><div><h2>AI Job</h2><p>오래 대기하거나 실패한 작업을 확인합니다.</p></div></div><div className="admin-metric-grid"><Metric label="대기" value={data.jobs.pending}/><Metric label="실행 중" value={data.jobs.running}/><Metric label="실패" value={data.jobs.failed}/><Metric label="최장 대기" value={data.jobs.oldestPendingMinutes === null ? "없음" : `${data.jobs.oldestPendingMinutes}분`}/></div>{data.jobs.failureReasons.length > 0 && <div className="failure-summary" aria-label="Job 실패 원인 요약">{data.jobs.failureReasons.map((item) => <span key={item.reason}>{item.reason} <strong>{item.count}</strong></span>)}</div>}{jobs.isError ? <div className="admin-inline-error"><AlertTriangle size={18}/><span>Job 목록을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void jobs.refetch()}>다시 시도</button></div> : <div className="admin-table-wrap"><table><thead><tr><th>종류</th><th>상태</th><th>시도</th><th>시각</th><th>조치</th></tr></thead><tbody>{jobs.data?.items.map((job) => <tr key={job.id}><td>{job.type}</td><td><span className={`job-status status-${job.status.toLowerCase()}`}>{job.status}</span>{job.errorMessage && <small className="job-error">{job.errorMessage}</small>}</td><td>{job.attempts}/{job.maxAttempts}</td><td>{formatDate(job.updatedAt)}</td><td>{job.status === "FAILED" ? <button className="small-button" disabled={running === job.id} onClick={() => void operation(job.id, `/admin/jobs/${job.id}/retry`)}><Play size={14}/>재시도</button> : "—"}</td></tr>)}</tbody></table></div>}</section>
 

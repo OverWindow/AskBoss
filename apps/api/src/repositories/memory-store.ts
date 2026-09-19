@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, BossPersona } from "../shared.js";
+import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionSummary, type BossPersona, type PersonalBossDefaults } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
@@ -40,6 +40,7 @@ export class MemoryStore implements Store {
   adminSessions = new Map<string, AdminSessionRecord>();
   adminAttempts = new Map<string, AdminLoginAttempt>();
   adminOperations: AdminOperation[] = [];
+  personalBossDefaults: PersonalBossDefaults = { prompt: DEFAULT_PERSONAL_BOSS_BASE_PROMPT, updatedAt: new Date().toISOString() };
 
   async createSession(tokenHash: string, expiresAt: string) { const now = new Date().toISOString(); const row = { id: randomUUID(), tokenHash, createdAt: now, lastSeenAt: now, expiresAt }; this.sessions.set(tokenHash, row); return row; }
   async findSession(tokenHash: string) { const row = this.sessions.get(tokenHash); return row && Date.parse(row.expiresAt) > Date.now() ? row : null; }
@@ -101,6 +102,7 @@ export class MemoryStore implements Store {
   async listChatMessages(sessionId: string, bossId: string, cursor?: string, limit = 50) { const thread = [...this.threads.values()].filter((row) => row.sessionId === sessionId && row.bossId === bossId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]; if (!thread) return { threadId: null, messages: [], nextCursor: null }; const filtered = cursor ? thread.messages.filter((message) => message.createdAt < cursor) : thread.messages; const messages = filtered.slice(-limit); return { threadId: thread.id, messages, nextCursor: filtered.length > limit ? messages[0]?.createdAt ?? null : null }; }
   async updateThreadSummary(threadId: string, summary: string) { const row = this.threads.get(threadId); if (row) row.conversationSummary = summary; }
   async createTranslation(input: Omit<TranslationRecord, "id" | "createdAt" | "feedback">) { const row: TranslationRecord = { ...input, id: randomUUID(), feedback: null, createdAt: new Date().toISOString() }; this.translations.set(row.id, row); return row; }
+  async getTranslation(sessionId: string, id: string) { const row = this.translations.get(id); return row?.sessionId === sessionId && Date.parse(row.expiresAt) > Date.now() ? row : null; }
   async setTranslationFeedback(sessionId: string, id: string, feedback: "GOOD" | "BAD") { const row = this.translations.get(id); if (!row || row.sessionId !== sessionId) throw new Error("번역 결과를 찾을 수 없습니다."); row.feedback = feedback; }
   async listMonologues(sessionId: string, bossId: string, limit: number) { return (this.monologues.get(`${sessionId}:${bossId}`) ?? []).slice(-limit); }
   async addMonologue(sessionId: string, bossId: string, content: string) { const key = `${sessionId}:${bossId}`; const values = this.monologues.get(key) ?? []; values.push(content); this.monologues.set(key, values.slice(-10)); }
@@ -146,5 +148,7 @@ export class MemoryStore implements Store {
     const items: AdminJobSummary[] = page.map((row) => ({ id: row.id, type: row.type, status: row.status, attempts: row.attempts, maxAttempts: row.maxAttempts, errorMessage: safeJobFailureReason(row.errorMessage), retryOf: row.retryOf, createdAt: row.createdAt, updatedAt: row.updatedAt }));
     return { items, nextCursor: rows.length > limit ? page.at(-1)?.createdAt ?? null : null };
   }
+  async getPersonalBossDefaults() { return structuredClone(this.personalBossDefaults); }
+  async updatePersonalBossDefaults(prompt: string) { this.personalBossDefaults = { prompt, updatedAt: new Date().toISOString() }; return structuredClone(this.personalBossDefaults); }
   async recordAdminOperation(type: AdminOperation["type"], status: AdminOperation["status"], detail: AdminOperation["detail"]) { const row: AdminOperation = { id: randomUUID(), type, status, detail, createdAt: new Date().toISOString() }; this.adminOperations.push(row); return row; }
 }
