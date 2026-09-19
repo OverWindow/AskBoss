@@ -100,7 +100,11 @@ export function MainPage() {
       <TranslatorPanel boss={boss} open={ui.translatorPanelOpen} onClose={() => closePanel("translator")} onSourceMessage={(message) => { setThinking(false); setSpeech(message); }}/>
       <section data-tutorial="workspace" className={`boss-stage ${thinking ? "is-thinking" : ""}`} aria-labelledby="boss-alias">
         <div className="speech-bubble" aria-live="polite">“{speech}”</div>
-        <div className="avatar-frame"><img className="boss-avatar" src={`/avatars/${boss.avatarKey}.png`} alt={`${boss.alias} 픽셀 아바타`}/><span className="thinking-indicator" aria-hidden="true"><i/><i/><i/></span></div>
+        <div className="avatar-frame">
+          <img className="boss-avatar" src={`/avatars/${boss.avatarKey}.png`} alt={`${boss.alias} 픽셀 아바타`}/>
+          <span className={`avatar-blink avatar-blink--${boss.avatarKey}`} aria-hidden="true"><i/><i/></span>
+          <span className="thinking-indicator" aria-hidden="true"><i/><i/><i/></span>
+        </div>
         <h1 id="boss-alias" className="boss-alias">{boss.alias}</h1>
         <p className="boss-subtitle">{boss.scope === "GLOBAL" ? "모두가 사용할 수 있는 가상의 공통 상사" : "관찰을 바탕으로 만든 가상 행동 모델"}</p>
         <PkiIndicator boss={boss}/>
