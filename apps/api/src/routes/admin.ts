@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { adminGlobalBossPatchSchema, adminGlobalUploadSignSchema, adminJobStatusSchema, adminLoginSchema, adminPersonalBossDefaultsSchema, evidenceSchema, surveyAnswersSchema, UPLOAD_LIMITS } from "../shared.js";
+import { adminGlobalBossDefaultsSchema, adminGlobalBossPatchSchema, adminGlobalUploadSignSchema, adminJobStatusSchema, adminLoginSchema, adminPersonalBossDefaultsSchema, evidenceSchema, surveyAnswersSchema, UPLOAD_LIMITS } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { cleanup } from "../services/cleanup.js";
 import { getAdminCredits } from "../services/ai/credits.js";
@@ -48,6 +48,17 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     const { prompt } = parse(adminPersonalBossDefaultsSchema, request.body);
     const settings = await store.updatePersonalBossDefaults(prompt);
     await store.recordAdminOperation("PERSONAL_BOSS_DEFAULTS_UPDATE", "SUCCEEDED", { enabled: Boolean(prompt), promptLength: prompt.length });
+    return settings;
+  });
+  app.get("/admin/global-boss-defaults", async (request) => {
+    await requireAdmin(request);
+    return store.getGlobalBossDefaults();
+  });
+  app.put("/admin/global-boss-defaults", async (request) => {
+    await requireAdminMutation(request);
+    const { prompt } = parse(adminGlobalBossDefaultsSchema, request.body);
+    const settings = await store.updateGlobalBossDefaults(prompt);
+    await store.recordAdminOperation("GLOBAL_BOSS_DEFAULTS_UPDATE", "SUCCEEDED", { enabled: Boolean(prompt), promptLength: prompt.length });
     return settings;
   });
   app.get("/admin/global-boss", async (request) => {

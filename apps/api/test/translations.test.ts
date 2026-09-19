@@ -27,11 +27,12 @@ describe("translation API", () => {
     });
   });
 
-  it("injects the administrator default for global and personal bosses", async () => {
+  it("injects separate administrator defaults for global and personal bosses", async () => {
     const seen: any[] = [];
     const translate = ai.translateBossMessage.bind(ai) as (...args: any[]) => Promise<any>;
     vi.spyOn(ai as any, "translateBossMessage").mockImplementation(async (...args: any[]) => { seen.push(args[0]); return translate(...args); });
-    await store.updatePersonalBossDefaults("결론과 마감을 먼저 확인하는 테스트 기본 성격");
+    await store.updatePersonalBossDefaults("개인 상사 전용 테스트 성격");
+    await store.updateGlobalBossDefaults("모두의 상사 전용 테스트 성격");
     try {
       const session = await app.inject({ method: "POST", url: "/api/session" });
       const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
@@ -45,10 +46,13 @@ describe("translation API", () => {
       await app.inject({ method: "POST", url: "/api/bosses/00000000-0000-4000-8000-000000000001/translate", headers: { cookie }, payload: { inputText: "확인했나?", channel: "사내 메신저" } });
       await app.inject({ method: "POST", url: `/api/bosses/${personal.json().boss.id}/translate`, headers: { cookie }, payload: { inputText: "확인했나?", channel: "사내 메신저" } });
 
-      expect(seen[0].basePrompt).toBe("결론과 마감을 먼저 확인하는 테스트 기본 성격");
-      expect(seen[1].basePrompt).toBe("결론과 마감을 먼저 확인하는 테스트 기본 성격");
+      expect(seen[0].basePrompt).toBe("모두의 상사 전용 테스트 성격");
+      expect(seen[0].globalBoss).toBeUndefined();
+      expect(seen[1].basePrompt).toBe("개인 상사 전용 테스트 성격");
+      expect(seen[1].globalBoss?.scope).toBe("GLOBAL");
     } finally {
       await store.updatePersonalBossDefaults(DEFAULT_PERSONAL_BOSS_BASE_PROMPT);
+      await store.updateGlobalBossDefaults("");
     }
   });
 

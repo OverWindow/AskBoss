@@ -96,10 +96,12 @@ test("관리자 비밀번호 로그인 후 운영 현황을 확인할 수 있다
   await expect(page.getByRole("heading", { name: "세션 현황" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "AI 상태와 크레딧" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "개인 상사 공통 기본 성격" })).toBeVisible();
-  await expect(page.getByLabel("시스템 프롬프트형 기본 성격")).not.toHaveValue("");
+  await expect(page.getByLabel("개인 상사 공통 시스템 프롬프트")).not.toHaveValue("");
   await page.getByRole("link", { name: "모두의 상사 관리" }).click();
   await expect(page.getByRole("heading", { name: "모두의 상사 관리" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "기본 정보" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "모두의 상사 전용 프롬프트" })).toBeVisible();
+  await expect(page.getByLabel("시스템 프롬프트형 기본 성격")).toHaveValue("");
   await expect(page.getByRole("heading", { name: "관찰 자료" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "상황 설문" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "페르소나 반영" })).toBeVisible();

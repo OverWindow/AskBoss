@@ -8,6 +8,7 @@ import { track } from "../services/analytics.js";
 import { HttpError } from "../utils/http.js";
 import { parse } from "../utils/validation.js";
 import { PlainTextStream, toPlainText } from "../utils/plain-text.js";
+import { getBossPromptContext } from "../services/boss-prompt-context.js";
 
 const FIRST_DELTA_TIMEOUT_MS = 30_000;
 const DELTA_IDLE_TIMEOUT_MS = 25_000;
@@ -32,17 +33,16 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     const session = await requireSession(request);
     const bossId = (request.params as { bossId: string }).bossId;
     const body = parse(chatSimulationInputSchema, request.body);
-    const [boss, profile, translation, globalBoss] = await Promise.all([
+    const [boss, profile, translation] = await Promise.all([
       store.getBoss(session.id, bossId),
       store.getProfile(session.id),
       store.getTranslation(session.id, body.translationId),
-      store.getGlobalBoss(),
     ]);
     if (!boss) throw new HttpError(404, "상사를 찾을 수 없습니다.");
     if (!translation || translation.bossId !== bossId) throw new HttpError(404, "번역 결과를 찾을 수 없습니다.", "TRANSLATION_NOT_FOUND");
     const selectedReply = translation.result.replies[body.replyIndex];
     if (!selectedReply) throw new HttpError(400, "추천 답변을 찾을 수 없습니다.", "REPLY_NOT_FOUND");
-    const basePrompt = (await store.getPersonalBossDefaults()).prompt;
+    const { basePrompt, globalBoss } = await getBossPromptContext(boss);
 
     reply.hijack();
     reply.raw.statusCode = 200;
@@ -126,9 +126,9 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     const session = await requireSession(request);
     const bossId = (request.params as { bossId: string }).bossId;
     const body = parse(chatInputSchema, request.body);
-    const [boss, profile, globalBoss] = await Promise.all([store.getBoss(session.id, bossId), store.getProfile(session.id), store.getGlobalBoss()]);
+    const [boss, profile] = await Promise.all([store.getBoss(session.id, bossId), store.getProfile(session.id)]);
     if (!boss) throw new HttpError(404, "상사를 찾을 수 없습니다.");
-    const basePrompt = (await store.getPersonalBossDefaults()).prompt;
+    const { basePrompt, globalBoss } = await getBossPromptContext(boss);
 
     const thread = await store.getOrCreateThread(session.id, bossId, body.threadId, sessionExpiry());
     // Capture history before adding the current message so the prompt contains it exactly once.

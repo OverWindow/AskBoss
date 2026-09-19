@@ -124,4 +124,34 @@ describe("admin API", () => {
     expect(JSON.stringify(operation)).not.toContain(prompt);
     await store.updatePersonalBossDefaults(DEFAULT_PERSONAL_BOSS_BASE_PROMPT);
   });
+
+  it("reads, validates, updates, and disables the global boss default without auditing its text", async () => {
+    const anonymous = await app.inject({ method: "GET", url: "/api/admin/global-boss-defaults" });
+    expect(anonymous.statusCode).toBe(401);
+
+    const login = await app.inject({ method: "POST", url: "/api/admin/login", headers: { origin, "x-forwarded-for": "10.0.0.41" }, payload: { password: env.ADMIN_PASSWORD } });
+    const cookie = String(login.headers["set-cookie"]).split(";")[0]!;
+    const initial = await app.inject({ method: "GET", url: "/api/admin/global-boss-defaults", headers: { cookie } });
+    expect(initial.statusCode).toBe(200);
+    expect(initial.json()).toMatchObject({ prompt: "", updatedAt: null });
+
+    const crossOrigin = await app.inject({ method: "PUT", url: "/api/admin/global-boss-defaults", headers: { cookie, origin: "https://attacker.example" }, payload: { prompt: "변조" } });
+    expect(crossOrigin.statusCode).toBe(403);
+    const tooLong = await app.inject({ method: "PUT", url: "/api/admin/global-boss-defaults", headers: { cookie, origin }, payload: { prompt: "가".repeat(5_001) } });
+    expect(tooLong.statusCode).toBe(400);
+
+    const prompt = "모두의 상사에만 적용할 비공개 성격 문구";
+    const updated = await app.inject({ method: "PUT", url: "/api/admin/global-boss-defaults", headers: { cookie, origin }, payload: { prompt } });
+    expect(updated.statusCode).toBe(200);
+    expect(updated.json()).toMatchObject({ prompt, updatedAt: expect.any(String) });
+
+    const dashboard = await app.inject({ method: "GET", url: "/api/admin/dashboard", headers: { cookie } });
+    const operation = dashboard.json().recentOperations.find((item: any) => item.type === "GLOBAL_BOSS_DEFAULTS_UPDATE" && item.detail.promptLength === prompt.length);
+    expect(operation.detail).toEqual({ enabled: true, promptLength: prompt.length });
+    expect(JSON.stringify(operation)).not.toContain(prompt);
+
+    const disabled = await app.inject({ method: "PUT", url: "/api/admin/global-boss-defaults", headers: { cookie, origin }, payload: { prompt: "" } });
+    expect(disabled.statusCode).toBe(200);
+    expect(disabled.json()).toMatchObject({ prompt: "", updatedAt: expect.any(String) });
+  });
 });

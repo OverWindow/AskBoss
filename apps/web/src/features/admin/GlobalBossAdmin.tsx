@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Bot, FileText, Image, LogOut, RefreshCw, Save, Trash2, Upload } from "lucide-react";
-import { AGE_BANDS, AVATARS, BOSS_RANKS, BOSS_TENURE_BANDS, JOB_FUNCTIONS, type AdminGlobalBossDetail, type Boss, type BossSurveyQuestion, type CompanyResearch } from "@askboss/shared";
+import { ArrowLeft, Bot, FileText, Image, LogOut, RefreshCw, Save, Settings2, Trash2, Upload } from "lucide-react";
+import { AGE_BANDS, AVATARS, BOSS_RANKS, BOSS_TENURE_BANDS, JOB_FUNCTIONS, type AdminGlobalBossDetail, type Boss, type BossSurveyQuestion, type CompanyResearch, type GlobalBossDefaults } from "@askboss/shared";
 import { api } from "../../services/api-client";
 import { uploadToSignedUrl } from "../../services/upload-client";
 
@@ -18,7 +18,13 @@ export function GlobalBossAdmin({ onLogout }: Props) {
     queryFn: () => adminApi<AdminGlobalBossDetail>("/admin/global-boss"),
     refetchInterval: (query) => query.state.data?.evidence.some((item) => item.status === "PENDING" || item.status === "PROCESSING") ? 1_200 : false,
   });
+  const promptSettings = useQuery({
+    queryKey: ["admin", "global-boss-defaults"],
+    queryFn: () => adminApi<GlobalBossDefaults>("/admin/global-boss-defaults"),
+    retry: 1,
+  });
   const [boss, setBoss] = useState<Boss | null>(null);
+  const [globalPrompt, setGlobalPrompt] = useState("");
   const [textEvidence, setTextEvidence] = useState("");
   const [questions, setQuestions] = useState<BossSurveyQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, { selectedOption: string | null; freeText: string }>>({});
@@ -26,6 +32,7 @@ export function GlobalBossAdmin({ onLogout }: Props) {
   const [message, setMessage] = useState("");
 
   useEffect(() => { if (!boss && detail.data?.boss) setBoss(detail.data.boss); }, [boss, detail.data?.boss]);
+  useEffect(() => { if (typeof promptSettings.data?.prompt === "string") setGlobalPrompt(promptSettings.data.prompt); }, [promptSettings.data?.prompt]);
   useEffect(() => {
     if (questions.length || !detail.data?.surveyAnswers.length) return;
     setQuestions(detail.data.surveyAnswers.map((item) => item.questionSnapshot as unknown as BossSurveyQuestion));
@@ -40,6 +47,14 @@ export function GlobalBossAdmin({ onLogout }: Props) {
       const { boss: saved } = await adminApi<{ boss: Boss }>("/admin/global-boss", { method: "PATCH", body: JSON.stringify({ alias: boss.alias, avatarKey: boss.avatarKey, jobFunction: boss.jobFunction, yearsOfServiceBand: boss.yearsOfServiceBand, rank: boss.rank, companyName: boss.companyName, ageBand: boss.ageBand, hierarchyScore: boss.hierarchyScore, companyResearch: boss.companyResearch }) });
       setBoss(saved); setMessage("모두의 상사 기본 정보를 저장했습니다."); await detail.refetch();
     } catch (error) { setMessage(error instanceof Error ? error.message : "저장하지 못했습니다."); }
+    finally { setBusy(undefined); }
+  };
+  const saveGlobalPrompt = async () => {
+    setBusy("global-prompt"); setMessage("");
+    try {
+      const saved = await adminApi<GlobalBossDefaults>("/admin/global-boss-defaults", { method: "PUT", body: JSON.stringify({ prompt: globalPrompt }) });
+      setGlobalPrompt(saved.prompt); setMessage(saved.prompt ? "모두의 상사 전용 프롬프트를 저장했습니다." : "모두의 상사 전용 프롬프트를 비활성화했습니다."); await promptSettings.refetch();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "전용 프롬프트를 저장하지 못했습니다."); }
     finally { setBusy(undefined); }
   };
   const researchCompany = async () => {
@@ -122,6 +137,16 @@ export function GlobalBossAdmin({ onLogout }: Props) {
         <div className="admin-form-actions"><button className="secondary-button" disabled={!boss.companyName || Boolean(busy)} onClick={() => void researchCompany()}><RefreshCw size={16}/>{busy === "research" ? "조사 중…" : "회사 정보 조사"}</button><button className="primary-button" disabled={Boolean(busy)} onClick={() => void saveBoss()}><Save size={16}/>{busy === "save" ? "저장 중…" : "기본 정보 저장"}</button></div>
         {boss.companyResearch && <div className="company-research-preview"><strong>{boss.companyResearch.industry ?? "업종 미확인"}</strong><p>{boss.companyResearch.businessSummary}</p><small>신뢰도 {Math.round(boss.companyResearch.confidence * 100)}%</small></div>}
       </div>
+    </section>
+
+    <section className="admin-section"><div className="admin-section-title"><Settings2/><div><h2>모두의 상사 전용 프롬프트</h2><p>모두의 상사에게만 적용되며 개인 상사 공통 기본 성격과 완전히 분리됩니다.</p></div></div>
+      {promptSettings.isError ? <div className="admin-inline-error"><span>전용 프롬프트를 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void promptSettings.refetch()}>다시 시도</button></div> : <div className="admin-prompt-form">
+        <label htmlFor="global-boss-base-prompt">시스템 프롬프트형 기본 성격</label>
+        <textarea id="global-boss-base-prompt" className="textarea" maxLength={5_000} value={globalPrompt} disabled={promptSettings.isLoading || busy === "global-prompt"} onChange={(event) => setGlobalPrompt(event.target.value)} placeholder="비워서 모두의 상사 전용 지침을 비활성화할 수 있습니다."/>
+        <div className="admin-prompt-meta"><small>{globalPrompt.length.toLocaleString("ko-KR")} / 5,000자</small>{promptSettings.data?.updatedAt && <small>마지막 저장 {new Date(promptSettings.data.updatedAt).toLocaleString("ko-KR")}</small>}</div>
+        <p className="hint">저장 즉시 새 대화·번역·시뮬레이션·혼잣말에 적용됩니다. 현재 페르소나는 다음 재생성 때 갱신됩니다.</p>
+        <div className="admin-form-actions"><button className="primary-button" type="button" disabled={promptSettings.isLoading || Boolean(busy)} onClick={() => void saveGlobalPrompt()}>{busy === "global-prompt" ? "저장 중…" : "전용 프롬프트 저장"}</button></div>
+      </div>}
     </section>
 
     <section className="admin-section"><div className="admin-section-title"><FileText/><div><h2>관찰 자료</h2><p>카톡 대화 붙여넣기와 TXT·이미지 자료를 영구 보관합니다.</p></div></div>

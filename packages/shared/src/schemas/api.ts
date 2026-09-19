@@ -49,6 +49,7 @@ export const surveyAnswerSchema = z.object({ questionId: z.string(), questionSna
 export const surveyAnswersSchema = z.object({ answers: z.array(surveyAnswerSchema).min(1).max(10) });
 export const adminLoginSchema = z.object({ password: z.string().min(1).max(256) });
 export const adminPersonalBossDefaultsSchema = z.object({ prompt: z.string().trim().max(5_000) });
+export const adminGlobalBossDefaultsSchema = z.object({ prompt: z.string().trim().max(5_000) });
 export const adminJobStatusSchema = z.enum(["PENDING", "RUNNING", "SUCCEEDED", "FAILED"]);
 export const adminGlobalBossPatchSchema = z.object({
   alias: z.string().trim().min(1).max(40).optional(),

@@ -104,9 +104,14 @@ export interface PersonalBossDefaults {
   updatedAt: string;
 }
 
+export interface GlobalBossDefaults {
+  prompt: string;
+  updatedAt: string | null;
+}
+
 export interface AdminOperation {
   id: string;
-  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD" | "PERSONAL_BOSS_DEFAULTS_UPDATE" | "MEANINGLESS_SESSIONS_PRUNE";
+  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD" | "PERSONAL_BOSS_DEFAULTS_UPDATE" | "GLOBAL_BOSS_DEFAULTS_UPDATE" | "MEANINGLESS_SESSIONS_PRUNE";
   status: "SUCCEEDED" | "FAILED";
   detail: Record<string, number | string | boolean | null>;
   createdAt: string;

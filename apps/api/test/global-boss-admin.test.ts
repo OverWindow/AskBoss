@@ -158,13 +158,21 @@ describe("global boss administration", () => {
 
   it("publishes persona and PKI together only after a successful rebuild", async () => {
     const before = structuredClone(await store.getGlobalBoss());
-    const response = await app.inject({ method: "POST", url: "/api/admin/global-boss/persona/rebuild", headers: { cookie, origin } });
-    expect(response.statusCode).toBe(202);
-    expect((await waitForJob(response.json().jobId)).status).toBe("SUCCEEDED");
-    const after = await store.getGlobalBoss();
-    expect(after.personaVersion).toBe((before.personaVersion ?? 0) + 1);
-    expect(after.persona).not.toBeNull();
-    expect(after.pki).not.toBeNull();
+    const build = vi.spyOn(ai, "buildPersona");
+    await store.updateGlobalBossDefaults("재생성 전용 글로벌 지침");
+    try {
+      const response = await app.inject({ method: "POST", url: "/api/admin/global-boss/persona/rebuild", headers: { cookie, origin } });
+      expect(response.statusCode).toBe(202);
+      expect((await waitForJob(response.json().jobId)).status).toBe("SUCCEEDED");
+      const after = await store.getGlobalBoss();
+      expect(after.personaVersion).toBe((before.personaVersion ?? 0) + 1);
+      expect(after.persona).not.toBeNull();
+      expect(after.pki).not.toBeNull();
+      expect(build).toHaveBeenCalledWith(expect.objectContaining({ basePrompt: "재생성 전용 글로벌 지침", globalBoss: undefined }));
+    } finally {
+      build.mockRestore();
+      await store.updateGlobalBossDefaults("");
+    }
   });
 
   it("keeps the live persona unchanged and reports a terminal job error on rebuild failure", async () => {
