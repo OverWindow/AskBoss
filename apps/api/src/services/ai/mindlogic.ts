@@ -6,7 +6,7 @@ import { companyPrompt } from "../../prompts/company.js";
 import { evidencePrompt } from "../../prompts/evidence.js";
 import { personaPrompt } from "../../prompts/persona.js";
 import { surveyPrompt } from "../../prompts/survey.js";
-import { chatPrompt } from "../../prompts/chat.js";
+import { buildBossChatMessages } from "../../prompts/chat.js";
 import { translatorPrompt } from "../../prompts/translator.js";
 import { monologuePrompt } from "../../prompts/monologue.js";
 import { hrSummaryPrompt } from "../../prompts/hr-summary.js";
@@ -31,8 +31,7 @@ export class MindlogicAiService implements AiService {
   buildPersona(input:any){const {basePrompt,globalBoss,...context}=input;return this.structured(env.AI_PRIMARY_MODEL,personaPrompt(context),bossPersonaSchema,undefined,bossSystemPrompt(input.boss.scope,basePrompt,input.boss.scope==="SESSION"?globalBoss?.persona:undefined));}
   generateSurvey(boss:any){return this.structured(env.AI_PRIMARY_MODEL,surveyPrompt(boss),surveyQuestionsSchema);}
   async *streamChatWithBoss(input:BossChatInput,signal?:AbortSignal){
-    const {message,basePrompt,globalPersona,...context}=input;
-    const stream=await this.client.chat.completions.create({model:env.AI_PRIMARY_MODEL,messages:[{role:"system" as const,content:bossSystemPrompt(input.boss.scope,basePrompt,input.boss.scope==="SESSION"?globalPersona:undefined)},{role:"user",content:`${chatPrompt(context)}\n사용자: ${message}\n상사:`}],temperature:.4,stream:true},{signal});
+    const stream=await this.client.chat.completions.create({model:env.AI_PRIMARY_MODEL,messages:[...buildBossChatMessages(input)],temperature:.4,stream:true},{signal});
     for await(const part of stream){
       if(signal?.aborted)throw signal.reason;
       const content=part.choices[0]?.delta?.content;

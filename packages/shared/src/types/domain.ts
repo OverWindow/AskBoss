@@ -109,9 +109,24 @@ export interface GlobalBossDefaults {
   updatedAt: string | null;
 }
 
+export type TranslationExamples = [string, string, string];
+
+export interface TranslationExamplesSettings {
+  examples: TranslationExamples;
+  updatedAt: string | null;
+}
+
+export interface GlobalBossPromptPreview {
+  messages: [
+    { role: "system"; content: string },
+    { role: "user"; content: string },
+  ];
+  usesMockUserData: true;
+}
+
 export interface AdminOperation {
   id: string;
-  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD" | "PERSONAL_BOSS_DEFAULTS_UPDATE" | "GLOBAL_BOSS_DEFAULTS_UPDATE" | "MEANINGLESS_SESSIONS_PRUNE";
+  type: "JOB_RETRY" | "CLEANUP" | "ANALYTICS_ROLLUP" | "GLOBAL_BOSS_UPDATE" | "GLOBAL_PERSONA_REBUILD" | "PERSONAL_BOSS_DEFAULTS_UPDATE" | "GLOBAL_BOSS_DEFAULTS_UPDATE" | "TRANSLATION_EXAMPLES_UPDATE" | "MEANINGLESS_SESSIONS_PRUNE";
   status: "SUCCEEDED" | "FAILED";
   detail: Record<string, number | string | boolean | null>;
   createdAt: string;

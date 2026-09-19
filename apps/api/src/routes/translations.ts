@@ -13,6 +13,12 @@ const TRANSLATION_TIMEOUT_MS = 60_000;
 const topics = (text: string) => ["보고", "일정", "마감", "야근", "메신저", "피드백", "회의", "자료", "실수", "확인"].filter((word) => text.includes(word));
 
 export const translationRoutes: FastifyPluginAsync = async (app) => {
+  app.get("/translation-examples", async (request) => {
+    await requireSession(request);
+    const { examples } = await store.getTranslationExamples();
+    return { examples };
+  });
+
   app.post("/bosses/:bossId/translate", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request) => {
     const session = await requireSession(request);
     const body = parse(translationInputSchema, request.body);

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Languages, MessageCircle, RefreshCw } from "lucide-react";
-import type { Boss, TranslationResult } from "@askboss/shared";
+import type { Boss, TranslationExamples, TranslationResult } from "@askboss/shared";
 import { CHANNELS } from "@askboss/shared";
 import { api } from "../../services/api-client";
 import type { ChatSimulationRequest } from "../chat/simulation-types";
@@ -8,13 +8,12 @@ import type { ChatSimulationRequest } from "../chat/simulation-types";
 interface TranslatorPanelProps {
   boss: Boss;
   active: boolean;
+  examples: readonly [string, string, string] | TranslationExamples;
   onSourceMessage: (message: string) => void;
   onSimulate: (request: ChatSimulationRequest) => void;
 }
 
-const TRANSLATION_EXAMPLES = ["이거 언제 되나?", "한번 검토해 볼게요.", "이 정도는 알아서 해주세요."];
-
-export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: TranslatorPanelProps) {
+export function TranslatorPanel({ boss, active, examples, onSourceMessage, onSimulate }: TranslatorPanelProps) {
   const [text, setText] = useState("");
   const [channel, setChannel] = useState<string>(CHANNELS[0]);
   const [result, setResult] = useState<TranslationResult | null>(null);
@@ -23,6 +22,7 @@ export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: T
   const [loading, setLoading] = useState(false);
   const [selectedReplyIndex, setSelectedReplyIndex] = useState<number>();
   const [error, setError] = useState<string>();
+  const [lastRequestedInput, setLastRequestedInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const requestController = useRef<AbortController | undefined>(undefined);
 
@@ -31,15 +31,16 @@ export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: T
   }, [active]);
 
   useEffect(() => {
-    setText(""); setResult(null); setTranslationId(undefined); setTranslatedInputText(""); setSelectedReplyIndex(undefined); setError(undefined);
+    setText(""); setResult(null); setTranslationId(undefined); setTranslatedInputText(""); setSelectedReplyIndex(undefined); setError(undefined); setLastRequestedInput("");
     return () => requestController.current?.abort();
   }, [boss.id]);
 
-  const translate = async () => {
-    const inputText = text.trim();
+  const translate = async (requestedText = text) => {
+    const inputText = requestedText.trim();
     if (!inputText || loading) return;
     setLoading(true);
     setError(undefined);
+    setLastRequestedInput(inputText);
     setSelectedReplyIndex(undefined);
     onSourceMessage(inputText);
     const controller = new AbortController();
@@ -73,10 +74,10 @@ export function TranslatorPanel({ boss, active, onSourceMessage, onSimulate }: T
   return <section id="translator-panel" className="workspace-tab-panel" role="tabpanel" aria-labelledby="workspace-tab-translator" aria-label="상사의 말 번역" hidden={!active} aria-busy={loading}>
     <div className="workspace-panel-title"><h2><Languages size={18}/>상사의 말 번역</h2></div>
     <div className="translator-scroll">
-      <div className="field"><label htmlFor="boss-message">상사가 뭐라고 했나요?</label><textarea ref={textareaRef} id="boss-message" className="textarea" value={text} onChange={(event) => setText(event.target.value)}/>{boss.scope === "GLOBAL" && <div className="translation-examples" aria-label="예시 문장">{TRANSLATION_EXAMPLES.map((example) => <button key={example} type="button" onClick={() => { setText(example); textareaRef.current?.focus(); }}>{example}</button>)}</div>}</div>
+      <div className="field"><label htmlFor="boss-message">상사가 뭐라고 했나요?</label><textarea ref={textareaRef} id="boss-message" className="textarea" value={text} onChange={(event) => setText(event.target.value)}/><div className="translation-examples" aria-label="예시 문장">{examples.map((example, index) => <button key={index} type="button" disabled={loading} onClick={() => void translate(example)}>{example}</button>)}</div></div>
       <div className="field"><label htmlFor="channel">어떤 상황인가요?</label><select id="channel" className="select" value={channel} onChange={(event) => setChannel(event.target.value)}>{CHANNELS.map((item) => <option key={item}>{item}</option>)}</select></div>
       <button className="primary-button panel-submit" type="button" disabled={!text.trim() || loading} onClick={() => void translate()}>{loading ? "해석하는 중…" : "해석하기"}</button>
-      {error && <div className="translation-error" role="alert"><span>{error}</span><button className="small-button" type="button" disabled={loading || !text.trim()} onClick={() => void translate()}><RefreshCw size={14}/>다시 시도</button></div>}
+      {error && <div className="translation-error" role="alert"><span>{error}</span><button className="small-button" type="button" disabled={loading || !lastRequestedInput} onClick={() => void translate(lastRequestedInput)}><RefreshCw size={14}/>다시 시도</button></div>}
       {result && <div className="translation-result">
         <section className="result-section"><h3>쉽게 말하면</h3><p>{result.plainMeaning}</p></section>
         <section className="result-section"><h3>가능성이 높은 의도</h3><ul>{result.likelyIntent.map((item) => <li key={item}>{item}</li>)}</ul></section>

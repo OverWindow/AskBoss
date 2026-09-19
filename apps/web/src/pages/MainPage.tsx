@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+import { DEFAULT_TRANSLATION_EXAMPLES } from "@askboss/shared";
 import { AppShell } from "../components/AppShell";
 import { useSession } from "../features/session/useSession";
 import { useBosses } from "../features/boss/useBosses";
@@ -8,6 +9,7 @@ import { PkiIndicator } from "../features/pki/PkiIndicator";
 import { ChatPanel } from "../features/chat/ChatPanel";
 import type { ChatSimulationRequest } from "../features/chat/simulation-types";
 import { TranslatorPanel } from "../features/translator/TranslatorPanel";
+import { useTranslationExamples } from "../features/translator/useTranslationExamples";
 import { Tutorial } from "../features/tutorial/Tutorial";
 import { useUiStore } from "../stores/ui-store";
 import { useProfile } from "../features/profile/useProfile";
@@ -25,6 +27,7 @@ export function MainPage() {
   const session = useSession();
   const bosses = useBosses(session.isSuccess);
   const profile = useProfile(session.isSuccess);
+  const translationExamples = useTranslationExamples(session.isSuccess);
   const ui = useUiStore();
   const boss = useMemo(() => bosses.data?.find((item) => item.id === ui.selectedBossId) ?? bosses.data?.[0], [bosses.data, ui.selectedBossId]);
   const [speech, setSpeech] = useState("밥은 먹었나?");
@@ -90,7 +93,7 @@ export function MainPage() {
         </header>
         <div id="workspace-dock-body" className="workspace-dock-body">
           <ChatPanel boss={boss} active={ui.activeWorkspaceTab === "chat"} simulationRequest={simulationRequest} onActivity={({ thinking: nextThinking, speech: nextSpeech }) => { setThinking(nextThinking); if (nextSpeech) setSpeech(nextSpeech); }}/>
-          <TranslatorPanel boss={boss} active={ui.activeWorkspaceTab === "translator"} onSourceMessage={(message) => { setThinking(false); setSpeech(message); }} onSimulate={(request) => { setSimulationRequest(request); setSpeech(request.inputText); setThinking(true); selectTab("chat"); }}/>
+          <TranslatorPanel boss={boss} active={ui.activeWorkspaceTab === "translator"} examples={translationExamples.data?.examples ?? DEFAULT_TRANSLATION_EXAMPLES} onSourceMessage={(message) => { setThinking(false); setSpeech(message); }} onSimulate={(request) => { setSimulationRequest(request); setSpeech(request.inputText); setThinking(true); selectTab("chat"); }}/>
         </div>
       </aside>
     </div>

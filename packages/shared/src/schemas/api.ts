@@ -50,6 +50,12 @@ export const surveyAnswersSchema = z.object({ answers: z.array(surveyAnswerSchem
 export const adminLoginSchema = z.object({ password: z.string().min(1).max(256) });
 export const adminPersonalBossDefaultsSchema = z.object({ prompt: z.string().trim().max(5_000) });
 export const adminGlobalBossDefaultsSchema = z.object({ prompt: z.string().trim().max(5_000) });
+export const translationExamplesSchema = z.tuple([
+  z.string().trim().min(1).max(200),
+  z.string().trim().min(1).max(200),
+  z.string().trim().min(1).max(200),
+]);
+export const adminTranslationExamplesSchema = z.object({ examples: translationExamplesSchema });
 export const adminJobStatusSchema = z.enum(["PENDING", "RUNNING", "SUCCEEDED", "FAILED"]);
 export const adminGlobalBossPatchSchema = z.object({
   alias: z.string().trim().min(1).max(40).optional(),

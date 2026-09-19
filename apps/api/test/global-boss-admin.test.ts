@@ -3,6 +3,7 @@ import { buildApp } from "../src/app";
 import { env } from "../src/config/env";
 import { store } from "../src/repositories";
 import { ai } from "../src/services/ai";
+import { buildGlobalBossPromptPreview } from "../src/services/global-boss-prompt-preview";
 
 const app = buildApp();
 const origin = "http://localhost:5173";
@@ -35,6 +36,23 @@ beforeAll(async () => {
 afterAll(() => app.close());
 
 describe("global boss administration", () => {
+  it("returns an exact prompt preview built only from current settings and deterministic mock user data", async () => {
+    const before = await store.getGlobalBossDefaults();
+    await store.updateGlobalBossDefaults("미리보기용 글로벌 지침");
+    try {
+      const response = await app.inject({ method: "GET", url: "/api/admin/global-boss/prompt-preview", headers: { cookie } });
+      expect(response.statusCode).toBe(200);
+      const expected = buildGlobalBossPromptPreview(await store.getGlobalBoss(), "미리보기용 글로벌 지침");
+      expect(response.json()).toEqual(expected);
+      expect(response.json()).toMatchObject({ usesMockUserData: true, messages: [{ role: "system" }, { role: "user" }] });
+      expect(response.json().messages[0].content).toContain("미리보기용 글로벌 지침");
+      expect(response.json().messages[1].content).toContain("관리자 미리보기용 가상 사용자");
+      expect(response.json().messages[1].content).toContain("수정본은 오늘 오후 4시까지 보내드리면 될까요?");
+    } finally {
+      await store.updateGlobalBossDefaults(before.prompt);
+    }
+  });
+
   it("rejects ordinary sessions and cross-origin mutations", async () => {
     const anonymous = await app.inject({ method: "GET", url: "/api/admin/global-boss" });
     expect(anonymous.statusCode).toBe(401);

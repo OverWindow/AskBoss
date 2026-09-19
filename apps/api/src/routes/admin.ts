@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { adminGlobalBossDefaultsSchema, adminGlobalBossPatchSchema, adminGlobalUploadSignSchema, adminJobStatusSchema, adminLoginSchema, adminPersonalBossDefaultsSchema, evidenceSchema, surveyAnswersSchema, UPLOAD_LIMITS } from "../shared.js";
+import { adminGlobalBossDefaultsSchema, adminGlobalBossPatchSchema, adminGlobalUploadSignSchema, adminJobStatusSchema, adminLoginSchema, adminPersonalBossDefaultsSchema, adminTranslationExamplesSchema, evidenceSchema, surveyAnswersSchema, UPLOAD_LIMITS } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { cleanup } from "../services/cleanup.js";
 import { getAdminCredits } from "../services/ai/credits.js";
@@ -10,6 +10,7 @@ import { jobs } from "../services/jobs.js";
 import { storage } from "../services/storage.js";
 import { HttpError } from "../utils/http.js";
 import { parse } from "../utils/validation.js";
+import { buildGlobalBossPromptPreview } from "../services/global-boss-prompt-preview.js";
 
 const maskId = (id: string | null) => id ? `${id.slice(0, 8)}…${id.slice(-4)}` : null;
 const cursor = (value: unknown) => typeof value === "string" && !Number.isNaN(Date.parse(value)) ? value : undefined;
@@ -59,6 +60,25 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     const { prompt } = parse(adminGlobalBossDefaultsSchema, request.body);
     const settings = await store.updateGlobalBossDefaults(prompt);
     await store.recordAdminOperation("GLOBAL_BOSS_DEFAULTS_UPDATE", "SUCCEEDED", { enabled: Boolean(prompt), promptLength: prompt.length });
+    return settings;
+  });
+  app.get("/admin/global-boss/prompt-preview", async (request) => {
+    await requireAdmin(request);
+    const [boss, defaults] = await Promise.all([store.getGlobalBoss(), store.getGlobalBossDefaults()]);
+    return buildGlobalBossPromptPreview(boss, defaults.prompt);
+  });
+  app.get("/admin/translation-examples", async (request) => {
+    await requireAdmin(request);
+    return store.getTranslationExamples();
+  });
+  app.put("/admin/translation-examples", async (request) => {
+    await requireAdminMutation(request);
+    const { examples } = parse(adminTranslationExamplesSchema, request.body);
+    const settings = await store.updateTranslationExamples(examples);
+    await store.recordAdminOperation("TRANSLATION_EXAMPLES_UPDATE", "SUCCEEDED", {
+      exampleCount: examples.length,
+      totalLength: examples.reduce((sum, example) => sum + example.length, 0),
+    });
     return settings;
   });
   app.get("/admin/global-boss", async (request) => {

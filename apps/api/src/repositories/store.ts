@@ -1,5 +1,5 @@
 import type { AdminDashboard, AdminJobSummary, AdminOperation, AdminSessionSummary, HrDashboard } from "../shared.js";
-import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalBossDefaults, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, PersonalBossDefaults, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
+import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalBossDefaults, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, PersonalBossDefaults, SessionRecord, SurveyAnswerRecord, TranslationExamplesSettings, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 
 export interface CreateBossInput {
   alias: string; avatarKey: string; jobFunction: string; yearsOfServiceBand: string; rank: string; companyName: string;
@@ -94,5 +94,7 @@ export interface Store {
   updatePersonalBossDefaults(prompt: string): Promise<PersonalBossDefaults>;
   getGlobalBossDefaults(): Promise<GlobalBossDefaults>;
   updateGlobalBossDefaults(prompt: string): Promise<GlobalBossDefaults>;
+  getTranslationExamples(): Promise<TranslationExamplesSettings>;
+  updateTranslationExamples(examples: TranslationExamplesSettings["examples"]): Promise<TranslationExamplesSettings>;
   recordAdminOperation(type: AdminOperation["type"], status: AdminOperation["status"], detail: AdminOperation["detail"]): Promise<AdminOperation>;
 }

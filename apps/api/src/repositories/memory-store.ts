@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionSummary, type BossPersona, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults } from "../shared.js";
+import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminSessionSummary, type BossPersona, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationExamplesSettings } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
@@ -43,6 +43,7 @@ export class MemoryStore implements Store {
   adminOperations: AdminOperation[] = [];
   personalBossDefaults: PersonalBossDefaults = { prompt: DEFAULT_PERSONAL_BOSS_BASE_PROMPT, updatedAt: new Date().toISOString() };
   globalBossDefaults: GlobalBossDefaults = { prompt: "", updatedAt: null };
+  translationExamples: TranslationExamplesSettings = { examples: [...DEFAULT_TRANSLATION_EXAMPLES], updatedAt: null };
 
   async createSession(tokenHash: string, expiresAt: string) { const now = new Date().toISOString(); const row = { id: randomUUID(), tokenHash, createdAt: now, lastSeenAt: now, expiresAt }; this.sessions.set(tokenHash, row); return row; }
   async findSession(tokenHash: string) { const row = this.sessions.get(tokenHash); return row && Date.parse(row.expiresAt) > Date.now() ? row : null; }
@@ -211,5 +212,7 @@ export class MemoryStore implements Store {
   async updatePersonalBossDefaults(prompt: string) { this.personalBossDefaults = { prompt, updatedAt: new Date().toISOString() }; return structuredClone(this.personalBossDefaults); }
   async getGlobalBossDefaults() { return structuredClone(this.globalBossDefaults); }
   async updateGlobalBossDefaults(prompt: string) { this.globalBossDefaults = { prompt, updatedAt: new Date().toISOString() }; return structuredClone(this.globalBossDefaults); }
+  async getTranslationExamples() { return structuredClone(this.translationExamples); }
+  async updateTranslationExamples(examples: TranslationExamplesSettings["examples"]) { this.translationExamples = { examples: structuredClone(examples), updatedAt: new Date().toISOString() }; return structuredClone(this.translationExamples); }
   async recordAdminOperation(type: AdminOperation["type"], status: AdminOperation["status"], detail: AdminOperation["detail"]) { const row: AdminOperation = { id: randomUUID(), type, status, detail, createdAt: new Date().toISOString() }; this.adminOperations.push(row); return row; }
 }

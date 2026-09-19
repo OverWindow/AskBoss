@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
 import { env } from "../src/config/env";
 import { store } from "../src/repositories";
-import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT } from "@askboss/shared";
+import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES } from "@askboss/shared";
 
 const app = buildApp();
 const origin = "http://localhost:5173";
@@ -153,5 +153,45 @@ describe("admin API", () => {
     const disabled = await app.inject({ method: "PUT", url: "/api/admin/global-boss-defaults", headers: { cookie, origin }, payload: { prompt: "" } });
     expect(disabled.statusCode).toBe(200);
     expect(disabled.json()).toMatchObject({ prompt: "", updatedAt: expect.any(String) });
+  });
+
+  it("validates and publishes exactly three shared translation examples without auditing their text", async () => {
+    const anonymous = await app.inject({ method: "GET", url: "/api/admin/translation-examples" });
+    expect(anonymous.statusCode).toBe(401);
+    const publicAnonymous = await app.inject({ method: "GET", url: "/api/translation-examples" });
+    expect(publicAnonymous.statusCode).toBe(401);
+
+    const login = await app.inject({ method: "POST", url: "/api/admin/login", headers: { origin, "x-forwarded-for": "10.0.0.42" }, payload: { password: env.ADMIN_PASSWORD } });
+    const cookie = String(login.headers["set-cookie"]).split(";")[0]!;
+    const before = await store.getTranslationExamples();
+    const examples = ["일정이 어떻게 되나요?", "제가 확인해 보겠습니다.", "핵심만 다시 정리해 주세요."] as [string, string, string];
+    try {
+      const crossOrigin = await app.inject({ method: "PUT", url: "/api/admin/translation-examples", headers: { cookie, origin: "https://attacker.example" }, payload: { examples } });
+      expect(crossOrigin.statusCode).toBe(403);
+      const tooFew = await app.inject({ method: "PUT", url: "/api/admin/translation-examples", headers: { cookie, origin }, payload: { examples: examples.slice(0, 2) } });
+      expect(tooFew.statusCode).toBe(400);
+      const blank = await app.inject({ method: "PUT", url: "/api/admin/translation-examples", headers: { cookie, origin }, payload: { examples: [examples[0], " ", examples[2]] } });
+      expect(blank.statusCode).toBe(400);
+      const tooLong = await app.inject({ method: "PUT", url: "/api/admin/translation-examples", headers: { cookie, origin }, payload: { examples: ["가".repeat(201), examples[1], examples[2]] } });
+      expect(tooLong.statusCode).toBe(400);
+
+      const updated = await app.inject({ method: "PUT", url: "/api/admin/translation-examples", headers: { cookie, origin }, payload: { examples } });
+      expect(updated.statusCode).toBe(200);
+      expect(updated.json()).toMatchObject({ examples, updatedAt: expect.any(String) });
+
+      const session = await app.inject({ method: "POST", url: "/api/session" });
+      const sessionCookie = String(session.headers["set-cookie"]).split(";")[0]!;
+      const published = await app.inject({ method: "GET", url: "/api/translation-examples", headers: { cookie: sessionCookie } });
+      expect(published.statusCode).toBe(200);
+      expect(published.json()).toEqual({ examples });
+
+      const dashboard = await app.inject({ method: "GET", url: "/api/admin/dashboard", headers: { cookie } });
+      const operation = dashboard.json().recentOperations.find((item: any) => item.type === "TRANSLATION_EXAMPLES_UPDATE");
+      expect(operation.detail).toEqual({ exampleCount: 3, totalLength: examples.reduce((sum, example) => sum + example.length, 0) });
+      expect(JSON.stringify(operation)).not.toContain(examples[0]);
+    } finally {
+      await store.updateTranslationExamples([...before.examples]);
+      expect((await store.getTranslationExamples()).examples).toEqual(before.examples.length ? before.examples : [...DEFAULT_TRANSLATION_EXAMPLES]);
+    }
   });
 });

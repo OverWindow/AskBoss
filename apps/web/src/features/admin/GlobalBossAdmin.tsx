@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Bot, FileText, Image, LogOut, RefreshCw, Save, Settings2, Trash2, Upload } from "lucide-react";
-import { AGE_BANDS, AVATARS, BOSS_RANKS, BOSS_TENURE_BANDS, JOB_FUNCTIONS, type AdminGlobalBossDetail, type Boss, type BossSurveyQuestion, type CompanyResearch, type GlobalBossDefaults } from "@askboss/shared";
+import { AGE_BANDS, AVATARS, BOSS_RANKS, BOSS_TENURE_BANDS, JOB_FUNCTIONS, type AdminGlobalBossDetail, type Boss, type BossSurveyQuestion, type CompanyResearch, type GlobalBossDefaults, type GlobalBossPromptPreview } from "@askboss/shared";
 import { api } from "../../services/api-client";
 import { uploadToSignedUrl } from "../../services/upload-client";
 
@@ -21,6 +21,11 @@ export function GlobalBossAdmin({ onLogout }: Props) {
   const promptSettings = useQuery({
     queryKey: ["admin", "global-boss-defaults"],
     queryFn: () => adminApi<GlobalBossDefaults>("/admin/global-boss-defaults"),
+    retry: 1,
+  });
+  const promptPreview = useQuery({
+    queryKey: ["admin", "global-boss", "prompt-preview"],
+    queryFn: () => adminApi<GlobalBossPromptPreview>("/admin/global-boss/prompt-preview"),
     retry: 1,
   });
   const [boss, setBoss] = useState<Boss | null>(null);
@@ -45,7 +50,7 @@ export function GlobalBossAdmin({ onLogout }: Props) {
     setBusy("save"); setMessage("");
     try {
       const { boss: saved } = await adminApi<{ boss: Boss }>("/admin/global-boss", { method: "PATCH", body: JSON.stringify({ alias: boss.alias, avatarKey: boss.avatarKey, jobFunction: boss.jobFunction, yearsOfServiceBand: boss.yearsOfServiceBand, rank: boss.rank, companyName: boss.companyName, ageBand: boss.ageBand, hierarchyScore: boss.hierarchyScore, companyResearch: boss.companyResearch }) });
-      setBoss(saved); setMessage("모두의 상사 기본 정보를 저장했습니다."); await detail.refetch();
+      setBoss(saved); setMessage("모두의 상사 기본 정보를 저장했습니다."); await Promise.all([detail.refetch(), promptPreview.refetch()]);
     } catch (error) { setMessage(error instanceof Error ? error.message : "저장하지 못했습니다."); }
     finally { setBusy(undefined); }
   };
@@ -53,7 +58,7 @@ export function GlobalBossAdmin({ onLogout }: Props) {
     setBusy("global-prompt"); setMessage("");
     try {
       const saved = await adminApi<GlobalBossDefaults>("/admin/global-boss-defaults", { method: "PUT", body: JSON.stringify({ prompt: globalPrompt }) });
-      setGlobalPrompt(saved.prompt); setMessage(saved.prompt ? "모두의 상사 전용 프롬프트를 저장했습니다." : "모두의 상사 전용 프롬프트를 비활성화했습니다."); await promptSettings.refetch();
+      setGlobalPrompt(saved.prompt); setMessage(saved.prompt ? "모두의 상사 전용 프롬프트를 저장했습니다." : "모두의 상사 전용 프롬프트를 비활성화했습니다."); await Promise.all([promptSettings.refetch(), promptPreview.refetch()]);
     } catch (error) { setMessage(error instanceof Error ? error.message : "전용 프롬프트를 저장하지 못했습니다."); }
     finally { setBusy(undefined); }
   };
@@ -111,7 +116,7 @@ export function GlobalBossAdmin({ onLogout }: Props) {
   };
   const rebuild = async () => {
     setBusy("rebuild"); setMessage("기존 페르소나를 유지한 채 새 버전을 만들고 있습니다…");
-    try { const { jobId } = await adminApi<{ jobId: string }>("/admin/global-boss/persona/rebuild", { method: "POST" }); await waitForJob(jobId); const refreshed = await detail.refetch(); if (refreshed.data?.boss) setBoss(refreshed.data.boss); setMessage("새 페르소나를 사용자에게 반영했습니다."); }
+    try { const { jobId } = await adminApi<{ jobId: string }>("/admin/global-boss/persona/rebuild", { method: "POST" }); await waitForJob(jobId); const [refreshed] = await Promise.all([detail.refetch(), promptPreview.refetch()]); if (refreshed.data?.boss) setBoss(refreshed.data.boss); setMessage("새 페르소나를 사용자에게 반영했습니다."); }
     catch (error) { setMessage(error instanceof Error ? error.message : "페르소나를 재생성하지 못했습니다."); }
     finally { setBusy(undefined); }
   };
@@ -147,6 +152,10 @@ export function GlobalBossAdmin({ onLogout }: Props) {
         <p className="hint">저장 즉시 새 대화·번역·시뮬레이션·혼잣말에 적용됩니다. 현재 페르소나는 다음 재생성 때 갱신됩니다.</p>
         <div className="admin-form-actions"><button className="primary-button" type="button" disabled={promptSettings.isLoading || Boolean(busy)} onClick={() => void saveGlobalPrompt()}>{busy === "global-prompt" ? "저장 중…" : "전용 프롬프트 저장"}</button></div>
       </div>}
+      <div className="admin-prompt-preview">
+        <div className="admin-prompt-preview-title"><div><h3>AI 전달 프롬프트 원문</h3><p className="hint">저장된 실사용 설정과 페르소나에 관리자 미리보기용 가상 프로필·대화·질문을 결합합니다. 실제 사용자 데이터는 포함하지 않습니다.</p></div><button className="small-button" type="button" disabled={promptPreview.isFetching} onClick={() => void promptPreview.refetch()}><RefreshCw size={14}/>{promptPreview.isFetching ? "갱신 중…" : "새로고침"}</button></div>
+        {promptPreview.isError ? <div className="admin-inline-error"><span>프롬프트 원문을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void promptPreview.refetch()}>다시 시도</button></div> : promptPreview.isLoading ? <p className="hint">프롬프트 원문을 조립하는 중입니다.</p> : promptPreview.data?.messages.map((promptMessage) => <div className="admin-prompt-raw" key={promptMessage.role}><strong>{promptMessage.role}</strong><pre>{promptMessage.content}</pre></div>)}
+      </div>
     </section>
 
     <section className="admin-section"><div className="admin-section-title"><FileText/><div><h2>관찰 자료</h2><p>카톡 대화 붙여넣기와 TXT·이미지 자료를 영구 보관합니다.</p></div></div>

@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AdminPage } from "./AdminPage";
 import { api } from "../services/api-client";
 
@@ -13,6 +13,7 @@ function renderAdmin(client: QueryClient, entry = "/admin") {
 }
 
 describe("AdminPage", () => {
+  afterEach(() => cleanup());
   beforeEach(() => {
     mockedApi.mockReset();
     let authenticated = false;
@@ -52,6 +53,7 @@ describe("AdminPage", () => {
       if (path === "/admin/global-boss") return { boss: { id: "00000000-0000-4000-8000-000000000001", scope: "GLOBAL", status: "READY", alias: "모두의 상사", avatarKey: "boss-male-01", jobFunction: null, yearsOfServiceBand: null, rank: "팀장", companyName: null, ageBand: 40, hierarchyScore: 55, companyResearch: null, persona: null, pki: null, personaVersion: 1 }, evidence: [], surveyAnswers: [] } as any;
       if (path === "/admin/global-boss-defaults" && options.method === "PUT") { prompt = JSON.parse(String(options.body)).prompt; return { prompt, updatedAt: "2026-09-19T11:00:00Z" } as any; }
       if (path === "/admin/global-boss-defaults") return { prompt, updatedAt: null } as any;
+      if (path === "/admin/global-boss/prompt-preview") return { messages: [{ role: "system", content: "SYSTEM 원문" }, { role: "user", content: "가상 사용자 질문 원문" }], usesMockUserData: true } as any;
       return {} as any;
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -63,6 +65,31 @@ describe("AdminPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "전용 프롬프트 저장" }));
     expect(await screen.findByText("모두의 상사 전용 프롬프트를 저장했습니다.")).toBeInTheDocument();
     expect(prompt).toBe("결론과 책임을 먼저 확인한다.");
+    expect(screen.getByText("SYSTEM 원문")).toBeInTheDocument();
+    expect(screen.getByText("가상 사용자 질문 원문")).toBeInTheDocument();
+    expect(screen.getByText(/실제 사용자 데이터는 포함하지 않습니다/)).toBeInTheDocument();
+  });
+
+  it("edits the three translation examples as one shared setting", async () => {
+    let examples = ["기존 예시 1", "기존 예시 2", "기존 예시 3"];
+    mockedApi.mockImplementation(async (path: string, options: RequestInit = {}) => {
+      if (path === "/admin/auth") return { authenticated: true, expiresAt: "2026-09-19T10:00:00Z" } as any;
+      if (path === "/admin/dashboard") return { generatedAt: new Date().toISOString(), sessions: { total: 0, active15m: 0, new24h: 0, expiring1h: 0 }, usage: { personalBosses: 0, chatMessages24h: 0, translations24h: 0 }, jobs: { pending: 0, running: 0, failed: 0, oldestPendingMinutes: null, failureReasons: [] }, uploads: { expiredIncomplete: 0 }, featureUsage: [], recentOperations: [] } as any;
+      if (path === "/admin/credits") return { available: false, checkedAt: new Date().toISOString(), latencyMs: 0, models: { ok: false, available: [], missing: [], mode: "demo" }, monthly: null, purchased: null, total: null } as any;
+      if (path === "/admin/sessions" || path === "/admin/jobs") return { items: [] } as any;
+      if (path === "/admin/personal-boss-defaults") return { prompt: "", updatedAt: null } as any;
+      if (path === "/admin/translation-examples" && options.method === "PUT") { examples = JSON.parse(String(options.body)).examples; return { examples, updatedAt: "2026-09-19T12:00:00Z" } as any; }
+      if (path === "/admin/translation-examples") return { examples, updatedAt: null } as any;
+      return {} as any;
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderAdmin(client);
+    const first = await screen.findByLabelText("예시 문장 1");
+    await waitFor(() => expect(first).toHaveValue("기존 예시 1"));
+    fireEvent.change(first, { target: { value: "새 예시 문장" } });
+    fireEvent.click(screen.getByRole("button", { name: "예시 문장 저장" }));
+    expect(await screen.findByText("번역 예시 문장을 저장했습니다.")).toBeInTheDocument();
+    expect(examples).toEqual(["새 예시 문장", "기존 예시 2", "기존 예시 3"]);
   });
 
   it("shows a recoverable error when the global boss detail cannot be loaded", async () => {
