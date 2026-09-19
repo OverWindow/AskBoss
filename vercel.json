@@ -3,13 +3,11 @@
   "buildCommand": "pnpm --filter @askboss/web build",
   "outputDirectory": "apps/web/dist",
   "functions": {
-    "api/[...path].ts": { "maxDuration": 60 }
+    "api/entry.ts": { "maxDuration": 60 }
   },
   "rewrites": [
-    { "source": "/boss/:path*", "destination": "/index.html" },
-    { "source": "/hr-demo", "destination": "/index.html" },
-    { "source": "/settings", "destination": "/index.html" },
-    { "source": "/admin", "destination": "/index.html" },
-    { "source": "/admin/:path*", "destination": "/index.html" }
-  ] 
+    { "source": "/api/:path*", "destination": "/api/entry?_vercel_api_path=:path*" },
+    { "source": "/api", "destination": "/api/entry?_vercel_api_path=" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

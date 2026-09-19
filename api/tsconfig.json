@@ -5,7 +5,7 @@
     "moduleResolution": "NodeNext"
   },
   "include": [
-    "./[...path].ts",
+    "./entry.ts",
     "../apps/api/src/**/*.ts",
     "../packages/shared/src/**/*.ts"
   ]
