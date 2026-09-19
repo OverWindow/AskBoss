@@ -36,7 +36,6 @@ export function HrDashboard({ dataset }: { dataset: "actual" | "mock" }) {
         <div>
           <h2>조직 커뮤니케이션 인사이트</h2>
         </div>
-        {!isMock && <span className="demo-badge">실제 익명 집계</span>}
       </header>
 
       {d.overview.summary && <p className="hr-summary">{d.overview.summary}</p>}
@@ -166,16 +165,17 @@ function TopicCloud({ words, colorful }: { words: { text: string; value: number 
         >
           {(cloudWords) =>
             cloudWords.map((word, index) => (
-              <Text
-                key={word.text}
-                fill={colorful ? MOCK_COLORS[index % MOCK_COLORS.length] : "#375DF3"}
-                textAnchor="middle"
-                transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
-                fontSize={word.size}
-                fontFamily={word.font}
-              >
-                {word.text}
-              </Text>
+              <g key={word.text} transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}>
+                <Text
+                  className="word-cloud-word"
+                  fill={colorful ? MOCK_COLORS[index % MOCK_COLORS.length] : "#375DF3"}
+                  textAnchor="middle"
+                  fontSize={word.size}
+                  fontFamily={word.font}
+                >
+                  {word.text}
+                </Text>
+              </g>
             ))
           }
         </Wordcloud>

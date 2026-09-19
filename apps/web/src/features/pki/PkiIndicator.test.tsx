@@ -19,8 +19,10 @@ describe("PkiIndicator", () => {
     expect(info).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(info);
     expect(info).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("정보 충족도 · 35%")).toBeInTheDocument();
-    expect(screen.getByText("최신성 · 15%")).toBeInTheDocument();
+    expect(screen.getByText("정보 충족도")).toBeInTheDocument();
+    expect(screen.getByText("55점")).toBeInTheDocument();
+    expect(screen.getByText("최신성")).toBeInTheDocument();
+    expect(screen.getByText("68점")).toBeInTheDocument();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("dialog", { name: "상사 파악도 산정 방식" })).not.toBeInTheDocument();
   });

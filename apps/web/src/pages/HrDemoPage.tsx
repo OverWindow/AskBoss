@@ -47,6 +47,7 @@ export function HrDemoPage() {
       <div className="hr-dataset-tabs" role="tablist" aria-label="HR 데이터 선택">
         <button type="button" role="tab" aria-selected={dataset === "actual"} className={dataset === "actual" ? "is-active" : ""} onClick={() => setDataset("actual")}>실제 익명 집계</button>
         <button type="button" role="tab" aria-selected={dataset === "mock"} className={dataset === "mock" ? "is-active" : ""} onClick={() => setDataset("mock")}>가상 데모</button>
+        <span className={`hr-dataset-tab-indicator${dataset === "mock" ? " is-mock" : ""}`} aria-hidden="true"/>
       </div>
       <HrDashboard dataset={dataset}/>
     </div>

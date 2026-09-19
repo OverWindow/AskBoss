@@ -247,7 +247,7 @@ export class PostgresStore implements Store {
     return {
       dataSource: "ACTUAL",
       includesDemo: false,
-      overview: { totalUses: total?.value??0, activeSubjects: total?.subjects??0, topFeature: feature?.feature??"-", summary: total?.value ? "최근 31일간의 실제 익명 집계이며 소표본도 그대로 포함됩니다." : "아직 집계된 실제 사용자 데이터가 없습니다." },
+      overview: { totalUses: total?.value??0, activeSubjects: total?.subjects??0, topFeature: feature?.feature??"-", summary: total?.value ? "" : "아직 집계된 실제 사용자 데이터가 없습니다." },
       topics: topics.map((r: any) => ({ text: r.text, value: r.value })),
       rankGap: rank.map((r: any) => ({ label: r.label, value: r.value })),
       ageGap: age.map((r: any) => ({ label: r.label, value: r.value })),

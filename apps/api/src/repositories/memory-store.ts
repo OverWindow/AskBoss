@@ -200,7 +200,7 @@ export class MemoryStore implements Store {
       const topicCounts=actualAnalytics.reduce((map,row)=>{for(const topic of row.topicKeywords??[])map.set(topic,(map.get(topic)??0)+1);return map;},new Map<string,number>());
       const featureCounts=actualAnalytics.reduce((map,row)=>map.set(row.feature,(map.get(row.feature)??0)+1),new Map<string,number>());
       const topFeature=[...featureCounts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0]?.[0]??"-";
-      return {dataSource:"ACTUAL",includesDemo:false,overview:{totalUses:actualAnalytics.length,activeSubjects:new Set(actualAnalytics.map(row=>row.subjectHash)).size,topFeature,summary:"최근 31일간의 실제 익명 집계이며 소표본도 그대로 포함됩니다."},topics:[...topicCounts].map(([text,value])=>({text,value})).sort((a,b)=>b.value-a.value).slice(0,30),rankGap:group("rankGapBucket"),ageGap:group("ageGapBucket"),sameJobFunctionDistribution,surfaceActualGapRate:null,topRepeatedPhrases};
+      return {dataSource:"ACTUAL",includesDemo:false,overview:{totalUses:actualAnalytics.length,activeSubjects:new Set(actualAnalytics.map(row=>row.subjectHash)).size,topFeature,summary:actualAnalytics.length?"":"아직 집계된 실제 사용자 데이터가 없습니다."},topics:[...topicCounts].map(([text,value])=>({text,value})).sort((a,b)=>b.value-a.value).slice(0,30),rankGap:group("rankGapBucket"),ageGap:group("ageGapBucket"),sameJobFunctionDistribution,surfaceActualGapRate:null,topRepeatedPhrases};
     }
     return {
       dataSource: "ACTUAL",
