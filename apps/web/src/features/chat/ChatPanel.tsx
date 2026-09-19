@@ -54,7 +54,6 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
   const loadingOlderRef = useRef(false);
   const olderRequestController = useRef<AbortController | undefined>(undefined);
   const preserveScrollRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
-  const skipBottomScrollRef = useRef(false);
   const activeBossIdRef = useRef(boss.id);
   const activeThreadIdRef = useRef<string | undefined>(undefined);
   activeBossIdRef.current = boss.id;
@@ -80,26 +79,17 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
     if (active) window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   }, [active]);
 
-  useEffect(() => {
-    if (!active) return;
-    if (skipBottomScrollRef.current) {
-      skipBottomScrollRef.current = false;
+  useLayoutEffect(() => {
+    const chatList = chatListRef.current;
+    if (!chatList) return;
+    const snapshot = preserveScrollRef.current;
+    if (snapshot) {
+      chatList.scrollTop = snapshot.scrollTop + (chatList.scrollHeight - snapshot.scrollHeight);
+      preserveScrollRef.current = null;
       return;
     }
-    const frame = window.requestAnimationFrame(() => {
-      const chatList = chatListRef.current;
-      if (chatList) chatList.scrollTop = chatList.scrollHeight;
-    });
-    return () => window.cancelAnimationFrame(frame);
+    if (active) chatList.scrollTop = chatList.scrollHeight;
   }, [messages, active, simulationLoading, actualMessage]);
-
-  useLayoutEffect(() => {
-    const snapshot = preserveScrollRef.current;
-    const chatList = chatListRef.current;
-    if (!snapshot || !chatList) return;
-    chatList.scrollTop = snapshot.scrollTop + (chatList.scrollHeight - snapshot.scrollHeight);
-    preserveScrollRef.current = null;
-  }, [messages]);
 
   useEffect(() => {
     requestController.current?.abort();
@@ -109,7 +99,6 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
     simulationStarted.current = false;
     loadingOlderRef.current = false;
     preserveScrollRef.current = null;
-    skipBottomScrollRef.current = false;
     setMessages([]);
     setThreadId(undefined);
     setArchiveId(undefined);
@@ -155,7 +144,6 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
       const page = await api<ChatHistoryPage>(`/bosses/${boss.id}/chat?cursor=${encodeURIComponent(nextCursor)}&limit=50`, { signal: controller.signal });
       if (controller.signal.aborted || activeBossIdRef.current !== requestedBossId || activeThreadIdRef.current !== requestedThreadId || page.threadId !== requestedThreadId) return;
       preserveScrollRef.current = snapshot;
-      skipBottomScrollRef.current = true;
       setMessages((current) => {
         const existingIds = new Set(current.map((message) => message.id));
         return [...page.messages.filter((message) => !existingIds.has(message.id)), ...current];

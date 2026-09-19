@@ -5,9 +5,6 @@
   "functions": {
     "api/entry.ts": { "maxDuration": 180 }
   },
-  "crons": [
-    { "path": "/api/internal/jobs/run", "schedule": "* * * * *" }
-  ],
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/entry?_vercel_api_path=:path*" },
     { "source": "/api", "destination": "/api/entry?_vercel_api_path=" },

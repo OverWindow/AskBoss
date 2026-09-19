@@ -216,7 +216,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     const result = await store.listAdminJobs(status?.data, cursor(query.cursor), 20);
     return result;
   });
-  app.get("/admin/jobs/:id",async(request)=>{await requireAdmin(request);const {id}=parse(idParamSchema,request.params);const job=await store.getJobById(id);if(!job)throw new HttpError(404,"Job을 찾을 수 없습니다.");return {job:{id:job.id,type:job.type,status:job.status,attempts:job.attempts,maxAttempts:job.maxAttempts,errorMessage:job.errorMessage,result:job.result,createdAt:job.createdAt,updatedAt:job.updatedAt}};});
+  app.get("/admin/jobs/:id",async(request)=>{await requireAdmin(request);const {id}=parse(idParamSchema,request.params);const job=await store.getJobById(id);if(!job)throw new HttpError(404,"Job을 찾을 수 없습니다.");jobs.resume(job);return {job:{id:job.id,type:job.type,status:job.status,attempts:job.attempts,maxAttempts:job.maxAttempts,errorMessage:job.errorMessage,result:job.result,createdAt:job.createdAt,updatedAt:job.updatedAt}};});
 
   app.post("/admin/jobs/:id/retry", async (request, reply) => {
     assertAdminOrigin(request); await requireAdmin(request);

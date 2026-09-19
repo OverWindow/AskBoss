@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app";
 import { env } from "../src/config/env";
 import { store } from "../src/repositories";
@@ -8,6 +8,45 @@ const app = buildApp();
 afterAll(() => app.close());
 
 describe("expired AI job recovery", () => {
+  it("reclaims an expired job when its owner polls without a cron runner", async () => {
+    const browserSession = await app.inject({ method: "POST", url: "/api/session" });
+    const cookie = String(browserSession.headers["set-cookie"]).split(";")[0]!;
+    const session = browserSession.json().session;
+    const boss = await store.createBoss(session.id, {
+      alias: "폴링 복구 상사",
+      avatarKey: "boss-male-01",
+      jobFunction: "개발",
+      yearsOfServiceBand: "10~14년",
+      rank: "팀장",
+      companyName: "테스트 회사",
+      ageBand: 40,
+      hierarchyScore: 60,
+    }, session.expiresAt);
+    const evidence = await store.createEvidence({
+      sessionId: session.id,
+      bossId: boss.id,
+      type: "TEXT",
+      status: "PENDING",
+      rawText: "진행 상황과 완료 시각을 함께 확인한다.",
+      storagePath: null,
+      parsedData: null,
+      observedAt: null,
+      expiresAt: session.expiresAt,
+      errorMessage: null,
+      sourceArchiveId: null,
+    });
+    const job = await store.createJob({ sessionId: session.id, bossId: boss.id, type: "EVIDENCE_EXTRACT", payload: { evidenceId: evidence.id } });
+    const claimed = await store.claimJob(job.id);
+    if (claimed) claimed.leaseUntil = new Date(Date.now() - 1_000).toISOString();
+
+    const polled = await app.inject({ method: "GET", url: `/api/jobs/${job.id}`, headers: { cookie } });
+    expect(polled.statusCode).toBe(200);
+    await vi.waitFor(async () => expect(await store.getJobById(job.id)).toMatchObject({ status: "SUCCEEDED", attempts: 2, leaseUntil: null }));
+    expect(await store.getEvidence(session.id, evidence.id)).toMatchObject({ status: "READY" });
+
+    await store.deleteSession(session.id);
+  });
+
   it("requires the cron secret and reclaims an expired running job", async () => {
     env.CRON_SECRET = "test-cron-secret";
     const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
