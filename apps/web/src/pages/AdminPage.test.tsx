@@ -22,6 +22,7 @@ describe("AdminPage", () => {
       if (path === "/admin/login") { authenticated = true; return { authenticated: true } as any; }
       if (path === "/admin/dashboard") return { generatedAt: new Date().toISOString(), sessions: { total: 2, active15m: 1, new24h: 2, expiring1h: 0 }, usage: { personalBosses: 1, chatMessages24h: 3, translations24h: 1 }, jobs: { pending: 0, running: 0, failed: 0, oldestPendingMinutes: null, failureReasons: [] }, uploads: { expiredIncomplete: 0 }, featureUsage: [], recentOperations: [] } as any;
       if (path === "/admin/credits") return { available: true, checkedAt: new Date().toISOString(), latencyMs: 20, models: { ok: true, available: ["gpt-5.6-luna"], missing: [], mode: "live" }, monthly: { quota: 100, used: 20, remaining: 80 }, purchased: { quota: 0, used: 0, remaining: 0 }, total: { quota: 100, used: 20, remaining: 80 } } as any;
+      if (path === "/admin/personal-boss-defaults") return { prompt: "", updatedAt: null } as any;
       if (path.startsWith("/admin/sessions?")) return { items: [], page: 1, pageSize: 20, total: 0, totalPages: 0 } as any;
       if (path === "/admin/jobs") return { items: [] } as any;
       return {} as any;
@@ -36,6 +37,8 @@ describe("AdminPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "로그인" }));
     await waitFor(() => expect(screen.getByRole("heading", { name: "운영 관리자" })).toBeInTheDocument());
     expect(screen.getByText("AI 상태와 크레딧")).toBeInTheDocument();
+    expect(await screen.findByLabelText("개인 상사 공통 시스템 프롬프트")).toHaveAttribute("maxLength", "10000");
+    expect(screen.getByText("0 / 10,000자")).toBeInTheDocument();
   });
 
   it("shows recent sessions in fixed 20-item pages and moves without mixing rows", async () => {
@@ -216,7 +219,7 @@ describe("AdminPage", () => {
         profile: { handle: "실사용자", ageBand: 30, yearsOfServiceBand: "3~4년", rank: "대리", jobFunction: "개발", entryPath: "신입", weaknesses: ["보고가 김"] },
         boss: { id: bossId, scope: "SESSION", status: "READY", alias: "김팀장", avatarKey: "boss-male-01", jobFunction: "개발", yearsOfServiceBand: "10~14년", rank: "팀장", companyName: "테스트 회사", ageBand: 40, hierarchyScore: 70, companyResearch: null, persona: { summary: "결론 우선형", communication: { tone: "간결", messageLength: "짧음", directness: 70, formality: 60 }, reporting: { preferredLength: "짧게", preferredStructure: [], frequentChecks: [] }, decisionMaking: { speed: "빠름", riskTolerance: "낮음", autonomyPreference: "중간" }, management: { hierarchyPreference: "중간", feedbackStyle: "직접적", deadlineSensitivity: "높음" }, recurringPatterns: [], recurringPhrases: [], humorStyle: null, uncertainty: [], traits: [] }, pki: null, personaVersion: 3 },
         personaGeneration: { messages: [{ role: "system", content: "생성 SYSTEM 원문" }, { role: "user", content: "생성 USER 원문" }], sources: [{ role: "user", component: "사용자 프로필", origin: "사용자 저장 프로필", description: "실제 프로필", containsPersonalData: true }], evidenceCount: 2, surveyAnswerCount: 1 },
-        chat: { status: "AVAILABLE", messages: [{ role: "system", content: "대화 SYSTEM 원문" }, { role: "user", content: "대화 USER 원문" }], sources: [{ role: "user", component: "최근 대화 이력", origin: "현재 활성 대화", description: "최근 19개", containsPersonalData: true }], lastQuestionAt: "2026-09-19T09:00:00Z", historyMessageCount: 7, includedMessageCount: 8, totalMessageCount: 8 },
+        chat: { status: "AVAILABLE", messages: [{ role: "system", content: "대화 SYSTEM 원문" }, { role: "user", content: "대화 USER 원문" }], sources: [{ role: "user", component: "최근 대화 이력", origin: "현재 활성 대화", description: "최근 49개", containsPersonalData: true }], lastQuestionAt: "2026-09-19T09:00:00Z", historyMessageCount: 7, includedMessageCount: 8, totalMessageCount: 8 },
       } as any;
       return {} as any;
     });
@@ -234,7 +237,8 @@ describe("AdminPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "상사 대화" }));
     expect(await screen.findByText("대화 SYSTEM 원문")).toBeInTheDocument();
     expect(screen.getByText("대화 USER 원문")).toBeInTheDocument();
-    expect(screen.getByText("최근 19개")).toBeInTheDocument();
+    expect(screen.getByText("최근 49개")).toBeInTheDocument();
+    expect(screen.getByText(/현재 질문을 포함해 최대 50개/)).toBeInTheDocument();
   });
 
   it("shows a recoverable error when the global boss detail cannot be loaded", async () => {

@@ -21,6 +21,8 @@ function TutorialTargets() {
   return <>
     <button data-tutorial="global-boss">모두의 상사</button>
     <button data-tutorial="add-boss">상사 추가</button>
+    <button data-tutorial="archive">아카이브</button>
+    <button data-tutorial="hr-demo">HR Demo</button>
     <button data-tutorial="chat">대화</button>
     <button data-tutorial="translate">번역</button>
     <button data-tutorial="pki">상사 파악도</button>
@@ -80,6 +82,10 @@ describe("Tutorial", () => {
     expect(await screen.findByText(/여기서 대화할 상사를 선택/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
     expect(screen.getByText(/실제 상사를 등록/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    expect(screen.getByText(/실제 상사 답변은 아카이브에서/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    expect(screen.getByText(/실제 익명 집계와 가상 데이터/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "건너뛰기" }));
     expect(localStorage.getItem(TUTORIAL_STORAGE_KEY)).toBe("true");
   });
@@ -95,6 +101,12 @@ describe("Tutorial", () => {
     await waitFor(() => expect(useUiStore.getState().mobileNavOpen).toBe(true));
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
     expect(useUiStore.getState().mobileNavOpen).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    expect(useUiStore.getState().mobileNavOpen).toBe(true);
+    expect(screen.getByText(/실제 상사 답변은 아카이브에서/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    expect(useUiStore.getState().mobileNavOpen).toBe(true);
+    expect(screen.getByText(/실제 익명 집계와 가상 데이터/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
     await waitFor(() => expect(useUiStore.getState().mobileNavOpen).toBe(false));
     expect(useUiStore.getState()).toMatchObject({ activeWorkspaceTab: "translator", mobilePanelExpanded: true });

@@ -34,7 +34,7 @@ describe("TranslatorPanel", () => {
     let finish: ((value: unknown) => void) | undefined;
     mockedApi.mockImplementation(() => new Promise((resolve) => { finish = resolve; }) as any);
     render(<TranslatorPanel boss={boss} active examples={examples} onSourceMessage={() => undefined} onSimulate={() => undefined}/>);
-    fireEvent.change(screen.getByLabelText("어떤 상황인가요?"), { target: { value: "메일" } });
+    fireEvent.change(screen.getByLabelText("전달 수단은 무엇인가요?"), { target: { value: "메일" } });
     fireEvent.click(screen.getByRole("button", { name: "한번 검토해 볼게요." }));
     fireEvent.click(screen.getByRole("button", { name: "해석하기" }));
     expect(screen.getByRole("button", { name: "이 정도는 알아서 해주세요." })).toBeDisabled();

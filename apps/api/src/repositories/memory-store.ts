@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminPersonalBossPage, type AdminSessionPage, type AdminSessionSummary, type BossPersona, type ChatMessageCoaching, type ChatMessageKind, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationArchiveDetail, type TranslationExamplesSettings } from "../shared.js";
+import { CHAT_CONTEXT_HISTORY_MESSAGE_LIMIT, DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminDashboard, type AdminJobSummary, type AdminOperation, type AdminPersonalBossPage, type AdminSessionPage, type AdminSessionSummary, type BossPersona, type ChatMessageCoaching, type ChatMessageKind, type GlobalBossDefaults, type HrDashboard, type PersonalBossDefaults, type TranslationArchiveDetail, type TranslationExamplesSettings } from "../shared.js";
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationArchiveRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
-import type { AdminPersonalBossPromptContext, ChatMessageCoachingContext, CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
+import { PERSONA_REFRESH_COOLDOWN_MS, type AdminPersonalBossPromptContext, type ChatMessageCoachingContext, type CreateBossInput, type CreatePersonaRefreshJobResult, type PersonaRefreshState, type Store, type UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 import { computeRepeatedSimulationTypes } from "../utils/hr-aggregation.js";
 import { buildActualResponseEvidence } from "../utils/actual-response.js";
@@ -147,6 +147,29 @@ export class MemoryStore implements Store {
   async upsertGlobalSurveyAnswers(answers: SurveyAnswerRecord[]) { for (const answer of answers) this.globalSurveys.set(answer.questionId, structuredClone(answer)); }
   async listGlobalSurveyAnswers() { return [...this.globalSurveys.values()]; }
   async createJob(input: Pick<JobRecord, "sessionId" | "bossId" | "type" | "payload">) { const now = new Date().toISOString(); const row: JobRecord = { ...input, id: randomUUID(), status: "PENDING", result: null, errorMessage: null, attempts: 0, maxAttempts: 3, leaseUntil: null, retryOf: null, createdAt: now, updatedAt: now }; this.jobs.set(row.id, row); return row; }
+  async getPersonaRefreshState(sessionId: string, bossId: string): Promise<PersonaRefreshState> {
+    const rows = [...this.jobs.values()]
+      .filter((job) => job.sessionId === sessionId && job.bossId === bossId && job.type === "PERSONA_REBUILD" && job.payload?.reason === "PKI_REFRESH")
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+    const latest = rows[0] ?? null;
+    const active = rows.find((job) => job.status === "PENDING" || job.status === "RUNNING") ?? null;
+    const availableAt = latest ? new Date(Date.parse(latest.createdAt) + PERSONA_REFRESH_COOLDOWN_MS).toISOString() : null;
+    const retryAfterSeconds = availableAt ? Math.max(0, Math.ceil((Date.parse(availableAt) - Date.now()) / 1_000)) : 0;
+    return { availableAt, retryAfterSeconds, inProgress: Boolean(active), jobId: active?.id ?? null };
+  }
+  async createPersonaRefreshJob(sessionId: string, bossId: string): Promise<CreatePersonaRefreshJobResult> {
+    const boss = await this.getBoss(sessionId, bossId);
+    if (!boss || boss.scope !== "SESSION") throw new Error("상사를 찾을 수 없습니다.");
+    const refresh = await this.getPersonaRefreshState(sessionId, bossId);
+    if (refresh.inProgress) return { status: "IN_PROGRESS", job: null, refresh };
+    if (refresh.retryAfterSeconds > 0) return { status: "COOLDOWN", job: null, refresh };
+    const job = await this.createJob({ sessionId, bossId, type: "PERSONA_REBUILD", payload: { reason: "PKI_REFRESH" } });
+    return {
+      status: "CREATED",
+      job,
+      refresh: { availableAt: new Date(Date.parse(job.createdAt) + PERSONA_REFRESH_COOLDOWN_MS).toISOString(), retryAfterSeconds: PERSONA_REFRESH_COOLDOWN_MS / 1_000, inProgress: true, jobId: job.id },
+    };
+  }
   async getJob(sessionId: string, id: string) { const row = this.jobs.get(id); return row?.sessionId === sessionId ? row : null; }
   async getJobById(id: string) { return this.jobs.get(id) ?? null; }
   async claimJob(id: string) { const row = this.jobs.get(id); if (!row || !(["PENDING", "RUNNING"].includes(row.status)) || (row.status === "RUNNING" && row.leaseUntil && Date.parse(row.leaseUntil) > Date.now())) return null; row.status = "RUNNING"; row.attempts += 1; row.leaseUntil = new Date(Date.now() + 90_000).toISOString(); row.updatedAt = new Date().toISOString(); return row; }
@@ -167,7 +190,7 @@ export class MemoryStore implements Store {
     if (index < 0) return null;
     return {
       conversationSummary: thread.conversationSummary,
-      previousMessages: structuredClone(thread.messages.slice(Math.max(0, index - 19), index)),
+      previousMessages: structuredClone(thread.messages.slice(Math.max(0, index - CHAT_CONTEXT_HISTORY_MESSAGE_LIMIT), index)),
       message: structuredClone(thread.messages[index]!),
     };
   }
@@ -327,7 +350,7 @@ export class MemoryStore implements Store {
     }
     const thread = activeThread && latestQuestionIndex >= 0 ? {
       conversationSummary: activeThread.conversationSummary,
-      previousMessages: structuredClone(activeThread.messages.slice(Math.max(0, latestQuestionIndex - 19), latestQuestionIndex)),
+      previousMessages: structuredClone(activeThread.messages.slice(Math.max(0, latestQuestionIndex - CHAT_CONTEXT_HISTORY_MESSAGE_LIMIT), latestQuestionIndex)),
       latestQuestion: structuredClone(activeThread.messages[latestQuestionIndex]!),
     } : null;
     return { boss: structuredClone(boss), profile: structuredClone(this.profiles.get(boss.sessionId) ?? null), sessionId: boss.sessionId, chatMessageCount: activeThread?.messages.length ?? 0, thread };

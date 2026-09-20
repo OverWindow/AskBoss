@@ -74,11 +74,16 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     const { id } = parse(idParamSchema, request.params);
     const context = await store.getAdminPersonalBossPromptContext(id);
     if (!context) throw new HttpError(404, "개인 상사를 찾을 수 없습니다.", "BOSS_NOT_FOUND");
-    const [evidence, survey, promptContext, prompts] = await Promise.all([
-      store.listEvidence(context.sessionId, context.boss.id),
-      store.listSurveyAnswers(context.sessionId, context.boss.id),
+    // Keep concurrent database work below the store's five-connection pool.
+    // getBossPromptContext performs two reads of its own, so combining every
+    // dependency in one Promise.all can exhaust the pool during cold starts.
+    const [promptContext, prompts] = await Promise.all([
       getBossPromptContext(context.boss, context.sessionId),
       store.getAiPromptSettings(),
+    ]);
+    const [evidence, survey] = await Promise.all([
+      store.listEvidence(context.sessionId, context.boss.id),
+      store.listSurveyAnswers(context.sessionId, context.boss.id),
     ]);
     if (!promptContext.globalBoss) throw new HttpError(500, "모두의 상사 프롬프트 기반을 찾을 수 없습니다.", "PROMPT_CONTEXT_MISSING");
     const preview = buildPersonalBossPromptPreview({

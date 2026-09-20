@@ -23,6 +23,28 @@ async function sendMessage(cookie: string, message: string) {
 }
 
 describe("chat message coaching", () => {
+  it("uses the latest 49 messages before the reviewed message", async () => {
+    const session = await app.inject({ method: "POST", url: "/api/session" });
+    const sessionId = session.json().session.id as string;
+    const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
+    const thread = await store.getOrCreateThread(sessionId, globalBossId, undefined, new Date(Date.now() + 86_400_000).toISOString());
+    for (let index = 1; index <= 55; index += 1) await store.addChatMessage(thread.id, index % 2 ? "user" : "assistant", `이전 메시지 ${index}`);
+    const target = await store.addChatMessage(thread.id, "user", "검토 대상 메시지");
+    const review = vi.spyOn(ai, "reviewUserMessage").mockResolvedValue({ shouldSuggest: false, reason: null, revisedText: null });
+
+    try {
+      const response = await app.inject({ method: "POST", url: `/api/bosses/${globalBossId}/chat/messages/${target.id}/coaching`, headers: { cookie } });
+      expect(response.statusCode).toBe(200);
+      const input = review.mock.calls[0]?.[0] as any;
+      expect(input.messages).toHaveLength(49);
+      expect(input.messages[0].content).toBe("이전 메시지 7");
+      expect(input.messages.at(-1).content).toBe("이전 메시지 55");
+      expect(input.message).toBe("검토 대상 메시지");
+    } finally {
+      await store.deleteSession(sessionId);
+    }
+  });
+
   it("stores a structured suggestion and reuses it without another AI call", async () => {
     const cookie = await createSession();
     const message = await sendMessage(cookie, "몰라요. 그냥 알아서 하세요.");

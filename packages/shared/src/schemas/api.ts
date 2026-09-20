@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AGE_BANDS, ALLOWED_MIME_TYPES, AVATARS, CHANNELS, DEFAULT_CHAT_COACHING_PROMPT_INSTRUCTION, ENTRY_PATHS } from "../constants/options.js";
+import { AGE_BANDS, ALLOWED_MIME_TYPES, AVATARS, CHANNELS, DEFAULT_CHAT_COACHING_PROMPT_INSTRUCTION, ENTRY_PATHS, PERSONAL_BOSS_BASE_PROMPT_MAX_CHARS } from "../constants/options.js";
 import { companyResearchSchema } from "./ai.js";
 
 export const handleSchema = z.string()
@@ -51,7 +51,7 @@ export const feedbackSchema = z.object({ feedback: z.enum(["GOOD", "BAD"]) });
 export const surveyAnswerSchema = z.object({ questionId: z.string(), questionSnapshot: z.record(z.string(), z.unknown()), selectedOption: z.string().nullable(), freeText: z.string().max(2_000).nullable() });
 export const surveyAnswersSchema = z.object({ answers: z.array(surveyAnswerSchema).min(1).max(10) });
 export const adminLoginSchema = z.object({ password: z.string().min(1).max(256) });
-export const adminPersonalBossDefaultsSchema = z.object({ prompt: z.string().trim().max(5_000) });
+export const adminPersonalBossDefaultsSchema = z.object({ prompt: z.string().trim().max(PERSONAL_BOSS_BASE_PROMPT_MAX_CHARS) });
 export const adminGlobalBossDefaultsSchema = z.object({ prompt: z.string().trim().max(5_000) });
 export const translationExamplesSchema = z.tuple([
   z.string().trim().min(1).max(200),

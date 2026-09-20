@@ -248,7 +248,11 @@ describe("BossOnboarding job recovery", () => {
     renderOnboarding();
     await advanceToEvidenceStep();
     expect(await screen.findByText("5/5장")).toBeInTheDocument();
-    expect(screen.getByText("restored-1.png")).toBeInTheDocument();
+    for (const item of evidence) {
+      const row = screen.getByText(item.sourceName).closest("li");
+      expect(row).toHaveTextContent("등록 완료");
+      expect(screen.getByRole("button", { name: `${item.sourceName} 삭제` })).toBeInTheDocument();
+    }
     const input = screen.getByText("이미지 업로드").closest("label")!.querySelector("input")!;
     expect(input).toBeDisabled();
   });

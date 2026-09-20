@@ -28,6 +28,30 @@ describe("chat SSE", () => {
     expect(history.json().messages.map((message: any) => message.role)).toEqual(["user", "assistant"]);
   });
 
+  it("sends the latest 49 saved messages plus the current question to the AI", async () => {
+    const session = await app.inject({ method: "POST", url: "/api/session" });
+    const sessionId = session.json().session.id as string;
+    const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
+    const bossId = "00000000-0000-4000-8000-000000000001";
+    const thread = await store.getOrCreateThread(sessionId, bossId, undefined, new Date(Date.now() + 86_400_000).toISOString());
+    for (let index = 1; index <= 55; index += 1) await store.addChatMessage(thread.id, index % 2 ? "user" : "assistant", `이전 메시지 ${index}`);
+    const inputs: any[] = [];
+    vi.spyOn(ai, "streamChatWithBoss").mockImplementation(async function* (input: any, _signal?: AbortSignal) { inputs.push(input); yield "확인했습니다."; });
+
+    try {
+      const stream = await app.inject({ method: "POST", url: `/api/bosses/${bossId}/chat`, headers: { cookie, accept: "text/event-stream" }, payload: { threadId: thread.id, message: "현재 질문" } });
+      expect(stream.statusCode).toBe(200);
+      expect(inputs).toHaveLength(1);
+      expect(inputs[0].messages).toHaveLength(49);
+      expect(inputs[0].messages[0].content).toBe("이전 메시지 7");
+      expect(inputs[0].messages.at(-1).content).toBe("이전 메시지 55");
+      expect(inputs[0].message).toBe("현재 질문");
+      expect(inputs[0].messages.some((message: any) => message.content === "현재 질문")).toBe(false);
+    } finally {
+      await store.deleteSession(sessionId);
+    }
+  });
+
   it("paginates every saved chat bubble without gaps and rejects foreign cursors", async () => {
     const session = await app.inject({ method: "POST", url: "/api/session" });
     const sessionId = session.json().session.id as string;

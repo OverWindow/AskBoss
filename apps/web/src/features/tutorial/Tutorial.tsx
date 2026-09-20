@@ -35,6 +35,16 @@ const desktopSteps: TutorialStep[] = [
     preferredSide: "right",
   },
   {
+    target: "archive",
+    message: "번역 결과와 이어서 연습한 대화, 실제 상사 답변은 아카이브에서 다시 확인할 수 있어.",
+    preferredSide: "right",
+  },
+  {
+    target: "hr-demo",
+    message: "HR Demo에서는 실제 익명 집계와 가상 데이터를 통해 조직 커뮤니케이션 인사이트를 확인할 수 있어.",
+    preferredSide: "right",
+  },
+  {
     target: "translate",
     message: "상사가 무슨 뜻으로 말한 건지 모르겠다면 먼저 번역 탭을 써봐.",
     preferredSide: "left",
@@ -60,6 +70,16 @@ const mobileSteps: TutorialStep[] = [
   {
     target: "add-boss",
     message: "상사 추가를 누르면 실제 상사의 말투와 업무 스타일을 등록할 수 있어.",
+    preferredSide: "right",
+  },
+  {
+    target: "archive",
+    message: "번역 결과와 이어서 연습한 대화, 실제 상사 답변은 아카이브에서 다시 확인할 수 있어.",
+    preferredSide: "right",
+  },
+  {
+    target: "hr-demo",
+    message: "HR Demo에서는 실제 익명 집계와 가상 데이터를 통해 조직 커뮤니케이션 인사이트를 확인할 수 있어.",
     preferredSide: "right",
   },
   {
@@ -183,7 +203,7 @@ export function Tutorial() {
   useEffect(() => {
     if (!tutorialOpen || !isMobile) return;
     const target = activeStep.target;
-    if (target === "global-boss" || target === "add-boss") setUi({ mobileNavOpen: true, mobilePanelExpanded: false });
+    if (["global-boss", "add-boss", "archive", "hr-demo"].includes(target)) setUi({ mobileNavOpen: true, mobilePanelExpanded: false });
     else if (target === "mobile-translate") setUi({ mobileNavOpen: false, activeWorkspaceTab: "translator", mobilePanelExpanded: true });
     else if (target === "mobile-chat") setUi({ mobileNavOpen: false, activeWorkspaceTab: "chat", mobilePanelExpanded: true });
     else setUi({ mobileNavOpen: false, mobilePanelExpanded: false });

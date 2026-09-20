@@ -15,7 +15,7 @@ const reaction = { id: "00000000-0000-4000-8000-000000000103", role: "assistant"
 
 function renderPanel(props: Partial<React.ComponentProps<typeof ChatPanel>> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><ChatPanel boss={boss} active simulationRequest={null} onActivity={() => undefined} {...props}/></QueryClientProvider>);
+  return { client, ...render(<QueryClientProvider client={client}><ChatPanel boss={boss} active simulationRequest={null} onActivity={() => undefined} {...props}/></QueryClientProvider>) };
 }
 
 describe("ChatPanel simulations", () => {
@@ -49,11 +49,12 @@ describe("ChatPanel simulations", () => {
       onEvent("done", { message: { id: "message-4", role: "assistant", kind: "CHAT", content: "변동이 있으면 바로 알려줘.", createdAt: "2026-01-01T00:00:03.000Z" } });
     });
 
-    renderPanel({ simulationRequest: { id: "simulation-1", translationId: "00000000-0000-4000-8000-000000000010", replyIndex: 0, inputText: source.content, reply: reply.content } });
+    const { client } = renderPanel({ simulationRequest: { id: "simulation-1", translationId: "00000000-0000-4000-8000-000000000010", replyIndex: 0, inputText: source.content, reply: reply.content } });
 
     expect(await screen.findByText(source.content)).toHaveClass("assistant");
     expect(screen.getByText(reply.content)).toHaveClass("user");
     expect(await screen.findByText(reaction.content)).toHaveClass("assistant");
+    await waitFor(() => expect(client.getQueryData(["chat", boss.id])).toMatchObject({ threadId: "thread-1", messages: [source, reply, reaction], nextCursor: null }));
     expect(screen.queryByText("임시 시뮬레이션")).not.toBeInTheDocument();
     expect(screen.queryByText("기록되지 않음")).not.toBeInTheDocument();
 

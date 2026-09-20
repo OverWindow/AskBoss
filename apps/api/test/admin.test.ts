@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
 import { env } from "../src/config/env";
 import { store } from "../src/repositories";
-import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES } from "@askboss/shared";
+import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_EXAMPLES, PERSONAL_BOSS_BASE_PROMPT_MAX_CHARS } from "@askboss/shared";
 
 const app = buildApp();
 const origin = "http://localhost:5173";
@@ -112,6 +112,13 @@ describe("admin API", () => {
     const initial = await app.inject({ method: "GET", url: "/api/admin/personal-boss-defaults", headers: { cookie } });
     expect(initial.statusCode).toBe(200);
     expect(initial.json().prompt).toBe(DEFAULT_PERSONAL_BOSS_BASE_PROMPT);
+
+    const maximumPrompt = "가".repeat(PERSONAL_BOSS_BASE_PROMPT_MAX_CHARS);
+    const maximum = await app.inject({ method: "PUT", url: "/api/admin/personal-boss-defaults", headers: { cookie, origin }, payload: { prompt: maximumPrompt } });
+    expect(maximum.statusCode).toBe(200);
+    expect(maximum.json().prompt).toHaveLength(PERSONAL_BOSS_BASE_PROMPT_MAX_CHARS);
+    const tooLong = await app.inject({ method: "PUT", url: "/api/admin/personal-boss-defaults", headers: { cookie, origin }, payload: { prompt: `${maximumPrompt}가` } });
+    expect(tooLong.statusCode).toBe(400);
 
     const prompt = "테스트용 비공개 기본 성격 문구";
     const updated = await app.inject({ method: "PUT", url: "/api/admin/personal-boss-defaults", headers: { cookie, origin }, payload: { prompt } });

@@ -193,6 +193,11 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
     const controller = new AbortController();
     simulationController.current = controller;
     simulationStarted.current = true;
+    await cache.cancelQueries({ queryKey: ["chat", boss.id] });
+    if (controller.signal.aborted || activeBossIdRef.current !== boss.id) {
+      if (simulationController.current === controller) simulationController.current = undefined;
+      return;
+    }
     setSimulationLoading(true);
     setSimulationError(undefined);
     setFailedSimulation(request);
@@ -207,11 +212,18 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
     onActivity({ thinking: true });
     try {
       let reaction = "";
+      let persistedMessages: ChatMessage[] = [];
+      let persistedThreadId: string | null = null;
+      let persistedArchiveId: string | null = null;
       await streamBossSimulation(boss.id, { translationId: request.translationId, replyIndex: request.replyIndex }, (event, data) => {
         if (event === "meta") {
+          persistedMessages = data.messages;
+          persistedThreadId = data.threadId;
+          persistedArchiveId = data.archiveId;
           setThreadId(data.threadId);
           setArchiveId(data.archiveId);
           setMessages([...data.messages, { id: "simulation-stream", role: "assistant", content: "", kind: data.usesActualResponse ? "ACTUAL_RESPONSE" : "SIMULATION_REACTION", createdAt: new Date().toISOString() }]);
+          cache.setQueryData<ChatHistoryPage>(["chat", boss.id], { threadId: data.threadId, archiveId: data.archiveId, messages: persistedMessages, nextCursor: null });
         }
         if (event === "delta") {
           reaction += data.text;
@@ -220,7 +232,9 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
         }
         if (event === "done") {
           reaction = data.message.content;
+          persistedMessages = [...persistedMessages, data.message];
           setMessages((old) => old.map((item) => item.id === "simulation-stream" ? data.message : item));
+          cache.setQueryData<ChatHistoryPage>(["chat", boss.id], { threadId: persistedThreadId, archiveId: persistedArchiveId, messages: persistedMessages, nextCursor: null });
           setFailedSimulation(undefined);
           onActivity({ thinking: false, speech: reaction });
         }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Activity, AlertTriangle, Bot, Clock3, Database, LogOut, Play, RefreshCw, Settings2, ShieldCheck, UsersRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
-import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_TRANSLATION_EXAMPLES, type AdminAiPromptSettings, type AdminAiPromptSettingsInput, type AdminCredits, type AdminDashboard, type AdminJobSummary, type AdminSessionPage, type PersonalBossDefaults, type TranslationExamples, type TranslationExamplesSettings } from "@askboss/shared";
+import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_TRANSLATION_EXAMPLES, PERSONAL_BOSS_BASE_PROMPT_MAX_CHARS, type AdminAiPromptSettings, type AdminAiPromptSettingsInput, type AdminCredits, type AdminDashboard, type AdminJobSummary, type AdminSessionPage, type PersonalBossDefaults, type TranslationExamples, type TranslationExamplesSettings } from "@askboss/shared";
 import { api } from "../services/api-client";
 import { GlobalBossAdmin } from "../features/admin/GlobalBossAdmin";
 import { PersonalBossPromptsAdmin } from "../features/admin/PersonalBossPromptsAdmin";
@@ -73,8 +73,8 @@ function PersonalBossDefaultsCard() {
   return <section className="admin-section"><div className="admin-section-title"><Settings2 size={19}/><div><h2>개인 상사 공통 기본 성격</h2><p>모든 기존·신규 개인 상사의 페르소나, 번역, 대화, 혼잣말에 적용됩니다. 모두의 상사는 제외됩니다.</p></div></div>
     {settings.isError ? <div className="admin-inline-error"><AlertTriangle size={18}/><span>기본 성격을 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void settings.refetch()}>다시 시도</button></div> : <div className="admin-prompt-form">
       <label htmlFor="personal-boss-base-prompt">개인 상사 공통 시스템 프롬프트</label>
-      <textarea id="personal-boss-base-prompt" className="textarea" maxLength={5_000} value={prompt} disabled={settings.isLoading || saving} onChange={(event) => setPrompt(event.target.value)} placeholder="비워서 추가 기본 성향을 비활성화할 수 있습니다."/>
-      <div className="admin-prompt-meta"><small>{prompt.length.toLocaleString("ko-KR")} / 5,000자</small>{settings.data?.updatedAt && <small>마지막 저장 {formatDate(settings.data.updatedAt)}</small>}</div>
+      <textarea id="personal-boss-base-prompt" className="textarea" maxLength={PERSONAL_BOSS_BASE_PROMPT_MAX_CHARS} value={prompt} disabled={settings.isLoading || saving} onChange={(event) => setPrompt(event.target.value)} placeholder="비워서 추가 기본 성향을 비활성화할 수 있습니다."/>
+      <div className="admin-prompt-meta"><small>{prompt.length.toLocaleString("ko-KR")} / {PERSONAL_BOSS_BASE_PROMPT_MAX_CHARS.toLocaleString("ko-KR")}자</small>{settings.data?.updatedAt && <small>마지막 저장 {formatDate(settings.data.updatedAt)}</small>}</div>
       <p className="hint">저장 즉시 새 AI 응답에 적용됩니다. 기존 페르소나 데이터는 다음 재생성 때 갱신됩니다.</p>
       <div className="admin-form-actions"><button className="primary-button" type="button" disabled={settings.isLoading || saving} onClick={() => void save()}>{saving ? "저장 중…" : "기본 성격 저장"}</button></div>
       {message && <p className="settings-message" role="status">{message}</p>}

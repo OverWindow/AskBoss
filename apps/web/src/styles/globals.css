@@ -485,3 +485,19 @@ body>.dialog-backdrop{z-index:200}
   .topic-feature-cell,.job-function-heatmap-cell{min-height:38px;font-size:.7rem}
   .topic-feature-heatmap th,.job-function-heatmap th{font-size:.66rem;padding:4px 2px}
 }
+
+/* Keep onboarding image names, statuses, and remove actions in aligned columns. */
+.onboarding-page .evidence-upload-progress li>div{display:grid;grid-template-columns:minmax(0,1fr) 5.25rem 25px;align-items:center;gap:12px}
+.onboarding-page .evidence-upload-progress strong{width:100%;max-width:100%;min-width:0}
+.onboarding-page .evidence-upload-progress span{width:5.25rem;text-align:right;white-space:nowrap}
+
+/* Personal boss PKI refresh control and cooldown state. */
+.pki-label{white-space:nowrap}
+.pki-refresh-button{min-width:26px;height:26px;padding:0 6px;border:0;border-radius:13px;display:inline-flex;align-items:center;justify-content:center;gap:4px;background:transparent;color:var(--hr-muted);font:inherit;font-size:.7rem;font-variant-numeric:tabular-nums}
+.pki-refresh-button:hover:not(:disabled),.pki-refresh-button:focus-visible{background:rgba(30,40,107,.1);color:var(--hr-accent)}
+.pki-refresh-button:disabled{cursor:not-allowed;opacity:.68}
+.pki-refresh-button .is-spinning{animation:pki-refresh-spin .9s linear infinite}
+.pki-refresh-countdown{min-width:2rem;text-align:left}
+.pki-note.is-error{color:var(--hr-danger)}
+@keyframes pki-refresh-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.pki-refresh-button .is-spinning{animation:none}}

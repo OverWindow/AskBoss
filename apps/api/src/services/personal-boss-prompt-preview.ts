@@ -1,4 +1,4 @@
-import type { AdminPersonalBossPromptPreview, AdminPersonalBossPromptSource, Boss } from "../shared.js";
+import { CHAT_CONTEXT_HISTORY_MESSAGE_LIMIT, type AdminPersonalBossPromptPreview, type AdminPersonalBossPromptSource, type Boss } from "../shared.js";
 import type { EvidenceRecord, SurveyAnswerRecord } from "../types.js";
 import type { AdminPersonalBossPromptContext } from "../repositories/store.js";
 import { buildBossChatMessages } from "../prompts/chat.js";
@@ -75,7 +75,7 @@ export function buildPersonalBossPromptPreview(input: BuildPersonalBossPromptPre
       { role: "user", component: "사용자 프로필", origin: "사용자 저장 프로필", description: "대화 응답의 맥락으로 전달되는 실제 사용자 프로필입니다.", containsPersonalData: true },
       { role: "user", component: "상사 정보·페르소나", origin: "사용자 생성 상사", description: "상사 기본 정보와 현재 적용 중인 페르소나입니다.", containsPersonalData: true },
       { role: "user", component: "대화 요약", origin: "현재 활성 대화", description: "활성 스레드에 저장된 대화 요약입니다.", containsPersonalData: true },
-      { role: "user", component: "최근 대화 이력", origin: "현재 활성 대화", description: "마지막 일반 사용자 질문 직전의 메시지를 최대 19개까지 포함합니다.", containsPersonalData: true },
+      { role: "user", component: "최근 대화 이력", origin: "현재 활성 대화", description: `마지막 일반 사용자 질문 직전의 메시지를 최대 ${CHAT_CONTEXT_HISTORY_MESSAGE_LIMIT}개까지 포함합니다.`, containsPersonalData: true },
       { role: "user", component: "마지막 사용자 질문", origin: "현재 활성 대화", description: "가장 최근 일반 채팅에서 AI에 전달된 실제 질문입니다.", containsPersonalData: true },
     ];
     return {

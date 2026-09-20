@@ -1,7 +1,7 @@
 import type { ServerResponse } from "node:http";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { chatInputSchema, chatSimulationInputSchema } from "../shared.js";
+import { CHAT_CONTEXT_HISTORY_MESSAGE_LIMIT, chatInputSchema, chatSimulationInputSchema } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { requireSession, sessionExpiry } from "../services/session.js";
 import { ai } from "../services/ai/index.js";
@@ -193,7 +193,7 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
 
     const thread = await store.getOrCreateThread(session.id, bossId, body.threadId, sessionExpiry());
     // Capture history before adding the current message so the prompt contains it exactly once.
-    const previousMessages = thread.messages.slice(-19);
+    const previousMessages = thread.messages.slice(-CHAT_CONTEXT_HISTORY_MESSAGE_LIMIT);
     const userMessage = await store.addChatMessage(thread.id, "user", body.message);
 
     reply.hijack();

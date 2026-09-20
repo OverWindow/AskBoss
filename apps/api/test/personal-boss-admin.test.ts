@@ -60,7 +60,7 @@ describe("personal boss prompt administration", () => {
     const evidence = await store.createEvidence({ bossId: boss.id, sessionId: owner.sessionId, type: "TEXT", status: "READY", rawText: "결론을 먼저 물어보는 실제 관찰", storagePath: null, parsedData: { observations: [] }, observedAt: new Date().toISOString(), expiresAt: expiry });
     await store.upsertSurveyAnswers(owner.sessionId, boss.id, [{ questionId: "q1", questionSnapshot: { situation: "일정 보고" }, selectedOption: "마감부터 확인", freeText: null }]);
     const thread = await store.getOrCreateThread(owner.sessionId, boss.id, undefined, expiry);
-    for (let index = 0; index < 20; index += 1) await store.addChatMessage(thread.id, index % 2 ? "assistant" : "user", `이전 메시지 ${String(index).padStart(2, "0")}`);
+    for (let index = 0; index < 52; index += 1) await store.addChatMessage(thread.id, index % 2 ? "assistant" : "user", `이전 메시지 ${String(index).padStart(2, "0")}`);
     await store.addChatMessage(thread.id, "user", "최신 실제 사용자 질문");
     await store.addChatMessage(thread.id, "assistant", "프롬프트 입력에서 제외될 최신 답변");
 
@@ -69,19 +69,19 @@ describe("personal boss prompt administration", () => {
       expect(response.statusCode).toBe(200);
       expect(response.headers["cache-control"]).toBe("no-store");
       const body = response.json();
-      expect(body).toMatchObject({ reconstructionMode: "CURRENT_STATE", profile: { handle: "원문테스트사용자" }, boss: { id: boss.id, alias: "원문 상사" }, chat: { status: "AVAILABLE", historyMessageCount: 19, includedMessageCount: 20, totalMessageCount: 22 } });
+      expect(body).toMatchObject({ reconstructionMode: "CURRENT_STATE", profile: { handle: "원문테스트사용자" }, boss: { id: boss.id, alias: "원문 상사" }, chat: { status: "AVAILABLE", historyMessageCount: 49, includedMessageCount: 50, totalMessageCount: 54 } });
       expect(body.personaGeneration.messages[0].content).toContain("개인 상사 원문 테스트 기본 성향");
       expect(body.personaGeneration.messages[1].content).toContain("원문 테스트 페르소나 생성 지침");
       expect(body.personaGeneration.messages[1].content).toContain("결론을 먼저 물어보는 실제 관찰");
       expect(body.personaGeneration.messages[1].content).toContain("마감부터 확인");
       expect(body.chat.messages[1].content).toContain("최신 실제 사용자 질문");
-      expect(body.chat.messages[1].content).toContain("이전 메시지 01");
-      expect(body.chat.messages[1].content).not.toContain("이전 메시지 00");
+      expect(body.chat.messages[1].content).toContain("이전 메시지 03");
+      expect(body.chat.messages[1].content).not.toContain("이전 메시지 02");
       expect(body.chat.messages[1].content).not.toContain("프롬프트 입력에서 제외될 최신 답변");
 
       const dashboard = await store.getAdminDashboard();
       const audit = dashboard.recentOperations.find((item) => item.type === "PERSONAL_BOSS_PROMPT_VIEW");
-      expect(audit?.detail).toMatchObject({ personaVersion: 0, chatMessageCount: 22, hasChatPrompt: true });
+      expect(audit?.detail).toMatchObject({ personaVersion: 0, chatMessageCount: 54, hasChatPrompt: true });
       expect(JSON.stringify(audit)).not.toContain("원문테스트사용자");
       expect(JSON.stringify(audit)).not.toContain("최신 실제 사용자 질문");
 

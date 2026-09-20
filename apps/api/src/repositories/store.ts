@@ -38,6 +38,19 @@ export interface ChatMessageCoachingContext {
   message: ChatMessageRecord;
 }
 
+export const PERSONA_REFRESH_COOLDOWN_MS = 3 * 60_000;
+
+export interface PersonaRefreshState {
+  availableAt: string | null;
+  retryAfterSeconds: number;
+  inProgress: boolean;
+  jobId: string | null;
+}
+
+export type CreatePersonaRefreshJobResult =
+  | { status: "CREATED"; job: JobRecord; refresh: PersonaRefreshState }
+  | { status: "IN_PROGRESS" | "COOLDOWN"; job: null; refresh: PersonaRefreshState };
+
 export interface Store {
   createSession(tokenHash: string, expiresAt: string): Promise<SessionRecord>;
   findSession(tokenHash: string): Promise<SessionRecord | null>;
@@ -82,6 +95,8 @@ export interface Store {
   upsertGlobalSurveyAnswers(answers: SurveyAnswerRecord[]): Promise<void>;
   listGlobalSurveyAnswers(): Promise<SurveyAnswerRecord[]>;
   createJob(input: Pick<JobRecord, "sessionId" | "bossId" | "type" | "payload">): Promise<JobRecord>;
+  getPersonaRefreshState(sessionId: string, bossId: string): Promise<PersonaRefreshState>;
+  createPersonaRefreshJob(sessionId: string, bossId: string): Promise<CreatePersonaRefreshJobResult>;
   getJob(sessionId: string, id: string): Promise<JobRecord | null>;
   getJobById(id: string): Promise<JobRecord | null>;
   claimJob(id: string): Promise<JobRecord | null>;

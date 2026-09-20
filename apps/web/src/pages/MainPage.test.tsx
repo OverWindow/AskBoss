@@ -5,6 +5,7 @@ import { useUiStore } from "../stores/ui-store";
 
 vi.mock("../components/AppShell", () => ({ AppShell: ({ children }: { children: React.ReactNode }) => <main>{children}</main> }));
 vi.mock("../features/tutorial/Tutorial", () => ({ Tutorial: () => null }));
+vi.mock("../features/pki/PkiIndicator", () => ({ PkiIndicator: () => <div>상사 파악도</div> }));
 vi.mock("../features/session/useSession", () => ({ useSession: () => ({ isSuccess: true, isLoading: false, isError: false }) }));
 vi.mock("../features/boss/useBosses", () => ({ useBosses: () => ({ isLoading: false, isError: false, data: [{ id: "00000000-0000-4000-8000-000000000001", scope: "GLOBAL", status: "READY", alias: "모두의 상사", avatarKey: "boss-male-01", jobFunction: null, yearsOfServiceBand: null, rank: "팀장", companyName: null, ageBand: 40, hierarchyScore: 55, companyResearch: null, persona: null, pki: null }] }) }));
 vi.mock("../features/profile/useProfile", () => ({ useProfile: () => ({ data: { handle: "수민" } }) }));
