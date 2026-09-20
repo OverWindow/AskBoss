@@ -46,7 +46,7 @@ export function HrDemoPage() {
 
   return <motion.div className="hr-layout" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} transition={{ duration: .3, ease: "easeOut" }}>
     <aside className="hr-nav">
-      <img className="hr-brand-logo" src="/image.png" alt={SERVICE_NAME} />
+      <img className="hr-brand-logo" src="/image.svg?v=2" alt={SERVICE_NAME} />
       {SECTIONS.map((section) => <a key={section.id} href={`#${section.id}`} className={activeSection === section.id ? "is-active" : ""} onClick={scrollTo(section.id)}>{section.label}</a>)}
     </aside>
     <div className="hr-content">

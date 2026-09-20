@@ -103,7 +103,13 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
       if (chatList) chatList.scrollTop = chatList.scrollHeight;
     };
     viewport.addEventListener("resize", pinToBottom);
-    return () => viewport.removeEventListener("resize", pinToBottom);
+    viewport.addEventListener("scroll", pinToBottom);
+    window.addEventListener("focusin", pinToBottom);
+    return () => {
+      viewport.removeEventListener("resize", pinToBottom);
+      viewport.removeEventListener("scroll", pinToBottom);
+      window.removeEventListener("focusin", pinToBottom);
+    };
   }, []);
 
   useEffect(() => {

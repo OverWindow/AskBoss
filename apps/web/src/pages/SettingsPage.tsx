@@ -118,7 +118,7 @@ export function SettingsPage() {
   };
 
   return <AppShell><div className="settings-panel">
-    <header><div className="settings-header-row"><button className="settings-back-button" type="button" onClick={() => navigate("/")} aria-label="메인으로 돌아가기"><ChevronLeft size={19}/></button><h1>내 정보와 상사 관리</h1></div></header>
+    <header><div className="settings-header-row"><button className="settings-back-button" type="button" onClick={() => navigate("/")} aria-label="메인으로 돌아가기"><ChevronLeft size={19}/></button><h1>내 정보 · 상사 관리</h1></div></header>
     {message && <p className="settings-message" role="status">{message}</p>}
     <section className="settings-section">
       <h2>내 정보</h2>

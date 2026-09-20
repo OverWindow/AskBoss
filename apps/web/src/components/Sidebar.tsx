@@ -55,7 +55,7 @@ export function Sidebar() {
 
   return <>
     <aside className={`sidebar ${ui.mobileNavOpen ? "is-mobile-open" : ""}`} aria-label="주요 메뉴">
-      <div className="brand"><span className="hide-collapsed"><img className="brand-logo" src="/image.png" alt={SERVICE_NAME} /></span></div>
+      <div className="brand"><span className="hide-collapsed"><img className="brand-logo" src="/image.svg?v=2" alt={SERVICE_NAME} /></span></div>
       <button className="sidebar-toggle" onClick={() => ui.set({ sidebarCollapsed: !ui.sidebarCollapsed })} aria-label={ui.sidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기"}>{ui.sidebarCollapsed ? <ChevronRight size={16}/> : <ChevronLeft size={16}/>}</button>
       {ui.mobileNavOpen && <button className="sidebar-close-button" type="button" onClick={() => ui.set({ mobileNavOpen: false })} aria-label="메뉴 닫기"><X size={18}/></button>}
       <nav className="boss-nav">
