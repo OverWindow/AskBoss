@@ -47,15 +47,12 @@ describe("HrDemoPage datasets", () => {
   });
   afterEach(() => cleanup());
 
-  it("defaults to actual anonymous data and switches to a clearly labelled, populated mock dashboard", async () => {
+  it("defaults to the populated mock dashboard and switches to actual anonymous data", async () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<MemoryRouter><QueryClientProvider client={client}><HrDemoPage/></QueryClientProvider></MemoryRouter>);
-    expect(await screen.findByText("아직 집계된 실제 사용자 데이터가 없습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "실제 익명 집계" })).toHaveAttribute("aria-selected", "true");
-
-    fireEvent.click(screen.getByRole("tab", { name: "가상 데모" }));
-    expect(screen.queryByText("100% 가상 데이터")).not.toBeInTheDocument();
     expect(await screen.findByText("일정·마감 압박")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "가상 데모" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByText("100% 가상 데이터")).not.toBeInTheDocument();
     expect(screen.queryByText("이거 언제까지 가능해?")).not.toBeInTheDocument();
     expect(screen.getAllByText("보고")).toHaveLength(2);
     expect(screen.getByRole("heading", { name: "주제별 기능 사용" })).toBeInTheDocument();
@@ -64,7 +61,11 @@ describe("HrDemoPage datasets", () => {
     expect(screen.getByRole("link", { name: "직무 조합" })).toHaveAttribute("href", "#job-function-pairs");
     expect(screen.getByLabelText("개발 사용자 · 기획 상사: 1건")).toBeInTheDocument();
     expect(screen.getByLabelText("개발 사용자 · 개발 상사: 0건")).toBeInTheDocument();
-    await waitFor(() => expect(api).toHaveBeenCalledWith("/hr/dashboard?dataset=actual"));
-    expect(api).toHaveBeenCalledWith("/hr/dashboard?dataset=mock");
+    await waitFor(() => expect(api).toHaveBeenCalledWith("/hr/dashboard?dataset=mock"));
+
+    fireEvent.click(screen.getByRole("tab", { name: "실제 익명 집계" }));
+    expect(await screen.findByText("아직 집계된 실제 사용자 데이터가 없습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "실제 익명 집계" })).toHaveAttribute("aria-selected", "true");
+    expect(api).toHaveBeenCalledWith("/hr/dashboard?dataset=actual");
   });
 });

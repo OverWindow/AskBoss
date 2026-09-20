@@ -450,6 +450,14 @@ body>.dialog-backdrop{z-index:200}
 .gap-rate-section .metric-line{justify-content:center}
 .gap-rate-section>.hint{text-align:center}
 
+/* Mock data is the first/default HR dataset; move the slider only for actual data. */
+.hr-dataset-tab-indicator.is-actual{transform:translateX(calc(100% + 6px))}
+
+/* Keep the complete gap-rate summary centered in the two-column desktop card. */
+@media(min-width:1025px){
+  .gap-rate-section .metric-line,.gap-rate-section>.hint{text-align:center}
+}
+
 /* Actual-response modal: keep textarea and actions above the soft keyboard on mobile */
 @media(max-width:767px){
   .dialog-backdrop:has(> .dialog.actual-response-dialog){padding-bottom:var(--keyboard-offset,0px)}

@@ -17,7 +17,7 @@ const SECTIONS = [
 
 export function HrDemoPage() {
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0]!.id);
-  const [dataset, setDataset] = useState<"actual" | "mock">("actual");
+  const [dataset, setDataset] = useState<"actual" | "mock">("mock");
 
   useEffect(() => {
     const onScroll = () => {
@@ -52,9 +52,9 @@ export function HrDemoPage() {
     <div className="hr-content">
       <header id="overview" className="hr-page-header"><div className="settings-header-row"><Link className="settings-back-button" to="/" aria-label="사용자 화면으로 돌아가기"><ChevronLeft size={19}/></Link><h1>조직 커뮤니케이션 인사이트</h1></div></header>
       <div className="hr-dataset-tabs" role="tablist" aria-label="HR 데이터 선택">
-        <button type="button" role="tab" aria-selected={dataset === "actual"} className={dataset === "actual" ? "is-active" : ""} onClick={() => setDataset("actual")}>실제 익명 집계</button>
         <button type="button" role="tab" aria-selected={dataset === "mock"} className={dataset === "mock" ? "is-active" : ""} onClick={() => setDataset("mock")}>가상 데모</button>
-        <span className={`hr-dataset-tab-indicator${dataset === "mock" ? " is-mock" : ""}`} aria-hidden="true"/>
+        <button type="button" role="tab" aria-selected={dataset === "actual"} className={dataset === "actual" ? "is-active" : ""} onClick={() => setDataset("actual")}>실제 익명 집계</button>
+        <span className={`hr-dataset-tab-indicator${dataset === "actual" ? " is-actual" : ""}`} aria-hidden="true"/>
       </div>
       <HrDashboard dataset={dataset}/>
     </div>
