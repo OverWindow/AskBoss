@@ -300,15 +300,16 @@
   .app-shell.is-collapsed .add-boss::after{display:block}
   .main-area{min-height:100dvh;padding:72px 18px 96px}
   .main-area:has(.interaction-workspace){padding:0}
+  .main-area:has(.settings-panel){padding-top:28px}
   .settings-panel{padding-top:0}
   .settings-panel>header{top:0;margin-inline:-18px;padding:14px 18px}
-  .settings-panel>header h1,.hr-page-header h1{font-size:clamp(1.45rem,7vw,1.8rem);line-height:1.25}
+  .settings-panel>header h1,.hr-page-header h1{font-size:clamp(1.15rem,5.6vw,1.4rem);line-height:1.25}
   .settings-heading,.settings-actions{align-items:stretch;flex-direction:column}
   .settings-actions .primary-button,.settings-actions .text-button{width:100%}
   .settings-form fieldset{min-width:0}
   .hr-main{padding:28px 18px 56px;overflow:hidden}
   .hr-page-header{padding:14px 18px}
-  .hr-dataset-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:min(330px,calc(100% - 32px));margin:18px auto -10px}
+  .hr-dataset-tabs{position:sticky;top:64px;z-index:11;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:min(330px,calc(100% - 32px));margin:10px auto 0;padding:6px;border-radius:14px;background:rgba(254,254,254,.94);backdrop-filter:blur(10px)}
   .hr-dataset-tabs button{min-width:0;min-height:40px;padding:8px 6px;font-size:clamp(.76rem,3.4vw,.86rem);line-height:1.2;white-space:nowrap;overflow:visible}
   .metric-line{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px}
   .metric-line{justify-content:center;text-align:center}
