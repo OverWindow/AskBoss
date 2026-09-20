@@ -10,6 +10,7 @@ import { api } from "../services/api-client";
 import { useUiStore } from "../stores/ui-store";
 import { Dialog } from "./Dialog";
 import { SERVICE_NAME } from "../config/brand";
+import { waGwa } from "../lib/korean";
 import { useProfile } from "../features/profile/useProfile";
 
 export function Sidebar() {
@@ -79,7 +80,7 @@ export function Sidebar() {
       </div>
     </aside>
     <Dialog compact open={Boolean(deleteTarget)} title="상사 데이터 삭제" onClose={() => { if (!deleting) setDeleteTarget(null); }}>
-      <p><strong>{deleteTarget?.alias}</strong>와 연결된 모든 데이터를 삭제합니다.</p>
+      <p><strong>{deleteTarget?.alias}</strong>{deleteTarget ? waGwa(deleteTarget.alias) : "와"} 연결된 모든 데이터를 삭제합니다.</p>
       <p className="hint">상사 프로필, 관찰 자료와 업로드 파일, 설문, 페르소나, 대화, 번역 아카이브, 혼잣말, 관련 AI 작업이 모두 삭제되며 복구할 수 없습니다.</p>
       {deleteError && <p className="error-text" role="alert">{deleteError}</p>}
       <div className="dialog-actions"><button className="secondary-button" type="button" disabled={deleting} onClick={() => setDeleteTarget(null)}>취소</button><button className="primary-button danger-confirm-button" type="button" disabled={deleting} onClick={() => void removeBoss()}>{deleting ? "삭제 중…" : "모두 삭제"}</button></div>

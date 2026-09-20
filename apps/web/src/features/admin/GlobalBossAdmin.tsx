@@ -6,6 +6,7 @@ import { AGE_BANDS, AVATARS, BOSS_RANKS, BOSS_TENURE_BANDS, JOB_FUNCTIONS, type 
 import { EvidenceUploadProgressList } from "../../components/EvidenceUploadProgressList";
 import { api } from "../../services/api-client";
 import { IMAGE_UPLOAD_CONCURRENCY,mapWithConcurrency,prepareEvidenceFile,prepareEvidenceImageBatch,type EvidenceUploadProgress,uploadToSignedUrl } from "../../services/upload-client";
+import { eulReul } from "../../lib/korean";
 
 const TIMEOUT = 60_000;
 const READ_TIMEOUT = 12_000;
@@ -89,7 +90,7 @@ export function GlobalBossAdmin({ onLogout }: Props) {
       if (upload.signedUrl) { setMessage(`${file.name} 저장소에 업로드 중…`); await uploadToSignedUrl(upload.signedUrl, prepared.file, upload.token); }
       setMessage(`${file.name} 분석 목록에 등록 중…`);
       await adminApi("/admin/global-boss/evidence", { method: "POST", body: JSON.stringify({ type: prepared.contentType === "text/plain" ? "TXT" : "IMAGE", uploadIntentId: upload.intentId }) });
-      setMessage(`${file.name}을 분석 목록에 추가했습니다.`); await detail.refetch();
+      setMessage(`${file.name}${eulReul(file.name)} 분석 목록에 추가했습니다.`); await detail.refetch();
     } catch (error) { setMessage(error instanceof Error ? error.message : "파일을 추가하지 못했습니다."); }
     finally { setBusy(undefined); }
   };

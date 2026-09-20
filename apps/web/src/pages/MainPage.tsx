@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type TouchEvent } from "react";
+import { ChevronDown, ChevronUp, Home, Languages, MessageCircle } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { DEFAULT_TRANSLATION_EXAMPLES, type ChatMessage } from "@askboss/shared";
 import { AppShell } from "../components/AppShell";
@@ -63,6 +63,25 @@ export function MainPage() {
 
   const selectTab = (tab: PanelName) => ui.set({ activeWorkspaceTab: tab, mobilePanelExpanded: true });
 
+  const goHome = () => ui.set({ mobilePanelExpanded: false });
+
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const onWorkspaceTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    if (!touch) return;
+    touchStart.current = { x: touch.clientX, y: touch.clientY };
+  };
+  const onWorkspaceTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch) return;
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 50 || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
+    selectTab(ui.activeWorkspaceTab === "chat" ? "translator" : "chat");
+  };
+
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: PanelName) => {
     if (!(["ArrowLeft", "ArrowRight"] as string[]).includes(event.key)) return;
     event.preventDefault();
@@ -96,7 +115,7 @@ export function MainPage() {
 
   return <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: .25, ease: "easeOut" }}>
     <AppShell>
-    <div className={`interaction-workspace ${ui.mobilePanelExpanded ? "" : "is-mobile-panel-collapsed"}`}>
+    <div className={`interaction-workspace ${ui.mobilePanelExpanded ? "" : "is-mobile-panel-collapsed"}`} onTouchStart={onWorkspaceTouchStart} onTouchEnd={onWorkspaceTouchEnd}>
       <section data-tutorial="workspace" className={`boss-stage ${thinking ? "is-thinking" : ""}`} aria-labelledby="boss-alias">
         <div aria-live="polite" className="speech-bubble-wrap"><AnimatePresence mode="popLayout" initial={false}><motion.div key={`${boss.id}:${speech}`} className="speech-bubble" initial={{ opacity: 0, scale: .97, y: 4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .97, y: -4 }} transition={{ duration: .5, ease: [0.22, 1, 0.36, 1] }}>{speech}</motion.div></AnimatePresence></div>
         <button className="avatar-frame avatar-button" type="button" onClick={changeAvatarSpeech} aria-label={`${boss.alias}의 한마디 바꾸기`}>
@@ -124,6 +143,11 @@ export function MainPage() {
           <ChatPanel boss={boss} active={ui.activeWorkspaceTab === "chat"} simulationRequest={simulationRequest} externalChatUpdate={externalChatUpdate} onActivity={({ thinking: nextThinking, speech: nextSpeech }) => { setThinking(nextThinking); if (nextSpeech) setSpeech(nextSpeech); }} onConversationStateChange={updateChatState} onReset={resetBossSpeech}/>
         </div>
       </aside>
+      <nav className="mobile-bottom-nav" aria-label="작업 이동">
+        <button type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded ? "" : "is-active"}`} aria-current={ui.mobilePanelExpanded ? undefined : "page"} onClick={goHome}><Home size={18}/><span>홈</span></button>
+        <button type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded && ui.activeWorkspaceTab === "translator" ? "is-active" : ""}`} aria-current={ui.mobilePanelExpanded && ui.activeWorkspaceTab === "translator" ? "page" : undefined} onClick={() => selectTab("translator")}><Languages size={18}/><span>번역</span></button>
+        <button type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded && ui.activeWorkspaceTab === "chat" ? "is-active" : ""}`} aria-current={ui.mobilePanelExpanded && ui.activeWorkspaceTab === "chat" ? "page" : undefined} onClick={() => selectTab("chat")}><MessageCircle size={18}/><span>대화</span></button>
+      </nav>
     </div>
     <Tutorial/>
     <Dialog compact open={Boolean(pendingSimulation)} title="새 시뮬레이션 시작" onClose={() => setPendingSimulation(null)}>

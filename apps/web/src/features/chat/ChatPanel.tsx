@@ -6,6 +6,7 @@ import { api } from "../../services/api-client";
 import { streamBossChat, streamBossSimulation } from "../../services/sse-client";
 import type { ChatSimulationRequest } from "./simulation-types";
 import { ActualResponseDialog } from "../archive/ActualResponseDialog";
+import { waGwa } from "../../lib/korean";
 
 interface ChatPanelProps {
   boss: Boss;
@@ -383,8 +384,8 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
     </div>;
   };
 
-  return <section id="chat-panel" className="workspace-tab-panel" role="tabpanel" aria-labelledby="workspace-tab-chat" aria-label={`${boss.alias}와 대화`} hidden={!active} aria-busy={busy}>
-    <div className="workspace-panel-title chat-panel-title"><h2><MessageCircle size={18}/>{boss.alias}와 대화</h2><button className="chat-reset-button" type="button" disabled={busy} onClick={() => void resetChat()} aria-label="대화 초기화" title="대화 초기화"><RotateCcw size={17}/></button></div>
+  return <section id="chat-panel" className="workspace-tab-panel" role="tabpanel" aria-labelledby="workspace-tab-chat" aria-label={`${boss.alias}${waGwa(boss.alias)} 대화`} hidden={!active} aria-busy={busy}>
+    <div className="workspace-panel-title chat-panel-title"><h2><MessageCircle size={18}/>{boss.alias}{waGwa(boss.alias)} 대화</h2><button className="chat-reset-button" type="button" disabled={busy} onClick={() => void resetChat()} aria-label="대화 초기화" title="대화 초기화"><RotateCcw size={17}/></button></div>
     <p className="panel-hint">가상 시뮬레이션이며 실제 인물의 생각을 단정하지 않습니다.</p>
     <div ref={chatListRef} className="chat-list" aria-live="polite" onScroll={(event) => { if (event.currentTarget.scrollTop <= 80) void loadOlderMessages(); }}>
       {history.isLoading && !simulationStarted.current && <p className="hint">이전 대화를 불러오는 중입니다.</p>}
