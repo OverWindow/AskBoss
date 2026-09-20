@@ -357,7 +357,7 @@
   .archive-modal{padding-bottom:env(safe-area-inset-bottom)}.archive-card-heading{padding:13px 12px;gap:9px}.archive-delete-button{width:42px}
   .archive-card-body{padding:14px 12px;gap:18px}.archive-actual{align-items:stretch;flex-direction:column}.archive-actual .secondary-button{align-self:flex-end}
   .archive-delete-actions{display:grid;grid-template-columns:1fr 1fr}.archive-delete-actions>*{width:100%}
-  .onboarding-page{height:100dvh;min-height:100dvh;grid-template-rows:auto minmax(0,1fr) auto;padding:24px 16px 0;overflow:hidden}.onboarding-top{gap:12px}.onboarding-step{align-self:stretch;margin:0 auto;padding:28px 0 24px;overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain}.onboarding-step h1{margin-bottom:22px;line-height:1.32}
+  .onboarding-page{height:100dvh;min-height:100dvh;grid-template-rows:auto minmax(0,1fr) auto;padding:24px 16px 0;overflow:hidden}.onboarding-top{gap:12px}.onboarding-step{align-self:stretch;margin:0 auto;padding:12px 0 24px;overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain}.onboarding-step h1{margin-bottom:22px;line-height:1.32}
   .onboarding-step .upload-options{grid-template-columns:repeat(2,minmax(0,1fr))}.onboarding-actions{position:static;width:100%;padding:16px 0 max(14px,env(safe-area-inset-bottom));transform:none;background:var(--hr-bg)}
   .evidence-privacy-notice{padding:12px;gap:10px}.evidence-privacy-notice>svg{width:28px;height:28px}
   .admin-page{overflow-x:hidden}.admin-topbar h1{overflow-wrap:anywhere}.admin-section{min-width:0}.admin-table-wrap{margin-inline:-4px}
@@ -467,7 +467,7 @@ body>.dialog-backdrop{z-index:200}
 /* Keep onboarding navigation pinned at the top with an opaque background so
    scrolled content never shows through or hides beneath it. */
 @media(max-width:767px){
-  .onboarding-top{position:sticky;top:0;z-index:14;margin:-24px -16px 0;padding:max(24px,env(safe-area-inset-top)) 16px 10px;background:#fff}
+  .onboarding-top{position:sticky;top:0;z-index:14;margin:-24px -16px 0;padding:max(8px,env(safe-area-inset-top)) 16px 8px;background:#fff}
 }
 /* Mobile workspace panels cover the floating brand logo; nav stays on top */
 @media(max-width:767px){
