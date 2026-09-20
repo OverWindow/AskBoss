@@ -83,7 +83,7 @@
 .onboarding-step input:focus-visible,.onboarding-step textarea:focus-visible{box-shadow:none}
 .onboarding-nav-button{border:1px solid var(--hr-accent);border-radius:11px;background:var(--hr-accent);color:#fff;min-height:44px;padding:10px 16px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:750;transition:background .18s ease,transform .18s ease}
 .onboarding-nav-button:hover{background:#151d55;transform:translateY(-1px)}
-.onboarding-back-button{border:0;background:transparent;color:var(--hr-accent);padding:10px 0;font-weight:800;transition:color .18s ease,transform .18s ease}
+.onboarding-back-button{border:0;background:transparent;color:var(--hr-accent);padding:10px 16px;margin-left:16px;font-weight:800;transition:color .18s ease,transform .18s ease}
 .onboarding-back-button:hover{color:#151d55;transform:translateX(-2px)}
 .add-boss{display:grid;grid-template-columns:18px 1fr 18px}.add-boss::after{content:"";width:18px}.add-boss>.hide-collapsed{justify-self:center}
 .app-shell.is-collapsed .add-boss{display:flex}.app-shell.is-collapsed .add-boss::after{display:none}
