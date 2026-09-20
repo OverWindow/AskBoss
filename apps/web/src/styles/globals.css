@@ -502,3 +502,6 @@ body>.dialog-backdrop{z-index:200}
 .pki-note.is-error{color:var(--hr-danger)}
 @keyframes pki-refresh-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.pki-refresh-button .is-spinning{animation:none}}
+
+/* Keep generated survey questions readable as the onboarding width changes. */
+.onboarding-step .survey-question{width:100%;max-width:100%;word-break:keep-all;overflow-wrap:break-word}
