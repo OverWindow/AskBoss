@@ -249,7 +249,7 @@
 .danger-confirm-button:hover{background:#7f3e3e;border-color:#7f3e3e}
 
 @media(hover:none),(max-width:767px){
-  .boss-nav-row.is-active .boss-delete-button{opacity:1;pointer-events:auto}
+  .boss-nav-row .boss-delete-button{opacity:1;pointer-events:auto}
 }
 
 /* Translation archive and actual-response correction */
@@ -309,7 +309,7 @@
   .settings-form fieldset{min-width:0}
   .hr-main{padding:28px 18px 56px;overflow:hidden}
   .hr-page-header{padding:14px 18px}
-  .hr-dataset-tabs{position:sticky;top:64px;z-index:11;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:min(330px,calc(100% - 32px));margin:10px auto 0;padding:6px;border-radius:14px;background:rgba(254,254,254,.94);backdrop-filter:blur(10px)}
+  .hr-dataset-tabs{position:sticky;top:76px;z-index:11;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:min(330px,calc(100% - 32px));margin:10px auto 0;padding:6px;border-radius:14px;background:rgba(254,254,254,.94);border:1px solid #fff;box-shadow:0 4px 16px rgba(33,34,50,.1);backdrop-filter:blur(10px)}
   .hr-dataset-tabs button{min-width:0;min-height:40px;padding:8px 6px;font-size:clamp(.76rem,3.4vw,.86rem);line-height:1.2;white-space:nowrap;overflow:visible}
   .metric-line{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 12px}
   .metric-line{justify-content:center;text-align:center}
@@ -325,6 +325,7 @@
 }
 @media(max-width:767px){
   .interaction-workspace{padding:max(64px,calc(env(safe-area-inset-top) + 54px)) 10px max(10px,env(safe-area-inset-bottom))}
+  .avatar-options.compact{grid-template-columns:repeat(4,minmax(0,1fr));justify-content:stretch}
   .interaction-workspace .boss-stage{padding-inline:12px}
   .interaction-workspace .speech-bubble{max-width:calc(100vw - 52px);margin-bottom:10px;padding:10px 14px;font-size:.88rem}
   .interaction-workspace .boss-alias{font-size:1.4rem}.interaction-workspace .boss-subtitle{margin-bottom:8px;font-size:.78rem}

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Wordcloud } from "@visx/wordcloud";
@@ -142,6 +143,7 @@ function EmptyPlaceholder({ children }: { children: React.ReactNode }) {
 }
 
 function TopicCloud({ words, colorful }: { words: { text: string; value: number }[]; colorful: boolean }) {
+  const [hovered, setHovered] = useState<string | null>(null);
   const maxValue = Math.max(...words.map((word) => word.value), 1);
   return (
     <div className="word-cloud">
@@ -157,38 +159,32 @@ function TopicCloud({ words, colorful }: { words: { text: string; value: number 
           rotate={() => 0}
           random={() => 0.5}
         >
-          {(cloudWords) => (
+          {(cloudWords) => {
+            const ordered = hovered ? [...cloudWords.filter((word) => word.text !== hovered), ...cloudWords.filter((word) => word.text === hovered)] : cloudWords;
+            return (
             <>
-              {cloudWords.map((word, index) => {
+              {ordered.map((word, index) => {
+                const count = (word as unknown as { value: number }).value;
                 const size = word.size ?? 20;
                 return (
-              <g key={word.text} className="word-cloud-word-group" transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}>
+              <g key={word.text} className="word-cloud-word-group" transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`} onMouseEnter={() => setHovered(word.text ?? null)} onMouseLeave={() => setHovered((current) => (current === word.text ? null : current))}>
                 <Text
                   className="word-cloud-word"
-                  fill={colorful ? MOCK_COLORS[index % MOCK_COLORS.length] : "#375DF3"}
+                  fill={colorful ? MOCK_COLORS[cloudWords.indexOf(word) % MOCK_COLORS.length] : "#375DF3"}
                   textAnchor="middle"
                   fontSize={size}
                   fontFamily={word.font}
                 >
                   {word.text}
                 </Text>
-              </g>
-                );
-              })}
-              {cloudWords.map((word) => {
-                const count = (word as unknown as { value: number }).value;
-                const size = word.size ?? 20;
-                return (
-              <g key={`${word.text}-tooltip`} className="word-cloud-word-group" transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}>
-                <g className="word-cloud-tooltip" transform={`translate(0, ${-size / 2 - 16})`} aria-hidden="true">
-                  <rect x={-(String(count).length * 8 + 24) / 2} y={-11} width={String(count).length * 8 + 24} height={22} rx={7} fill="#212232"/>
-                  <text textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={12} fontFamily="Pretendard, sans-serif">{count}건</text>
+                <g className="word-cloud-tooltip" transform={`translate(0, ${-size / 2 - 16})`} aria-hidden="true">                  <rect x={-(String(count).length * 8 + 24) / 2} y={-11} width={String(count).length * 8 + 24} height={22} rx={7} fill="#212232"/>
+                  <text textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={12} fontFamily="Pretendard, sans-serif">{count}회</text>
                 </g>
               </g>
                 );
               })}
             </>
-          )}
+          );}}
         </Wordcloud>
       </svg>
     </div>
