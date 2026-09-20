@@ -29,7 +29,6 @@ export function PkiIndicator({ boss }: { boss: Boss }) {
     <div className="pki-track" aria-hidden="true"><div className="pki-fill" style={{ width: `${pki?.score ?? 0}%` }}/></div>
     <div className="pki-note">정보가 더 쌓이면 반응을 더 안정적으로 추정할 수 있어요.</div>
     <AnimatePresence>{open && <motion.div id={popoverId} className="pki-popover" role="dialog" aria-label="상사 파악도 산정 방식" initial={{ opacity: 0, x: "-50%", y: 8, scale: .97 }} animate={{ opacity: 1, x: "-50%", y: 0, scale: 1 }} exit={{ opacity: 0, x: "-50%", y: 8, scale: .97 }} transition={{ duration: .2, ease: [0.22, 1, 0.36, 1] }}>
-      <strong>상사 파악도 구성</strong>
       <div className="pki-breakdown">
         <div><span><b>정보 충족도</b><small>5개 업무 상황별 관찰이 충분히 쌓였는지 반영합니다.</small></span><b>{pki?.completeness ?? 0}점</b></div>
         <div><span><b>근거 신뢰도</b><small>페르소나 특성과 연결된 근거 수와 맥락 품질을 반영합니다.</small></span><b>{pki?.evidenceReliability ?? 0}점</b></div>

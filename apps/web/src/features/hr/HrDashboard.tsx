@@ -50,12 +50,12 @@ export function HrDashboard({ dataset }: { dataset: "actual" | "mock" }) {
 
       <section id="topics" className="chart-section">
         <h3>자주 등장한 주제</h3>
-        {d.topics.length > 0 ? <TopicCloud words={d.topics} colorful={isMock}/> : <EmptyPlaceholder>아직 집계된 대화 주제가 없습니다.</EmptyPlaceholder>}
+        {d.topics.length > 0 ? <TopicCloud words={d.topics} colorful/> : <EmptyPlaceholder>아직 집계된 대화 주제가 없습니다.</EmptyPlaceholder>}
       </section>
 
       <div id="demographics" className="chart-grid">
-        <Chart title="직급 차이별 사용량" data={d.rankGap} colorful={isMock}/>
-        <Chart title="나이 차이별 사용량" data={d.ageGap} colorful={isMock}/>
+        <Chart title="직급 차이별 사용량" data={d.rankGap} colorful/>
+        <Chart title="나이 차이별 사용량" data={d.ageGap} colorful/>
       </div>
 
       <div id="insights" className="chart-grid">
@@ -73,7 +73,7 @@ export function HrDashboard({ dataset }: { dataset: "actual" | "mock" }) {
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Bar dataKey="value" fill="#375DF3" radius={[4, 4, 0, 0]}>{d.sameJobFunctionDistribution.map((item, index) => <Cell key={item.bucket} fill={isMock ? MOCK_COLORS[(index + 3) % MOCK_COLORS.length] : "#375DF3"}/>)}</Bar>
+                <Bar dataKey="value" fill="#375DF3" radius={[4, 4, 0, 0]}>{d.sameJobFunctionDistribution.map((item, index) => <Cell key={item.bucket} fill={MOCK_COLORS[(index + 3) % MOCK_COLORS.length]}/>)}</Bar>
               </BarChart>
             </ResponsiveContainer>
           ) : (
@@ -156,21 +156,38 @@ function TopicCloud({ words, colorful }: { words: { text: string; value: number 
           rotate={() => 0}
           random={() => 0.5}
         >
-          {(cloudWords) =>
-            cloudWords.map((word, index) => (
-              <g key={word.text} transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}>
+          {(cloudWords) => (
+            <>
+              {cloudWords.map((word, index) => {
+                const size = word.size ?? 20;
+                return (
+              <g key={word.text} className="word-cloud-word-group" transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}>
                 <Text
                   className="word-cloud-word"
                   fill={colorful ? MOCK_COLORS[index % MOCK_COLORS.length] : "#375DF3"}
                   textAnchor="middle"
-                  fontSize={word.size}
+                  fontSize={size}
                   fontFamily={word.font}
                 >
                   {word.text}
                 </Text>
               </g>
-            ))
-          }
+                );
+              })}
+              {cloudWords.map((word) => {
+                const count = (word as unknown as { value: number }).value;
+                const size = word.size ?? 20;
+                return (
+              <g key={`${word.text}-tooltip`} className="word-cloud-word-group" transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}>
+                <g className="word-cloud-tooltip" transform={`translate(0, ${-size / 2 - 16})`} aria-hidden="true">
+                  <rect x={-(String(count).length * 8 + 24) / 2} y={-11} width={String(count).length * 8 + 24} height={22} rx={7} fill="#212232"/>
+                  <text textAnchor="middle" dominantBaseline="central" fill="#fff" fontSize={12} fontFamily="Pretendard, sans-serif">{count}건</text>
+                </g>
+              </g>
+                );
+              })}
+            </>
+          )}
         </Wordcloud>
       </svg>
     </div>
