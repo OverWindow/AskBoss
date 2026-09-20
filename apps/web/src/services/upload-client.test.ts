@@ -33,9 +33,27 @@ describe("evidence upload client", () => {
     expect(batch[4]).toMatchObject({ prepared: null, error: expect.stringContaining("이미지 업로드") });
   });
 
-  it("rejects an image selection larger than five before processing it", () => {
+  it("accepts only the remaining image slots and marks overflow files", () => {
     const files = Array.from({ length: 6 }, (_, index) => new File([String(index)], `${index}.png`, { type: "image/png" }));
-    expect(() => prepareEvidenceImageBatch(files)).toThrow("최대 5장");
+    const batch = prepareEvidenceImageBatch(files);
+    expect(batch.filter((item) => item.prepared)).toHaveLength(5);
+    expect(batch[5]).toMatchObject({ prepared: null, error: expect.stringContaining("최대 5장") });
+  });
+
+  it("does not spend an available slot on an invalid file", () => {
+    const batch = prepareEvidenceImageBatch([
+      new File(["text"], "notes.txt", { type: "text/plain" }),
+      new File(["one"], "one.png", { type: "image/png" }),
+      new File(["two"], "two.png", { type: "image/png" }),
+    ], 1);
+    expect(batch[0]).toMatchObject({ prepared: null, error: expect.stringContaining("이미지 업로드") });
+    expect(batch[1]?.prepared?.file.name).toBe("one.png");
+    expect(batch[2]).toMatchObject({ prepared: null, error: expect.stringContaining("최대 5장") });
+  });
+
+  it("uses unique progress ids across repeated selections of the same file", () => {
+    const file = new File(["one"], "same.png", { type: "image/png", lastModified: 1 });
+    expect(prepareEvidenceImageBatch([file])[0]?.id).not.toBe(prepareEvidenceImageBatch([file])[0]?.id);
   });
 
   it("runs batch work with no more than two concurrent uploads", async () => {

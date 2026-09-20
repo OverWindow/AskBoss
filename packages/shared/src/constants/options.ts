@@ -23,5 +23,6 @@ export const DEFAULT_AI_PROMPT_INSTRUCTIONS = {
   },
 } as const;
 export const OBSERVATION_CATEGORIES = ["업무 지시", "보고 및 피드백", "일정 관리", "의사결정", "일상 소통"] as const;
+export const MAX_IMAGE_EVIDENCE_PER_BOSS = 5;
 export const UPLOAD_LIMITS = { text: 2 * 1024 * 1024, image: 8 * 1024 * 1024 } as const;
 export const ALLOWED_MIME_TYPES = ["text/plain", "image/png", "image/jpeg", "image/webp"] as const;

@@ -1,4 +1,4 @@
-import { ALLOWED_MIME_TYPES, UPLOAD_LIMITS } from "@askboss/shared";
+import { ALLOWED_MIME_TYPES, MAX_IMAGE_EVIDENCE_PER_BOSS, UPLOAD_LIMITS } from "@askboss/shared";
 
 const MIME_BY_EXTENSION: Record<string, (typeof ALLOWED_MIME_TYPES)[number]> = {
   txt: "text/plain",
@@ -13,16 +13,18 @@ export interface PreparedEvidenceFile {
   contentType: (typeof ALLOWED_MIME_TYPES)[number];
 }
 
-export const MAX_IMAGE_UPLOADS_PER_BATCH = 5;
 export const IMAGE_UPLOAD_CONCURRENCY = 2;
+let imageSelectionSequence = 0;
 
-export type EvidenceUploadStatus = "VALIDATING" | "UPLOADING" | "REGISTERING" | "SUCCEEDED" | "FAILED";
+export type EvidenceUploadStatus = "VALIDATING" | "UPLOADING" | "REGISTERING" | "ANALYZING" | "SUCCEEDED" | "FAILED";
 
 export interface EvidenceUploadProgress {
   id: string;
   name: string;
   status: EvidenceUploadStatus;
   error: string | null;
+  evidenceId?: string;
+  jobId?: string;
 }
 
 export interface PreparedEvidenceImage {
@@ -46,13 +48,16 @@ export function prepareEvidenceFile(file: File): PreparedEvidenceFile {
   return { file: normalized, contentType };
 }
 
-export function prepareEvidenceImageBatch(files: readonly File[]): PreparedEvidenceImage[] {
-  if (files.length > MAX_IMAGE_UPLOADS_PER_BATCH) throw new Error(`이미지는 한 번에 최대 ${MAX_IMAGE_UPLOADS_PER_BATCH}장까지 업로드할 수 있습니다.`);
+export function prepareEvidenceImageBatch(files: readonly File[], availableSlots = MAX_IMAGE_EVIDENCE_PER_BOSS): PreparedEvidenceImage[] {
+  const selectionId = ++imageSelectionSequence;
+  let accepted = 0;
   return files.map((source, index) => {
-    const id = `${source.name}:${source.size}:${source.lastModified}:${index}`;
+    const id = `${selectionId}:${source.name}:${source.size}:${source.lastModified}:${index}`;
     try {
       const prepared = prepareEvidenceFile(source);
       if (prepared.contentType === "text/plain") throw new Error("이미지 업로드에서는 PNG, JPG, JPEG, WebP 파일만 선택할 수 있습니다.");
+      if (accepted >= Math.max(0, availableSlots)) throw new Error(`이미지는 상사별로 최대 ${MAX_IMAGE_EVIDENCE_PER_BOSS}장까지 등록할 수 있습니다.`);
+      accepted += 1;
       return { id, source, prepared, error: null };
     } catch (error) {
       return { id, source, prepared: null, error: error instanceof Error ? error.message : "파일을 검증하지 못했습니다." };

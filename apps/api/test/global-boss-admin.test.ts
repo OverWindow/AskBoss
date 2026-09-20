@@ -3,6 +3,7 @@ import { buildApp } from "../src/app";
 import { env } from "../src/config/env";
 import { store } from "../src/repositories";
 import { ai } from "../src/services/ai";
+import { storage } from "../src/services/storage";
 import { buildGlobalBossPromptPreview } from "../src/services/global-boss-prompt-preview";
 
 const app = buildApp();
@@ -138,6 +139,45 @@ describe("global boss administration", () => {
         const deleted = await app.inject({ method: "DELETE", url: `/api/admin/global-boss/evidence/${id}`, headers: { cookie, origin } });
         expect(deleted.statusCode).toBe(204);
       }
+    }
+  });
+
+  it("caps global boss images at five and allows replacement after deletion", async () => {
+    const createdIds: string[] = [];
+    vi.spyOn(storage, "verify").mockResolvedValue(true);
+    vi.spyOn(storage, "remove").mockResolvedValue();
+    try {
+      const uploads = await Promise.all(Array.from({ length: 6 }, (_, index) => app.inject({
+        method: "POST",
+        url: "/api/admin/global-boss/uploads/sign",
+        headers: { cookie, origin },
+        payload: { fileName: `global-${index}.png`, contentType: "image/png", size: 300 + index },
+      })));
+      expect(uploads.every((response) => response.statusCode === 200)).toBe(true);
+      const registered = await Promise.all(uploads.map((signed) => app.inject({
+        method: "POST",
+        url: "/api/admin/global-boss/evidence",
+        headers: { cookie, origin },
+        payload: { type: "IMAGE", uploadIntentId: signed.json().upload.intentId },
+      })));
+      const succeeded = registered.filter((response) => response.statusCode === 202);
+      createdIds.push(...succeeded.map((response) => response.json().evidence.id));
+      expect(succeeded).toHaveLength(5);
+      expect(registered.find((response) => response.statusCode === 409)?.json().error.code).toBe("IMAGE_LIMIT_EXCEEDED");
+
+      const full = await app.inject({ method: "POST", url: "/api/admin/global-boss/uploads/sign", headers: { cookie, origin }, payload: { fileName: "blocked.png", contentType: "image/png", size: 400 } });
+      expect(full.statusCode).toBe(409);
+
+      const removedId = createdIds.shift()!;
+      const removed = await app.inject({ method: "DELETE", url: `/api/admin/global-boss/evidence/${removedId}`, headers: { cookie, origin } });
+      expect(removed.statusCode).toBe(204);
+      const replacementSign = await app.inject({ method: "POST", url: "/api/admin/global-boss/uploads/sign", headers: { cookie, origin }, payload: { fileName: "global-replacement.png", contentType: "image/png", size: 500 } });
+      expect(replacementSign.statusCode).toBe(200);
+      const replacement = await app.inject({ method: "POST", url: "/api/admin/global-boss/evidence", headers: { cookie, origin }, payload: { type: "IMAGE", uploadIntentId: replacementSign.json().upload.intentId } });
+      expect(replacement.statusCode).toBe(202);
+      createdIds.push(replacement.json().evidence.id);
+    } finally {
+      for (const id of createdIds) await app.inject({ method: "DELETE", url: `/api/admin/global-boss/evidence/${id}`, headers: { cookie, origin } });
     }
   });
 

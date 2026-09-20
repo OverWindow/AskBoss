@@ -66,14 +66,17 @@ export interface Store {
   getGlobalUploadIntent(id: string): Promise<GlobalUploadIntentRecord | null>;
   completeGlobalUploadIntent(id: string): Promise<void>;
   createEvidence(input: Omit<EvidenceRecord, "id" | "createdAt">): Promise<EvidenceRecord>;
+  createImageEvidenceWithLimit(input: Omit<EvidenceRecord, "id" | "createdAt">, limit: number): Promise<EvidenceRecord | null>;
   getEvidence(sessionId: string, id: string): Promise<EvidenceRecord | null>;
   listEvidence(sessionId: string, bossId: string): Promise<EvidenceRecord[]>;
   updateEvidence(sessionId: string, id: string, patch: Partial<EvidenceRecord>): Promise<void>;
+  deleteImageEvidenceWithJobs(sessionId: string, bossId: string, id: string): Promise<{ evidence: EvidenceRecord; jobIds: string[] } | null>;
   createGlobalEvidence(input: Omit<GlobalEvidenceRecord, "id" | "createdAt">): Promise<GlobalEvidenceRecord>;
+  createGlobalImageEvidenceWithLimit(input: Omit<GlobalEvidenceRecord, "id" | "createdAt">, limit: number): Promise<GlobalEvidenceRecord | null>;
   getGlobalEvidence(id: string): Promise<GlobalEvidenceRecord | null>;
   listGlobalEvidence(): Promise<GlobalEvidenceRecord[]>;
   updateGlobalEvidence(id: string, patch: Partial<GlobalEvidenceRecord>): Promise<void>;
-  deleteGlobalEvidence(id: string): Promise<void>;
+  deleteGlobalEvidence(id: string): Promise<{ evidence: GlobalEvidenceRecord; jobIds: string[] } | null>;
   upsertSurveyAnswers(sessionId: string, bossId: string, answers: SurveyAnswerRecord[]): Promise<void>;
   listSurveyAnswers(sessionId: string, bossId: string): Promise<SurveyAnswerRecord[]>;
   upsertGlobalSurveyAnswers(answers: SurveyAnswerRecord[]): Promise<void>;

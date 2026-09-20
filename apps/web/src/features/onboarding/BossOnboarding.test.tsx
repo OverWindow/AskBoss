@@ -53,6 +53,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   sessionStorage.clear();
+  vi.restoreAllMocks();
 });
 
 describe("EvidencePrivacyNotice", () => {
@@ -144,5 +145,94 @@ describe("BossOnboarding job recovery", () => {
     expect(mockedApi).toHaveBeenCalledWith("/jobs/missing-persona");
     expect(mockedApi).toHaveBeenCalledWith("/jobs/completed-persona");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("accumulates image selections up to five and frees a slot after deletion", async () => {
+    const images: Array<{ id: string; type: string; status: string; sourceName: string; errorMessage: null }> = [];
+    const intentNames = new Map<string, string>();
+    let intentSequence = 0;
+    let jobSequence = 0;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockedApi.mockImplementation(async (path, options) => {
+      if (path === "/profile") return { profile } as any;
+      if (path === "/company/research") return { research: null } as any;
+      if (path === "/bosses" && options?.method === "POST") return { boss: { id: "new-boss" } } as any;
+      if (path === "/bosses/new-boss/evidence" && !options?.method) return { evidence: [...images] } as any;
+      if (path === "/uploads/sign" && options?.method === "POST") {
+        const body = JSON.parse(String(options.body));
+        const intentId = `intent-${++intentSequence}`;
+        intentNames.set(intentId, body.fileName);
+        return { upload: { intentId, signedUrl: null, token: null } } as any;
+      }
+      if (path === "/bosses/new-boss/evidence" && options?.method === "POST") {
+        const body = JSON.parse(String(options.body));
+        const id = `00000000-0000-4000-8000-${String(images.length + 1).padStart(12, "0")}`;
+        const sourceName = intentNames.get(body.uploadIntentId)!;
+        images.push({ id, type: "IMAGE", status: "PENDING", sourceName, errorMessage: null });
+        return { evidence: images.at(-1), jobId: `job-${++jobSequence}` } as any;
+      }
+      if (String(path).startsWith("/bosses/new-boss/evidence/") && options?.method === "DELETE") {
+        const evidenceId = String(path).split("/").at(-1)!;
+        const index = images.findIndex((item) => item.id === evidenceId);
+        images.splice(index, 1);
+        return { deletedEvidenceId: evidenceId, deletedJobIds: ["job-1"] } as any;
+      }
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderOnboarding();
+    await advanceToEvidenceStep();
+    expect(await screen.findByText("0/5장 · 여러 번 선택 가능")).toBeInTheDocument();
+
+    const selectImages = (files: File[]) => {
+      const input = screen.getByText("이미지 업로드").closest("label")!.querySelector("input")!;
+      fireEvent.change(input, { target: { files } });
+    };
+    selectImages([
+      new File(["1"], "one.png", { type: "image/png" }),
+      new File(["2"], "two.png", { type: "image/png" }),
+    ]);
+    await waitFor(() => expect(images).toHaveLength(2));
+    await screen.findByText("2/5장 · 여러 번 선택 가능");
+
+    selectImages([
+      new File(["3"], "three.png", { type: "image/png" }),
+      new File(["4"], "four.png", { type: "image/png" }),
+      new File(["5"], "five.png", { type: "image/png" }),
+      new File(["6"], "six.png", { type: "image/png" }),
+    ]);
+    await waitFor(() => expect(images).toHaveLength(5));
+    expect(await screen.findByText("5/5장 · 여러 번 선택 가능")).toBeInTheDocument();
+    expect(screen.getByText("six.png").closest("li")).toHaveTextContent("최대 5장");
+    expect(mockedApi.mock.calls.filter(([path, options]) => path === "/bosses/new-boss/evidence" && options?.method === "POST")).toHaveLength(5);
+
+    fireEvent.click(screen.getByRole("button", { name: "one.png 삭제" }));
+    await waitFor(() => expect(images).toHaveLength(4));
+    expect(await screen.findByText("4/5장 · 여러 번 선택 가능")).toBeInTheDocument();
+    const input = screen.getByText("이미지 업로드").closest("label")!.querySelector("input")!;
+    expect(input).not.toBeDisabled();
+    await waitFor(() => expect(JSON.parse(sessionStorage.getItem("askboss:onboarding")!).evidenceJobIds).not.toContain("job-1"));
+  });
+
+  it("restores the cumulative image count and names from server evidence", async () => {
+    const evidence = Array.from({ length: 5 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      type: "IMAGE",
+      status: "READY",
+      sourceName: `restored-${index + 1}.png`,
+      errorMessage: null,
+    }));
+    mockedApi.mockImplementation(async (path, options) => {
+      if (path === "/profile") return { profile } as any;
+      if (path === "/company/research") return { research: null } as any;
+      if (path === "/bosses" && options?.method === "POST") return { boss: { id: "new-boss" } } as any;
+      if (path === "/bosses/new-boss/evidence" && !options?.method) return { evidence } as any;
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderOnboarding();
+    await advanceToEvidenceStep();
+    expect(await screen.findByText("5/5장 · 여러 번 선택 가능")).toBeInTheDocument();
+    expect(screen.getByText("restored-1.png")).toBeInTheDocument();
+    const input = screen.getByText("이미지 업로드").closest("label")!.querySelector("input")!;
+    expect(input).toBeDisabled();
   });
 });

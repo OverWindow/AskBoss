@@ -109,18 +109,18 @@ describe("AdminPage", () => {
         if (signCount === 2) throw new Error("두 번째 파일 업로드 실패");
         return { upload: { intentId: `00000000-0000-4000-8000-00000000000${signCount}`, signedUrl: `https://storage.example/${signCount}`, token: `token-${signCount}` } } as any;
       }
-      if (path === "/admin/global-boss/evidence" && options.method === "POST") { registered.push(JSON.parse(String(options.body)).uploadIntentId); return { jobId: `job-${registered.length}` } as any; }
+      if (path === "/admin/global-boss/evidence" && options.method === "POST") { registered.push(JSON.parse(String(options.body)).uploadIntentId); return { evidence: { id: `evidence-${registered.length}` }, jobId: `job-${registered.length}` } as any; }
       return {} as any;
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     renderAdmin(client, "/admin/global-boss");
-    const input = await screen.findByLabelText("이미지 업로드 (최대 5장)");
+    const input = await screen.findByLabelText("이미지 업로드 (0/5장)");
     const files = Array.from({ length: 5 }, (_, index) => new File([String(index)], `${index + 1}.png`, { type: "image/png" }));
 
     fireEvent.change(input, { target: { files } });
 
     expect(await screen.findByText(/4장 등록 완료 · 1장 실패/)).toBeInTheDocument();
-    expect(screen.getAllByText("등록 완료")).toHaveLength(4);
+    expect(screen.getAllByText("분석 중")).toHaveLength(4);
     expect(screen.getByText("등록 실패")).toBeInTheDocument();
     expect(screen.getByText("두 번째 파일 업로드 실패")).toBeInTheDocument();
     expect(registered).toHaveLength(4);
@@ -128,25 +128,27 @@ describe("AdminPage", () => {
     fetchMock.mockRestore();
   });
 
-  it("rejects six selected images before requesting an upload URL", async () => {
+  it("uploads the first five images and marks the sixth as over the cumulative limit", async () => {
     let signCount = 0;
-    mockedApi.mockImplementation(async (path: string) => {
+    mockedApi.mockImplementation(async (path: string, options: RequestInit = {}) => {
       if (path === "/admin/auth") return { authenticated: true, expiresAt: "2026-09-19T10:00:00Z" } as any;
       if (path === "/admin/global-boss") return { boss: { id: "00000000-0000-4000-8000-000000000001", scope: "GLOBAL", status: "READY", alias: "모두의 상사", avatarKey: "boss-male-01", jobFunction: null, yearsOfServiceBand: null, rank: "팀장", companyName: null, ageBand: 40, hierarchyScore: 55, companyResearch: null, persona: null, pki: null, personaVersion: 1 }, evidence: [], surveyAnswers: [] } as any;
       if (path === "/admin/global-boss-defaults") return { prompt: "", updatedAt: null } as any;
       if (path === "/admin/global-boss/prompt-preview") return { messages: [], sources: [], usesMockUserData: true } as any;
-      if (path === "/admin/global-boss/uploads/sign") { signCount += 1; return {} as any; }
+      if (path === "/admin/global-boss/uploads/sign") { signCount += 1; return { upload: { intentId: `intent-${signCount}`, signedUrl: null, token: null } } as any; }
+      if (path === "/admin/global-boss/evidence" && options.method === "POST") return { evidence: { id: `evidence-${signCount}` }, jobId: `job-${signCount}` } as any;
       return {} as any;
     });
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     renderAdmin(client, "/admin/global-boss");
-    const input = await screen.findByLabelText("이미지 업로드 (최대 5장)");
+    const input = await screen.findByLabelText("이미지 업로드 (0/5장)");
     const files = Array.from({ length: 6 }, (_, index) => new File([String(index)], `${index + 1}.png`, { type: "image/png" }));
 
     fireEvent.change(input, { target: { files } });
 
-    expect(await screen.findByText("이미지는 한 번에 최대 5장까지 업로드할 수 있습니다.")).toBeInTheDocument();
-    expect(signCount).toBe(0);
+    expect(await screen.findByText(/5장 등록 완료 · 1장 실패/)).toBeInTheDocument();
+    expect(screen.getByText("이미지는 상사별로 최대 5장까지 등록할 수 있습니다.")).toBeInTheDocument();
+    expect(signCount).toBe(5);
   });
 
   it("edits the shared translation and onboarding prompt instructions together", async () => {

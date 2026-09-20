@@ -70,4 +70,60 @@ describe("personal boss evidence uploads", () => {
     expect(mismatch.statusCode).toBe(400);
     expect(mismatch.json().error.code).toBe("UPLOAD_MISMATCH");
   });
+
+  it("caps cumulative images at five, preserves names, and frees a slot after deletion", async () => {
+    const owner = await createOwner();
+    vi.spyOn(storage, "verify").mockResolvedValue(true);
+    const remove = vi.spyOn(storage, "remove").mockResolvedValue();
+    const uploads = await Promise.all(Array.from({ length: 6 }, (_, index) => app.inject({
+      method: "POST",
+      url: "/api/uploads/sign",
+      headers: { cookie: owner.cookie },
+      payload: { bossId: owner.bossId, fileName: `capture-${index}.png`, contentType: "image/png", size: 100 + index },
+    })));
+    expect(uploads.every((response) => response.statusCode === 200)).toBe(true);
+
+    const registered = await Promise.all(uploads.map((signed) => app.inject({
+      method: "POST",
+      url: `/api/bosses/${owner.bossId}/evidence`,
+      headers: { cookie: owner.cookie },
+      payload: { type: "IMAGE", uploadIntentId: signed.json().upload.intentId },
+    })));
+    expect(registered.filter((response) => response.statusCode === 202)).toHaveLength(5);
+    const rejected = registered.find((response) => response.statusCode === 409)!;
+    expect(rejected.json().error.code).toBe("IMAGE_LIMIT_EXCEEDED");
+
+    const list = await app.inject({ method: "GET", url: `/api/bosses/${owner.bossId}/evidence`, headers: { cookie: owner.cookie } });
+    const images = list.json().evidence.filter((item: { type: string }) => item.type === "IMAGE");
+    expect(images).toHaveLength(5);
+    expect(images.map((item: { sourceName: string }) => item.sourceName)).toEqual(expect.arrayContaining(["capture-0.png", "capture-4.png"]));
+
+    const full = await app.inject({ method: "POST", url: "/api/uploads/sign", headers: { cookie: owner.cookie }, payload: { bossId: owner.bossId, fileName: "blocked.png", contentType: "image/png", size: 200 } });
+    expect(full.statusCode).toBe(409);
+    expect(full.json().error.code).toBe("IMAGE_LIMIT_EXCEEDED");
+
+    const target = registered.find((response) => response.statusCode === 202)!.json();
+    const deleted = await app.inject({ method: "DELETE", url: `/api/bosses/${owner.bossId}/evidence/${target.evidence.id}`, headers: { cookie: owner.cookie } });
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.json()).toMatchObject({ deletedEvidenceId: target.evidence.id, deletedJobIds: expect.arrayContaining([target.jobId]) });
+    expect(remove).toHaveBeenCalledWith([target.evidence.storagePath]);
+
+    const replacementSign = await app.inject({ method: "POST", url: "/api/uploads/sign", headers: { cookie: owner.cookie }, payload: { bossId: owner.bossId, fileName: "replacement.png", contentType: "image/png", size: 300 } });
+    expect(replacementSign.statusCode).toBe(200);
+    const replacement = await app.inject({ method: "POST", url: `/api/bosses/${owner.bossId}/evidence`, headers: { cookie: owner.cookie }, payload: { type: "IMAGE", uploadIntentId: replacementSign.json().upload.intentId } });
+    expect(replacement.statusCode).toBe(202);
+  });
+
+  it("rejects foreign, non-image, and missing personal evidence deletion", async () => {
+    const owner = await createOwner();
+    const foreign = await createOwner();
+    const text = await app.inject({ method: "POST", url: `/api/bosses/${owner.bossId}/evidence`, headers: { cookie: owner.cookie }, payload: { type: "TEXT", rawText: "삭제할 수 없는 텍스트" } });
+    const foreignDelete = await app.inject({ method: "DELETE", url: `/api/bosses/${owner.bossId}/evidence/${text.json().evidence.id}`, headers: { cookie: foreign.cookie } });
+    expect(foreignDelete.statusCode).toBe(404);
+    const textDelete = await app.inject({ method: "DELETE", url: `/api/bosses/${owner.bossId}/evidence/${text.json().evidence.id}`, headers: { cookie: owner.cookie } });
+    expect(textDelete.statusCode).toBe(400);
+    expect(textDelete.json().error.code).toBe("IMAGE_EVIDENCE_REQUIRED");
+    const missingDelete = await app.inject({ method: "DELETE", url: `/api/bosses/${owner.bossId}/evidence/00000000-0000-4000-8000-000000000099`, headers: { cookie: owner.cookie } });
+    expect(missingDelete.statusCode).toBe(404);
+  });
 });

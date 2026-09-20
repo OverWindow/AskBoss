@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Bot, FileText, Image, LogOut, RefreshCw, Save, Settings2, Trash2, Upload } from "lucide-react";
-import { AGE_BANDS, AVATARS, BOSS_RANKS, BOSS_TENURE_BANDS, JOB_FUNCTIONS, type AdminGlobalBossDetail, type Boss, type BossSurveyQuestion, type CompanyResearch, type GlobalBossDefaults, type GlobalBossPromptPreview } from "@askboss/shared";
+import { AGE_BANDS, AVATARS, BOSS_RANKS, BOSS_TENURE_BANDS, JOB_FUNCTIONS, MAX_IMAGE_EVIDENCE_PER_BOSS, type AdminGlobalBossDetail, type Boss, type BossSurveyQuestion, type CompanyResearch, type GlobalBossDefaults, type GlobalBossPromptPreview } from "@askboss/shared";
 import { EvidenceUploadProgressList } from "../../components/EvidenceUploadProgressList";
 import { api } from "../../services/api-client";
 import { IMAGE_UPLOAD_CONCURRENCY,mapWithConcurrency,prepareEvidenceFile,prepareEvidenceImageBatch,type EvidenceUploadProgress,uploadToSignedUrl } from "../../services/upload-client";
@@ -49,6 +49,16 @@ export function GlobalBossAdmin({ onLogout }: Props) {
     setQuestions(detail.data.surveyAnswers.map((item) => item.questionSnapshot as unknown as BossSurveyQuestion));
     setAnswers(Object.fromEntries(detail.data.surveyAnswers.map((item) => [item.questionId, { selectedOption: item.selectedOption, freeText: item.freeText ?? "" }])));
   }, [detail.data?.surveyAnswers, questions.length]);
+  useEffect(() => {
+    const evidence = detail.data?.evidence;
+    if (!evidence) return;
+    setUploadItems((items) => items.map((item) => {
+      if (!item.evidenceId) return item;
+      const stored = evidence.find((entry) => entry.id === item.evidenceId);
+      if (!stored) return item;
+      return { ...item, status: stored.status === "READY" ? "SUCCEEDED" : stored.status === "FAILED" ? "FAILED" : "ANALYZING", error: stored.errorMessage };
+    }));
+  }, [detail.data?.evidence]);
 
   const patchBoss = <K extends keyof Boss>(key: K, value: Boss[K]) => setBoss((current) => current ? { ...current, [key]: value } : current);
   const saveBoss = async () => {
@@ -83,7 +93,7 @@ export function GlobalBossAdmin({ onLogout }: Props) {
     finally { setBusy(undefined); }
   };
   const uploadFile = async (file: File) => {
-    setBusy("evidence"); setMessage(`${file.name} 검증 중…`); setUploadItems([]);
+    setBusy("evidence"); setMessage(`${file.name} 검증 중…`);
     try {
       const prepared = prepareEvidenceFile(file);
       const { upload } = await adminApi<{ upload: { intentId: string; signedUrl: string | null; token: string | null } }>("/admin/global-boss/uploads/sign", { method: "POST", body: JSON.stringify({ fileName: prepared.file.name, contentType: prepared.contentType, size: prepared.file.size }) });
@@ -98,10 +108,8 @@ export function GlobalBossAdmin({ onLogout }: Props) {
   const uploadImages = async (files: File[]) => {
     if (!files.length) return;
     setMessage("");
-    let batch;
-    try { batch = prepareEvidenceImageBatch(files); }
-    catch (error) { setUploadItems([]); setMessage(error instanceof Error ? error.message : "이미지를 선택하지 못했습니다."); return; }
-    setUploadItems(batch.map((item) => ({ id: item.id, name: item.source.name, status: item.error ? "FAILED" : "VALIDATING", error: item.error })));
+    const batch = prepareEvidenceImageBatch(files, Math.max(0, MAX_IMAGE_EVIDENCE_PER_BOSS - imageCount));
+    setUploadItems((items) => [...items, ...batch.map((item) => ({ id: item.id, name: item.source.name, status: item.error ? "FAILED" as const : "VALIDATING" as const, error: item.error }))]);
     const valid = batch.filter((item): item is typeof item & { prepared: NonNullable<typeof item.prepared> } => Boolean(item.prepared));
     if (!valid.length) { setMessage("업로드할 수 있는 이미지가 없습니다. 파일별 오류를 확인해 주세요."); return; }
     setBusy("evidence");
@@ -111,9 +119,9 @@ export function GlobalBossAdmin({ onLogout }: Props) {
         const { upload } = await adminApi<{ upload: { intentId: string; signedUrl: string | null; token: string | null } }>("/admin/global-boss/uploads/sign", { method: "POST", body: JSON.stringify({ fileName: item.prepared.file.name, contentType: item.prepared.contentType, size: item.prepared.file.size }) });
         if (upload.signedUrl) await uploadToSignedUrl(upload.signedUrl, item.prepared.file, upload.token);
         updateUploadItem(item.id, { status: "REGISTERING" });
-        await adminApi("/admin/global-boss/evidence", { method: "POST", body: JSON.stringify({ type: "IMAGE", uploadIntentId: upload.intentId }) });
-        updateUploadItem(item.id, { status: "SUCCEEDED" });
-        return item.id;
+        const result = await adminApi<{ evidence: { id: string }; jobId: string }>("/admin/global-boss/evidence", { method: "POST", body: JSON.stringify({ type: "IMAGE", uploadIntentId: upload.intentId }) });
+        updateUploadItem(item.id, { status: "ANALYZING", evidenceId: result.evidence.id, jobId: result.jobId });
+        return result.evidence.id;
       });
       const succeeded = results.filter((result) => result.status === "fulfilled").length;
       results.forEach((result, index) => { if (result.status === "rejected") updateUploadItem(valid[index]!.id, { status: "FAILED", error: result.reason instanceof Error ? result.reason.message : "이미지를 추가하지 못했습니다." }); });
@@ -123,11 +131,15 @@ export function GlobalBossAdmin({ onLogout }: Props) {
     } finally { setBusy(undefined); }
   };
   const deleteEvidence = async (id: string) => {
-    if (!window.confirm("이 관찰 자료를 삭제할까요? 다음 재생성부터 제외됩니다.")) return;
+    if (!window.confirm("이 관찰 자료를 삭제할까요? 다음 재생성부터 제외됩니다.")) return false;
     setBusy(id); setMessage("");
-    try { await adminApi(`/admin/global-boss/evidence/${id}`, { method: "DELETE" }); setMessage("관찰 자료를 삭제했습니다."); await detail.refetch(); }
-    catch (error) { setMessage(error instanceof Error ? error.message : "자료를 삭제하지 못했습니다."); }
+    try { await adminApi(`/admin/global-boss/evidence/${id}`, { method: "DELETE" }); setUploadItems((items)=>items.filter((item)=>item.evidenceId!==id));setMessage("관찰 자료를 삭제했습니다."); await detail.refetch();return true; }
+    catch (error) { setMessage(error instanceof Error ? error.message : "자료를 삭제하지 못했습니다.");return false; }
     finally { setBusy(undefined); }
+  };
+  const removeUploadItem = async (item: EvidenceUploadProgress) => {
+    if (!item.evidenceId) { setUploadItems((items) => items.filter((current) => current.id !== item.id)); return; }
+    await deleteEvidence(item.evidenceId);
   };
   const generateSurvey = async () => {
     setBusy("survey-generate"); setMessage("");
@@ -162,6 +174,7 @@ export function GlobalBossAdmin({ onLogout }: Props) {
   if (detail.isLoading) return <div className="loading-state"><div className="spinner"/></div>;
   if (detail.isError || !boss) return <main className="admin-page"><div className="admin-section"><p className="error-text">모두의 상사 정보를 불러오지 못했습니다.</p><button className="secondary-button" onClick={() => void detail.refetch()}>다시 시도</button></div></main>;
   const evidence = detail.data?.evidence ?? [];
+  const imageCount = evidence.filter((item) => item.type === "IMAGE").length;
   const processing = evidence.some((item) => item.status === "PENDING" || item.status === "PROCESSING");
 
   return <main className="admin-page global-boss-admin">
@@ -201,8 +214,8 @@ export function GlobalBossAdmin({ onLogout }: Props) {
 
     <section className="admin-section"><div className="admin-section-title"><FileText/><div><h2>관찰 자료</h2><p>카톡 대화 붙여넣기와 TXT·이미지 자료를 영구 보관합니다.</p></div></div>
       <div className="admin-evidence-input"><textarea className="textarea" value={textEvidence} onChange={(event) => setTextEvidence(event.target.value)} placeholder="대화 내용을 붙여넣으세요."/><button className="primary-button" disabled={!textEvidence.trim() || Boolean(busy)} onClick={() => void addTextEvidence()}><Upload size={16}/>텍스트 추가</button></div>
-      <div className="admin-upload-actions"><label className="secondary-button"><FileText size={16}/>TXT 업로드<input hidden disabled={Boolean(busy)} type="file" accept=".txt,text/plain" onChange={(event) => { const file=event.target.files?.[0];if(file)void uploadFile(file);event.currentTarget.value=""; }}/></label><label className="secondary-button"><Image size={16}/>이미지 업로드 (최대 5장)<input hidden multiple disabled={Boolean(busy)} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" onChange={(event) => { const files=Array.from(event.target.files??[]);event.currentTarget.value="";if(files.length)void uploadImages(files); }}/></label></div>
-      <EvidenceUploadProgressList items={uploadItems}/>
+      <div className="admin-upload-actions"><label className="secondary-button"><FileText size={16}/>TXT 업로드<input hidden disabled={Boolean(busy)} type="file" accept=".txt,text/plain" onChange={(event) => { const file=event.target.files?.[0];if(file)void uploadFile(file);event.currentTarget.value=""; }}/></label><label className={`secondary-button ${imageCount>=MAX_IMAGE_EVIDENCE_PER_BOSS?"is-disabled":""}`}><Image size={16}/>이미지 업로드 ({imageCount}/{MAX_IMAGE_EVIDENCE_PER_BOSS}장)<input hidden multiple disabled={Boolean(busy)||imageCount>=MAX_IMAGE_EVIDENCE_PER_BOSS} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" onChange={(event) => { const files=Array.from(event.target.files??[]);event.currentTarget.value="";if(files.length)void uploadImages(files); }}/></label></div>
+      <EvidenceUploadProgressList items={uploadItems} onRemove={(item)=>void removeUploadItem(item)} removingId={busy}/>
       <div className="admin-evidence-list">{evidence.map((item) => <article key={item.id}><div><strong>{item.sourceName ?? item.type}</strong><span className={`job-status status-${item.status.toLowerCase()}`}>{item.status}</span><small>{new Date(item.createdAt).toLocaleString("ko-KR")}</small>{item.rawText && <p>{item.rawText}</p>}{item.errorMessage && <p className="error-text">{item.errorMessage}</p>}</div><button className="icon-button" aria-label={`${item.sourceName ?? item.type} 삭제`} disabled={busy === item.id} onClick={() => void deleteEvidence(item.id)}><Trash2 size={16}/></button></article>)}{!evidence.length && <p className="hint">등록된 관찰 자료가 없습니다.</p>}</div>
     </section>
 
