@@ -13,7 +13,16 @@ export function useKeyboardOffset() {
     if (!viewport) return;
     const apply = () => {
       const offset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
-      document.documentElement.style.setProperty("--keyboard-offset", `${Math.round(offset)}px`);
+      // In resize mode (Android Chrome) the layout viewport shrinks along with the
+      // visual viewport, so the panel flexes by itself and padding would double the
+      // gap. Only overlay keyboards (iOS Safari) keep clientHeight tall and need the
+      // manual offset.
+      const layoutShrank = document.documentElement.clientHeight <= viewport.height + 8;
+      document.documentElement.style.setProperty("--keyboard-offset", layoutShrank ? "0px" : `${Math.round(offset)}px`);
+      // The mobile workspace body is scroll-locked, but momentum scrolling and
+      // Chrome's scroll restoration around keyboard show/hide can still leave a
+      // stale document offset that drags the fixed nav and panel titles away.
+      if (window.scrollY && window.matchMedia("(max-width:767px)").matches) window.scrollTo(0, 0);
     };
     apply();
     viewport.addEventListener("resize", apply);

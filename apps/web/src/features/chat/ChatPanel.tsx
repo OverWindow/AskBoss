@@ -55,6 +55,7 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
   const loadingOlderRef = useRef(false);
   const olderRequestController = useRef<AbortController | undefined>(undefined);
   const preserveScrollRef = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const stickToBottomRef = useRef(true);
   const activeBossIdRef = useRef(boss.id);
   const activeThreadIdRef = useRef<string | undefined>(undefined);
   activeBossIdRef.current = boss.id;
@@ -89,8 +90,20 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
       preserveScrollRef.current = null;
       return;
     }
-    if (active) chatList.scrollTop = chatList.scrollHeight;
+    if (active && stickToBottomRef.current) chatList.scrollTop = chatList.scrollHeight;
   }, [messages, active, simulationLoading, actualMessage]);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const pinToBottom = () => {
+      if (document.activeElement !== inputRef.current) return;
+      const chatList = chatListRef.current;
+      if (chatList) chatList.scrollTop = chatList.scrollHeight;
+    };
+    viewport.addEventListener("resize", pinToBottom);
+    return () => viewport.removeEventListener("resize", pinToBottom);
+  }, []);
 
   useEffect(() => {
     requestController.current?.abort();
@@ -387,7 +400,7 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
   return <section id="chat-panel" className="workspace-tab-panel" role="tabpanel" aria-labelledby="workspace-tab-chat" aria-label={`${boss.alias}${waGwa(boss.alias)} 대화`} hidden={!active} aria-busy={busy}>
     <div className="workspace-panel-title chat-panel-title"><h2><MessageCircle size={18}/>{boss.alias}{waGwa(boss.alias)} 대화</h2><button className="chat-reset-button" type="button" disabled={busy} onClick={() => void resetChat()} aria-label="대화 초기화" title="대화 초기화"><RotateCcw size={17}/></button></div>
     <p className="panel-hint">가상 시뮬레이션이며 실제 인물의 생각을 단정하지 않습니다.</p>
-    <div ref={chatListRef} className="chat-list" aria-live="polite" onScroll={(event) => { if (event.currentTarget.scrollTop <= 80) void loadOlderMessages(); }}>
+    <div ref={chatListRef} className="chat-list" aria-live="polite" onScroll={(event) => { const list = event.currentTarget; stickToBottomRef.current = list.scrollHeight - list.scrollTop - list.clientHeight < 120; if (list.scrollTop <= 80) void loadOlderMessages(); }}>
       {history.isLoading && !simulationStarted.current && <p className="hint">이전 대화를 불러오는 중입니다.</p>}
       {history.isError && <p className="error-text" role="alert">이전 대화를 불러오지 못했습니다.</p>}
       {loadingOlder && <p className="chat-history-status" role="status">이전 대화를 불러오는 중…</p>}

@@ -60,6 +60,9 @@ export function MainPage() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    const activeElement = document.activeElement;
+    const chatPanel = document.getElementById("chat-panel");
+    if (activeElement instanceof HTMLElement && chatPanel?.contains(activeElement)) activeElement.blur();
   }, [ui.mobilePanelExpanded, ui.activeWorkspaceTab]);
 
   const resetBossSpeech = useCallback(() => {
