@@ -398,7 +398,6 @@
   #chat-panel .chat-composer{gap:9px;padding:10px 12px max(10px,env(safe-area-inset-bottom));box-shadow:0 -8px 24px rgba(33,34,50,.05)}
   #chat-panel .chat-input{font-size:16px;line-height:1.4;padding:11px 12px;touch-action:manipulation}
   #chat-panel .chat-composer>.primary-button{width:46px;height:46px;min-height:46px;border-radius:12px;flex:none}
-  html:has(#chat-panel .chat-input:focus) .mobile-bottom-nav{visibility:hidden;pointer-events:none}
 }
 
 @media(max-width:850px){
