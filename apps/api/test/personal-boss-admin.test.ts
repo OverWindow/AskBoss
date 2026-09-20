@@ -56,7 +56,7 @@ describe("personal boss prompt administration", () => {
     const previousDefaults = await store.getPersonalBossDefaults();
     const previousPrompts = await store.getAiPromptSettings();
     await store.updatePersonalBossDefaults("개인 상사 원문 테스트 기본 성향");
-    await store.updateAiPromptSettings({ translation: previousPrompts.translation, onboarding: { ...previousPrompts.onboarding, personaGeneration: "원문 테스트 페르소나 생성 지침" } });
+    await store.updateAiPromptSettings({ translation: previousPrompts.translation, translationReplyStyles: previousPrompts.translationReplyStyles, onboarding: { ...previousPrompts.onboarding, personaGeneration: "원문 테스트 페르소나 생성 지침" } });
     const evidence = await store.createEvidence({ bossId: boss.id, sessionId: owner.sessionId, type: "TEXT", status: "READY", rawText: "결론을 먼저 물어보는 실제 관찰", storagePath: null, parsedData: { observations: [] }, observedAt: new Date().toISOString(), expiresAt: expiry });
     await store.upsertSurveyAnswers(owner.sessionId, boss.id, [{ questionId: "q1", questionSnapshot: { situation: "일정 보고" }, selectedOption: "마감부터 확인", freeText: null }]);
     const thread = await store.getOrCreateThread(owner.sessionId, boss.id, undefined, expiry);
@@ -103,7 +103,7 @@ describe("personal boss prompt administration", () => {
       auditFailure.mockRestore();
     } finally {
       await store.updatePersonalBossDefaults(previousDefaults.prompt);
-      await store.updateAiPromptSettings({ translation: previousPrompts.translation, onboarding: previousPrompts.onboarding });
+      await store.updateAiPromptSettings({ translation: previousPrompts.translation, translationReplyStyles: previousPrompts.translationReplyStyles, onboarding: previousPrompts.onboarding });
       await store.updateEvidence(owner.sessionId, evidence.id, { rawText: null });
       await store.deleteSession(owner.sessionId);
     }

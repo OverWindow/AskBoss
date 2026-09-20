@@ -168,6 +168,7 @@ export interface GlobalBossDefaults {
 }
 
 export type TranslationExamples = [string, string, string];
+export type TranslationReplyStyles = [string, string, string];
 
 export interface TranslationExamplesSettings {
   examples: TranslationExamples;
@@ -176,6 +177,7 @@ export interface TranslationExamplesSettings {
 
 export interface AiPromptInstructions {
   translation: string;
+  translationReplyStyles: TranslationReplyStyles;
   onboarding: {
     companyResearch: string;
     evidenceExtraction: string;

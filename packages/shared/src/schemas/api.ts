@@ -60,8 +60,14 @@ export const translationExamplesSchema = z.tuple([
 ]);
 export const adminTranslationExamplesSchema = z.object({ examples: translationExamplesSchema });
 const adminPromptInstructionSchema = z.string().trim().min(1, "프롬프트 지침을 입력해 주세요.").max(5_000, "프롬프트 지침은 5,000자 이하로 입력해 주세요.");
+const translationReplyStylesSchema = z.tuple([
+  z.string().trim().min(1, "답장 스타일을 입력해 주세요.").max(40, "답장 스타일은 40자 이하로 입력해 주세요."),
+  z.string().trim().min(1, "답장 스타일을 입력해 주세요.").max(40, "답장 스타일은 40자 이하로 입력해 주세요."),
+  z.string().trim().min(1, "답장 스타일을 입력해 주세요.").max(40, "답장 스타일은 40자 이하로 입력해 주세요."),
+]);
 export const adminAiPromptSettingsSchema = z.object({
   translation: adminPromptInstructionSchema,
+  translationReplyStyles: translationReplyStylesSchema,
   onboarding: z.object({
     companyResearch: adminPromptInstructionSchema,
     evidenceExtraction: adminPromptInstructionSchema,

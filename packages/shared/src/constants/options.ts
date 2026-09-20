@@ -11,8 +11,10 @@ export const AVATARS = ["boss-male-01", "boss-male-bald-01", "boss-female-01", "
 
 export const DEFAULT_PERSONAL_BOSS_BASE_PROMPT = "대한민국 직장의 일반적인 상사처럼 반응한다. 지나치게 다정하거나 상담가처럼 위로하지 말고, 직급 차이와 업무 맥락을 반영해 간결하고 현실적으로 말한다. 일정, 결과, 책임, 다음 행동을 분명히 확인한다. 다만 모욕·비하·위협·직장 내 괴롭힘 표현은 만들지 않는다.";
 export const DEFAULT_TRANSLATION_EXAMPLES = ["이거 언제 되나?", "한번 검토해 볼게요.", "이 정도는 알아서 해주세요."] as const;
+export const DEFAULT_TRANSLATION_REPLY_STYLES = ["수락", "조율", "거절"] as const;
 export const DEFAULT_AI_PROMPT_INSTRUCTIONS = {
   translation: "상사 발언을 쉽게 풀고 가능한 의도와 주의점을 확률적 표현으로 설명한다. 서로 다른 스타일의 답장 3개를 추천한다.",
+  translationReplyStyles: [...DEFAULT_TRANSLATION_REPLY_STYLES] as [string, string, string],
   onboarding: {
     companyResearch: "공개적으로 확인 가능한 정보만으로 회사를 조사한다. 기업문화는 관찰 가능한 신호와 추정을 구분하고 특정 상사 개인의 성격으로 일반화하지 않는다.",
     evidenceExtraction: "대화 자료에서 발신자, 시각, 메시지, 앞뒤 맥락과 독립 관찰을 추출한다.",

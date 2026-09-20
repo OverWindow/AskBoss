@@ -26,7 +26,7 @@ describe("editable onboarding prompt routing", () => {
       surveyGeneration: "질문 생성 라우팅 테스트",
       personaGeneration: "페르소나 생성 라우팅 테스트",
     };
-    await store.updateAiPromptSettings({ translation: before.translation, onboarding: instructions });
+    await store.updateAiPromptSettings({ translation: before.translation, translationReplyStyles: before.translationReplyStyles, onboarding: instructions });
     await store.clearCompanyResearchCache();
 
     const originalResearch = ai.researchCompany.bind(ai);
@@ -61,7 +61,7 @@ describe("editable onboarding prompt routing", () => {
       expect((await waitForSessionJob(cookie, rebuild.json().jobId)).status).toBe("SUCCEEDED");
       expect(build).toHaveBeenCalledWith(expect.objectContaining({ boss: expect.objectContaining({ id: bossId }), promptInstruction: instructions.personaGeneration }));
     } finally {
-      await store.updateAiPromptSettings({ translation: before.translation, onboarding: before.onboarding });
+      await store.updateAiPromptSettings({ translation: before.translation, translationReplyStyles: before.translationReplyStyles, onboarding: before.onboarding });
     }
   });
 });

@@ -150,7 +150,7 @@ describe("AdminPage", () => {
   });
 
   it("edits the shared translation and onboarding prompt instructions together", async () => {
-    let prompts = { translation: "기존 번역 지침", onboarding: { companyResearch: "기존 회사 조사 지침", evidenceExtraction: "기존 자료 추출 지침", surveyGeneration: "기존 질문 생성 지침", personaGeneration: "기존 페르소나 지침" }, updatedAt: null as string | null };
+    let prompts = { translation: "기존 번역 지침", translationReplyStyles: ["수락", "조율", "거절"], onboarding: { companyResearch: "기존 회사 조사 지침", evidenceExtraction: "기존 자료 추출 지침", surveyGeneration: "기존 질문 생성 지침", personaGeneration: "기존 페르소나 지침" }, updatedAt: null as string | null };
     mockedApi.mockImplementation(async (path: string, options: RequestInit = {}) => {
       if (path === "/admin/auth") return { authenticated: true, expiresAt: "2026-09-19T10:00:00Z" } as any;
       if (path === "/admin/dashboard") return { generatedAt: new Date().toISOString(), sessions: { total: 0, active15m: 0, new24h: 0, expiring1h: 0 }, usage: { personalBosses: 0, chatMessages24h: 0, translations24h: 0 }, jobs: { pending: 0, running: 0, failed: 0, oldestPendingMinutes: null, failureReasons: [] }, uploads: { expiredIncomplete: 0 }, featureUsage: [], recentOperations: [] } as any;
@@ -168,10 +168,12 @@ describe("AdminPage", () => {
     const translation = await screen.findByLabelText("번역 업무 지침");
     await waitFor(() => expect(translation).toHaveValue("기존 번역 지침"));
     fireEvent.change(translation, { target: { value: "새 공통 번역 지침" } });
+    fireEvent.change(screen.getByLabelText("추천 답장 스타일 2"), { target: { value: "조건부 수락" } });
     fireEvent.change(screen.getByLabelText("페르소나 생성"), { target: { value: "새 페르소나 지침" } });
     fireEvent.click(screen.getByRole("button", { name: "AI 프롬프트 저장" }));
     expect(await screen.findByText("AI 업무 프롬프트를 저장했습니다.")).toBeInTheDocument();
     expect(prompts.translation).toBe("새 공통 번역 지침");
+    expect(prompts.translationReplyStyles).toEqual(["수락", "조건부 수락", "거절"]);
     expect(prompts.onboarding.personaGeneration).toBe("새 페르소나 지침");
     expect(screen.getByText(/보안 규칙, JSON 필드와 응답 형식/)).toBeInTheDocument();
   });

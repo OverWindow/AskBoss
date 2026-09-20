@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { feedbackSchema, translationInputSchema } from "../shared.js";
+import { feedbackSchema, translationInputSchema, type TranslationResult } from "../shared.js";
 import { store } from "../repositories/index.js";
 import { requireSession, sessionExpiry } from "../services/session.js";
 import { ai } from "../services/ai/index.js";
@@ -39,7 +39,11 @@ export const translationRoutes: FastifyPluginAsync = async (app) => {
     request.raw.once("aborted", onClientAbort);
 
     try {
-      const result = plainTextValues(await ai.translateBossMessage({ profile, boss, basePrompt, globalBoss: boss.scope === "SESSION" ? globalBoss : undefined, sessionCalibration, promptInstruction: prompts.translation, ...body }, controller.signal));
+      const translated = plainTextValues(await ai.translateBossMessage({ profile, boss, basePrompt, globalBoss: boss.scope === "SESSION" ? globalBoss : undefined, sessionCalibration, promptInstruction: prompts.translation, replyStyles: prompts.translationReplyStyles, ...body }, controller.signal));
+      const result: TranslationResult = {
+        ...translated,
+        replies: translated.replies.map((reply, index) => ({ ...reply, style: prompts.translationReplyStyles[index] })) as TranslationResult["replies"],
+      };
       const { translation: row, archive } = await store.createTranslationWithArchive({ sessionId: session.id, bossId, inputText: body.inputText, channel: body.channel, result, expiresAt: sessionExpiry() }, ownerHash, boss);
       void track(session.id, "TRANSLATE", profile, boss, { topicKeywords: topics(body.inputText) }).catch((error) => request.log.warn(error, "translation analytics failed"));
       return { translationId: row.id, archiveId: archive.id, result };

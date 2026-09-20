@@ -144,7 +144,7 @@ describe("global boss administration", () => {
   it("generates and saves survey answers as global evidence", async () => {
     const beforePrompts = await store.getAiPromptSettings();
     const generateSurvey = vi.spyOn(ai, "generateSurvey");
-    await store.updateAiPromptSettings({ translation: beforePrompts.translation, onboarding: { ...beforePrompts.onboarding, surveyGeneration: "모두의 상사 질문 테스트 지침" } });
+    await store.updateAiPromptSettings({ translation: beforePrompts.translation, translationReplyStyles: beforePrompts.translationReplyStyles, onboarding: { ...beforePrompts.onboarding, surveyGeneration: "모두의 상사 질문 테스트 지침" } });
     try {
       const generated = await app.inject({ method: "POST", url: "/api/admin/global-boss/survey/generate", headers: { cookie, origin } });
       expect(generated.statusCode).toBe(200);
@@ -162,7 +162,7 @@ describe("global boss administration", () => {
       expect(detail.json().evidence).toEqual(expect.arrayContaining([expect.objectContaining({ type: "SURVEY", status: "READY" })]));
     } finally {
       generateSurvey.mockRestore();
-      await store.updateAiPromptSettings({ translation: beforePrompts.translation, onboarding: beforePrompts.onboarding });
+      await store.updateAiPromptSettings({ translation: beforePrompts.translation, translationReplyStyles: beforePrompts.translationReplyStyles, onboarding: beforePrompts.onboarding });
     }
   });
 
@@ -192,7 +192,7 @@ describe("global boss administration", () => {
     const beforePrompts = await store.getAiPromptSettings();
     const build = vi.spyOn(ai, "buildPersona");
     await store.updateGlobalBossDefaults("재생성 전용 글로벌 지침");
-    await store.updateAiPromptSettings({ translation: beforePrompts.translation, onboarding: { ...beforePrompts.onboarding, personaGeneration: "모두의 상사 페르소나 테스트 지침" } });
+    await store.updateAiPromptSettings({ translation: beforePrompts.translation, translationReplyStyles: beforePrompts.translationReplyStyles, onboarding: { ...beforePrompts.onboarding, personaGeneration: "모두의 상사 페르소나 테스트 지침" } });
     try {
       const response = await app.inject({ method: "POST", url: "/api/admin/global-boss/persona/rebuild", headers: { cookie, origin } });
       expect(response.statusCode).toBe(202);
@@ -205,7 +205,7 @@ describe("global boss administration", () => {
     } finally {
       build.mockRestore();
       await store.updateGlobalBossDefaults("");
-      await store.updateAiPromptSettings({ translation: beforePrompts.translation, onboarding: beforePrompts.onboarding });
+      await store.updateAiPromptSettings({ translation: beforePrompts.translation, translationReplyStyles: beforePrompts.translationReplyStyles, onboarding: beforePrompts.onboarding });
     }
   });
 

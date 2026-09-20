@@ -28,7 +28,7 @@ describe("prompt security boundaries", () => {
   });
 
   it("inserts editable instructions without replacing fixed response contracts", () => {
-    const translation = translatorPrompt({ inputText: "언제 되나?" }, "번역 사용자 설정");
+    const translation = translatorPrompt({ inputText: "언제 되나?" }, "번역 사용자 설정", ["수락", "일정 조율", "정중한 거절"]);
     const company = companyPrompt("테스트 회사", "회사 사용자 설정");
     const evidence = evidencePrompt("대화 원문", "추출 사용자 설정");
     const survey = surveyPrompt({ alias: "김팀장" }, "설문 사용자 설정");
@@ -38,6 +38,8 @@ describe("prompt security boundaries", () => {
       expect(prompt).toContain("JSON");
     }
     expect(translation).toContain("surfaceActualGapScore");
+    expect(translation).toContain('<reply-styles>["수락","일정 조율","정중한 거절"]</reply-styles>');
+    expect(translation).toContain('"style":"일정 조율"');
     expect(company).toContain("companyName, industry");
     expect(evidence).toContain("업무 지시, 보고 및 피드백");
     expect(survey).toContain("질문은 정확히 5개");

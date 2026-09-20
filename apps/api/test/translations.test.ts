@@ -2,7 +2,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app.js";
 import { ai } from "../src/services/ai/index.js";
 import { store } from "../src/repositories/index.js";
-import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT } from "@askboss/shared";
+import { DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFAULT_TRANSLATION_REPLY_STYLES } from "@askboss/shared";
 
 const app = buildApp();
 afterAll(() => app.close());
@@ -34,7 +34,7 @@ describe("translation API", () => {
     await store.updatePersonalBossDefaults("개인 상사 전용 테스트 성격");
     await store.updateGlobalBossDefaults("모두의 상사 전용 테스트 성격");
     const beforePrompts = await store.getAiPromptSettings();
-    await store.updateAiPromptSettings({ translation: "모든 상사 공통 번역 테스트 지침", onboarding: beforePrompts.onboarding });
+    await store.updateAiPromptSettings({ translation: "모든 상사 공통 번역 테스트 지침", translationReplyStyles: ["수락형", "조율형", "거절형"], onboarding: beforePrompts.onboarding });
     try {
       const session = await app.inject({ method: "POST", url: "/api/session" });
       const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
@@ -50,14 +50,16 @@ describe("translation API", () => {
 
       expect(seen[0].basePrompt).toBe("모두의 상사 전용 테스트 성격");
       expect(seen[0].promptInstruction).toBe("모든 상사 공통 번역 테스트 지침");
+      expect(seen[0].replyStyles).toEqual(["수락형", "조율형", "거절형"]);
       expect(seen[0].globalBoss).toBeUndefined();
       expect(seen[1].basePrompt).toBe("개인 상사 전용 테스트 성격");
       expect(seen[1].promptInstruction).toBe("모든 상사 공통 번역 테스트 지침");
+      expect(seen[1].replyStyles).toEqual(["수락형", "조율형", "거절형"]);
       expect(seen[1].globalBoss?.scope).toBe("GLOBAL");
     } finally {
       await store.updatePersonalBossDefaults(DEFAULT_PERSONAL_BOSS_BASE_PROMPT);
       await store.updateGlobalBossDefaults("");
-      await store.updateAiPromptSettings({ translation: beforePrompts.translation, onboarding: beforePrompts.onboarding });
+      await store.updateAiPromptSettings({ translation: beforePrompts.translation, translationReplyStyles: beforePrompts.translationReplyStyles, onboarding: beforePrompts.onboarding });
     }
   });
 
@@ -67,6 +69,7 @@ describe("translation API", () => {
     const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
     const response = await app.inject({ method: "POST", url: "/api/bosses/00000000-0000-4000-8000-000000000001/translate", headers: { cookie }, payload: { inputText: "언제 되나?", channel: "사내 메신저" } });
     expect(response.json().result).toMatchObject({ plainMeaning: "현재 상황 공유 요청", tone: "간결함", caution: "단정 금지" });
+    expect(response.json().result.replies.map((reply: { style: string }) => reply.style)).toEqual(DEFAULT_TRANSLATION_REPLY_STYLES);
     expect(JSON.stringify(response.json().result)).not.toMatch(/\*\*|`|https:\/\//);
   });
 });
