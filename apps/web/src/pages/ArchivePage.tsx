@@ -7,6 +7,7 @@ import { Dialog } from "../components/Dialog";
 import { ActualResponseDialog } from "../features/archive/ActualResponseDialog";
 import { api } from "../services/api-client";
 import { useSession } from "../features/session/useSession";
+import { useModalFocus } from "../lib/use-modal-focus";
 
 function ArchiveCard({ summary, onDelete, deleting }: { summary: TranslationArchiveSummary; onDelete: () => void; deleting: boolean }) {
   const cache = useQueryClient();
@@ -61,6 +62,7 @@ function ArchiveCard({ summary, onDelete, deleting }: { summary: TranslationArch
 }
 
 export function ArchiveModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const modalRef = useModalFocus<HTMLElement>(open, onClose);
   const session = useSession();
   const cache = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<TranslationArchiveSummary>();
@@ -94,7 +96,7 @@ export function ArchiveModal({ open, onClose }: { open: boolean; onClose: () => 
     }
   };
   return <AnimatePresence>{open && <motion.div className="archive-modal-backdrop" role="presentation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: .2 }} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <motion.section className="archive-modal" role="dialog" aria-modal="true" aria-labelledby="archive-modal-title" initial={{ opacity: 0, y: 18, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: .98 }} transition={{ duration: .24, ease: [0.22, 1, 0.36, 1] }}>
+    <motion.section ref={modalRef} tabIndex={-1} className="archive-modal" role="dialog" aria-modal="true" aria-labelledby="archive-modal-title" initial={{ opacity: 0, y: 18, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: .98 }} transition={{ duration: .24, ease: [0.22, 1, 0.36, 1] }}>
       <header className="archive-modal-header"><div><h1 id="archive-modal-title">번역 아카이브</h1></div><button className="icon-button" type="button" aria-label="아카이브 닫기" onClick={onClose}><X size={19}/></button></header>
       <div className="archive-modal-body">
         {session.isLoading ? <div className="loading-state"><div className="spinner"/><p>아카이브를 불러오는 중입니다.</p></div> : session.isError ? <div className="empty-state"><p className="error-text" role="alert">세션을 시작하지 못했습니다.</p></div> : archives.isLoading ? <div className="loading-state"><div className="spinner"/><p>아카이브를 불러오는 중입니다.</p></div> : archives.isError ? <p className="error-text" role="alert">아카이브를 불러오지 못했습니다.</p> : items.length === 0 ? <div className="archive-empty"><Archive size={28}/><h2>아직 저장된 번역이 없습니다.</h2><p>번역이 완료되면 자동으로 이곳에 저장됩니다.</p></div> : <div className="archive-list">{items.map((item) => <ArchiveCard key={item.id} summary={item} deleting={deleting && deleteTarget?.id === item.id} onDelete={() => { setDeleteError(undefined); setDeleteTarget(item); }}/>)}</div>}

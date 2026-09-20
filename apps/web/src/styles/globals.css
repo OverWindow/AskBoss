@@ -260,7 +260,8 @@
 
 @media(max-width:767px){
   .boss-nav-row .boss-nav-item{padding-right:44px}
-  .boss-delete-button{right:12px;top:50%;transform:translateY(-50%);width:32px;height:32px}
+  .boss-delete-button{right:12px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%}
+  .boss-delete-button:hover,.boss-delete-button:focus-visible,.boss-delete-button:active{border-radius:50%;background:rgba(190,55,55,.1);color:var(--hr-danger)}
   .boss-nav-row .boss-delete-button{opacity:1;pointer-events:auto}
 }
 
@@ -303,7 +304,7 @@
 @media(max-width:1024px){
   body{overflow-x:hidden}
   .mobile-nav-trigger{position:fixed;top:max(14px,env(safe-area-inset-top));left:14px;z-index:30;width:44px;height:44px;padding:0;border:1px solid var(--hr-border);border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.94);color:var(--hr-accent);box-shadow:0 8px 24px rgba(33,34,50,.1);backdrop-filter:blur(10px)}
-  .mobile-nav-backdrop{position:fixed;inset:0;z-index:80;display:block;border:0;background:rgba(33,34,50,.28);touch-action:none;overscroll-behavior:contain}.sidebar-close-button{position:absolute;right:12px;top:24px;width:38px;height:38px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--hr-ink);display:grid;place-items:center;z-index:2}.sidebar-close-button:hover,.sidebar-close-button:focus-visible{background:rgba(55,93,243,.07);color:var(--hr-primary)}
+  .mobile-nav-backdrop{position:fixed;inset:0;z-index:80;display:block;border:0;background:rgba(33,34,50,.28);touch-action:none;overscroll-behavior:contain}.sidebar-close-button{position:absolute;right:12px;top:24px;width:38px;height:38px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--hr-ink);display:grid;place-items:center;z-index:2;opacity:0;transform:scale(.88);pointer-events:none}.sidebar.is-mobile-open .sidebar-close-button{animation:sidebar-close-reveal .18s ease .18s both;pointer-events:auto}.sidebar-close-button:hover,.sidebar-close-button:focus-visible{background:rgba(55,93,243,.07);color:var(--hr-primary)}
   .app-shell:has(.settings-panel)>.mobile-nav-trigger{display:none}
   .sidebar{background:#fff;top:0;z-index:81;height:100vh;height:100dvh;padding:max(28px,env(safe-area-inset-top)) 22px max(20px,env(safe-area-inset-bottom));overflow:hidden;box-shadow:18px 0 48px rgba(33,34,50,.14)}
   .sidebar.is-mobile-open{transform:translateX(0)}
@@ -431,6 +432,10 @@
 .sidebar-anim-in .sidebar{animation:sidebar-in .36s cubic-bezier(.22,1,.36,1)}
 .sidebar-anim-out .mobile-nav-trigger{animation:sidebar-in .28s ease}
 @keyframes sidebar-in{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:none}}
+@keyframes sidebar-close-reveal{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:scale(1)}}
+
+/* Portaled dialogs always sit above drawers, tutorials, and mobile navigation. */
+body>.dialog-backdrop{z-index:200}
 
 /* Settings evidence box: plain icon buttons and compact upload row */
 .settings-evidence-list .icon-button{width:auto;min-height:0;height:auto;padding:6px;border:0;border-radius:0;background:transparent;color:var(--hr-muted)}
@@ -453,7 +458,7 @@
 /* Mobile top-right brand logo and hidden sidebar brand on mobile */
 .mobile-brand-logo{display:none}
 @media(max-width:767px){
-  .mobile-brand-logo{display:block;position:fixed;top:max(0px,env(safe-area-inset-top));right:16px;z-index:30;width:104px;height:104px;object-fit:contain}
+  .app-shell:has(.interaction-workspace)>.mobile-brand-logo{display:block;position:fixed;top:max(0px,env(safe-area-inset-top));right:16px;z-index:30;width:104px;height:104px;object-fit:contain}
   .sidebar .brand{display:none}
 }
 
@@ -467,4 +472,15 @@
   .interaction-workspace .boss-stage,.interaction-workspace .workspace-tab-panel{z-index:35}
   .mobile-bottom-nav{z-index:40}
   .mobile-nav-trigger{z-index:45}
+}
+
+/* Hide floating mobile controls while the archive modal is open */
+.app-shell:has(.archive-modal-backdrop)>.mobile-nav-trigger,.app-shell:has(.archive-modal-backdrop)>.mobile-brand-logo{display:none}
+
+/* Fit HR heatmaps to narrow screens without horizontal scrolling */
+@media(max-width:767px){
+  .topic-feature-heatmap,.job-function-heatmap{min-width:0!important}
+  .topic-feature-heatmap-scroll,.job-function-heatmap-scroll{overflow-x:visible}
+  .topic-feature-cell,.job-function-heatmap-cell{min-height:38px;font-size:.7rem}
+  .topic-feature-heatmap th,.job-function-heatmap th{font-size:.66rem;padding:4px 2px}
 }

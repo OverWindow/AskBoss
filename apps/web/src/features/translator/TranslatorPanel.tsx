@@ -39,7 +39,7 @@ export function TranslatorPanel({ boss, active, examples, simulationDisabled = f
   const requestController = useRef<AbortController | undefined>(undefined);
 
   useEffect(() => {
-    if (active && !window.matchMedia("(max-width:767px)").matches) window.requestAnimationFrame(() => textareaRef.current?.focus({ preventScroll: true }));
+    if (active && !window.matchMedia("(max-width:1024px), (pointer:coarse)").matches) window.requestAnimationFrame(() => textareaRef.current?.focus({ preventScroll: true }));
   }, [active]);
 
   useEffect(() => {

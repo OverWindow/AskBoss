@@ -144,7 +144,7 @@ export function Tutorial() {
   const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed);
   const mobileNavOpen = useUiStore((state) => state.mobileNavOpen);
   const setUi = useUiStore((state) => state.set);
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 850px)").matches);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 1024px)").matches);
   const [step, setStep] = useState(0);
   const activeSteps = isMobile ? mobileSteps : desktopSteps;
   const activeStep = activeSteps[step] ?? activeSteps[0]!;
@@ -160,7 +160,7 @@ export function Tutorial() {
   }, [setUi]);
 
   useEffect(() => {
-    const media = window.matchMedia("(max-width: 850px)");
+    const media = window.matchMedia("(max-width: 1024px)");
     const onChange = () => setIsMobile(media.matches);
     media.addEventListener("change", onChange);
     return () => media.removeEventListener("change", onChange);

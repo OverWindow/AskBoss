@@ -86,7 +86,7 @@ describe("Tutorial", () => {
 
   it("opens and restores the mobile sidebar only for sidebar steps", async () => {
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: query === "(max-width: 850px)",
+      matches: query === "(max-width: 1024px)",
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     }));

@@ -78,7 +78,7 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
   }, [history.data]);
 
   useEffect(() => {
-    if (active && !window.matchMedia("(max-width:767px)").matches) window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+    if (active && !window.matchMedia("(max-width:1024px), (pointer:coarse)").matches) window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   }, [active]);
 
   useLayoutEffect(() => {
