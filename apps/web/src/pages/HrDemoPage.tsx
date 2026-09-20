@@ -26,6 +26,11 @@ export function HrDemoPage() {
         const el = document.getElementById(section.id);
         if (el && el.offsetTop <= position) current = section.id;
       }
+      // The last section (시뮬레이션 유형) is short and content follows it, so
+      // its offsetTop can stay below the 30% line even at the page bottom —
+      // pin the last section once the document is scrolled to the end.
+      const atPageBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 1;
+      if (atPageBottom) current = SECTIONS[SECTIONS.length - 1]!.id;
       setActiveSection(current);
     };
     onScroll();

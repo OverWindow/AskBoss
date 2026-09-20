@@ -174,9 +174,9 @@ export function BossEvidenceManager({ bossId, onProcessingChange, onPersonaJob, 
       <label className="settings-evidence-text-label" htmlFor={`settings-evidence-text-${bossId}`}>대화 내용 붙여넣기</label>
       <div className="settings-evidence-input">
         <textarea id={`settings-evidence-text-${bossId}`} className="textarea" maxLength={100_000} value={textEvidence} disabled={Boolean(busy)} onChange={(event) => setTextEvidence(event.target.value)} placeholder="상사와 나눈 대화 내용을 붙여넣으세요."/>
-        <button className="primary-button" type="button" disabled={!textEvidence.trim() || Boolean(busy)} onClick={() => void addTextEvidence()}><Upload size={16}/>텍스트 추가</button>
       </div>
       <div className="admin-upload-actions">
+        <button className="primary-button" type="button" disabled={!textEvidence.trim() || Boolean(busy)} onClick={() => void addTextEvidence()}><Upload size={16}/>텍스트 추가</button>
         <label className="secondary-button"><FileText size={16}/>TXT 업로드<input hidden type="file" accept=".txt,text/plain" disabled={Boolean(busy)} onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) void uploadTxt(file); }}/></label>
         <label className={`secondary-button ${imageCount >= MAX_IMAGE_EVIDENCE_PER_BOSS ? "is-disabled" : ""}`}><Image size={16}/>이미지 업로드 ({imageCount}/{MAX_IMAGE_EVIDENCE_PER_BOSS}장)<input hidden multiple type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" disabled={Boolean(busy) || evidenceQuery.isLoading || imageCount >= MAX_IMAGE_EVIDENCE_PER_BOSS} onChange={(event) => { const files = Array.from(event.target.files ?? []); event.currentTarget.value = ""; if (files.length) void uploadImages(files); }}/></label>
       </div>
@@ -189,7 +189,7 @@ export function BossEvidenceManager({ bossId, onProcessingChange, onPersonaJob, 
         <div>
           <strong>{item.sourceName ?? typeLabel(item.type)}</strong>
           <span className={`job-status status-${item.status.toLowerCase()}`}>{statusLabel(item.status)}</span>
-          <small>{typeLabel(item.type)} · {new Date(item.createdAt).toLocaleString("ko-KR")}</small>
+          <small>{new Date(item.createdAt).toLocaleString("ko-KR")}</small>
           {item.errorMessage && <p className="error-text">{item.errorMessage}</p>}
         </div>
         <button className="icon-button" type="button" aria-label={`${item.sourceName ?? typeLabel(item.type)} 삭제`} disabled={Boolean(busy)} onClick={() => void deleteEvidence(item)}><Trash2 size={16}/></button>

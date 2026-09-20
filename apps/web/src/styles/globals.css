@@ -99,7 +99,7 @@
 .evidence-paste-zone{padding:14px;border:1px dashed rgba(55,93,243,.28);border-radius:13px;outline:none;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}.evidence-paste-zone:focus,.evidence-paste-zone:focus-within{border-color:var(--hr-accent);background:rgba(55,93,243,.025);box-shadow:0 0 0 3px rgba(55,93,243,.08)}.evidence-paste-hint{margin:0 0 12px;color:var(--hr-muted);font-size:.78rem;line-height:1.5}
 @media(max-width:520px){.onboarding-actions{width:calc(100% - 32px)}.onboarding-step .upload-box{min-height:104px;padding:16px 8px}}
 .settings-panel>header{position:sticky;top:0;z-index:12;margin-bottom:20px;padding:14px 0;background:rgba(254,254,254,.94);backdrop-filter:blur(10px)}
-.settings-section>h2,.settings-section .settings-heading{position:sticky;top:82px;z-index:11;margin:0 0 10px;padding:10px 0;background:rgba(254,254,254,.96);border-bottom:1px solid var(--hr-border)}
+.settings-section>h2,.settings-section .settings-heading{position:sticky;top:74px;z-index:11;margin:0 0 10px;padding:10px 0;background:rgba(254,254,254,.96);border-bottom:1px solid var(--hr-border)}
 .onboarding-step .avatar-option:hover img,.settings-form .avatar-option:hover img{transform:none;filter:drop-shadow(0 9px 8px rgba(33,34,50,.16))}
 .onboarding-step .avatar-option,.settings-form .avatar-option{position:relative;isolation:isolate;border-color:transparent!important}
 .avatar-selection{position:absolute;inset:0;border:2px solid var(--hr-accent);border-radius:12px;z-index:-1;box-shadow:0 6px 18px rgba(30,40,107,.12)}
@@ -205,7 +205,7 @@
 .simulation-loading-spinner{width:25px;height:25px;flex:none;border:3px solid rgba(30,40,107,.14);border-top-color:var(--hr-accent);border-radius:50%;animation:spin .8s linear infinite}
 .simulation-loading strong{display:block;color:var(--hr-accent);font-size:.84rem}.simulation-loading p{margin:2px 0 0;color:var(--hr-muted);font-size:.74rem}
 .evidence-upload-progress{list-style:none;margin:14px 0 18px;padding:0;display:grid;gap:8px}.evidence-upload-progress li{padding:10px 12px;border:1px solid var(--hr-border);border-radius:10px;background:rgba(255,255,255,.42)}.evidence-upload-progress li>div{display:flex;align-items:center;justify-content:space-between;gap:12px}.evidence-upload-progress strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.82rem}.evidence-upload-progress span{flex:none;font-size:.74rem;color:var(--hr-muted);font-weight:750}.evidence-upload-progress p{margin:6px 0 0;color:var(--hr-danger);font-size:.75rem;line-height:1.45}.evidence-upload-progress .status-succeeded{border-color:rgba(39,133,90,.24);background:rgba(39,133,90,.05)}.evidence-upload-progress .status-succeeded span{color:#23734f}.evidence-upload-progress .status-failed{border-color:rgba(190,55,55,.24);background:rgba(190,55,55,.05)}.evidence-upload-progress .status-failed span{color:var(--hr-danger)}.evidence-upload-remove{display:grid;place-items:center;flex:none;width:25px;height:25px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--hr-muted)}.evidence-upload-remove:hover:not(:disabled){background:rgba(33,34,50,.08);color:var(--hr-danger)}.evidence-upload-remove:disabled{opacity:.45}
-.evidence-privacy-notice{display:flex;align-items:flex-start;gap:12px;margin:0 0 18px;padding:14px 16px;border:1px solid rgba(30,40,107,.16);border-radius:var(--radius);background:rgba(30,40,107,.045);color:var(--hr-ink)}.evidence-privacy-notice>svg{flex:none;margin-top:1px;padding:5px;width:30px;height:30px;border-radius:50%;background:rgba(30,40,107,.1);color:var(--hr-accent)}.evidence-privacy-notice strong{display:block;font-size:.84rem;line-height:1.45;color:var(--hr-accent)}.evidence-privacy-notice p{margin:4px 0 0;font-size:.76rem;line-height:1.55;color:var(--hr-muted)}.chat-history-status{margin:0;text-align:center;color:var(--hr-muted);font-size:.76rem}.chat-history-error{display:flex;align-items:center;justify-content:center;gap:9px;padding:9px 10px;border-radius:9px;background:#fff6f6;color:var(--hr-danger);font-size:.76rem}
+.evidence-privacy-notice{display:flex;align-items:flex-start;gap:12px;margin:0 0 18px;padding:14px 16px;border:1px solid rgba(30,40,107,.16);border-radius:var(--radius);background:rgba(30,40,107,.045);color:var(--hr-ink)}.evidence-privacy-notice>svg{flex:none;margin-top:1px;width:20px;height:20px;color:var(--hr-accent)}.evidence-privacy-notice strong{display:block;font-size:.84rem;line-height:1.45;color:var(--hr-accent)}.evidence-privacy-notice p{margin:4px 0 0;font-size:.76rem;line-height:1.55;color:var(--hr-muted)}.chat-history-status{margin:0;text-align:center;color:var(--hr-muted);font-size:.76rem}.chat-history-error{display:flex;align-items:center;justify-content:center;gap:9px;padding:9px 10px;border-radius:9px;background:#fff6f6;color:var(--hr-danger);font-size:.76rem}
 .settings-evidence-manager{grid-column:1/-1;display:grid;gap:14px;margin-top:10px;padding-top:24px;border-top:1px solid var(--hr-border)}
 .settings-evidence-heading h3{margin:0 0 5px;font-size:1rem}.settings-evidence-heading p{margin:0;color:var(--hr-muted);font-size:.8rem}
 .settings-evidence-manager .evidence-privacy-notice{margin-bottom:0}.settings-evidence-input{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}.settings-evidence-input .textarea{min-height:110px}.settings-evidence-text-label{display:block;margin-bottom:7px;font-size:.82rem;font-weight:750}.settings-evidence-list{margin-top:2px}.settings-evidence-processing{grid-column:1/-1;margin:0}
@@ -253,7 +253,7 @@
 .boss-nav-row:hover .boss-delete-button,.boss-delete-button:focus-visible{opacity:1;pointer-events:auto}
 .boss-delete-button:hover{background:#fff0f0;color:var(--hr-danger)}
 .app-shell.is-collapsed .boss-nav-row .boss-nav-item{padding-inline:11px}
-.app-shell.is-collapsed .boss-delete-button{right:-7px;top:1px;width:22px;height:22px;background:#fff;border:1px solid var(--hr-border)}
+.app-shell.is-collapsed .boss-delete-button{right:-7px;top:1px;width:22px;height:22px;border-radius:0}
 .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}
 .danger-confirm-button{background:var(--hr-danger);border-color:var(--hr-danger)}
 .danger-confirm-button:hover{background:#7f3e3e;border-color:#7f3e3e}
@@ -428,3 +428,9 @@
 
 /* Suppress sidebar slide animation while crossing the mobile breakpoint. */
 .sidebar-no-motion .sidebar{transition:none!important}
+
+/* Settings evidence box: plain icon buttons and compact upload row */
+.settings-evidence-list .icon-button{width:auto;min-height:0;height:auto;padding:6px;border:0;border-radius:0;background:transparent;color:var(--hr-muted)}
+.settings-evidence-list .icon-button:hover:not(:disabled){background:transparent;color:var(--hr-danger)}
+.settings-evidence-manager .admin-upload-actions{align-items:center}
+.settings-evidence-manager .admin-upload-actions .primary-button,.settings-evidence-manager .admin-upload-actions .secondary-button{min-height:34px;padding:6px 12px;font-size:.8rem;gap:6px}
