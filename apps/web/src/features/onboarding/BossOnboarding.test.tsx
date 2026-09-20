@@ -24,7 +24,7 @@ const draft = {
 
 function renderOnboarding() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<MemoryRouter><QueryClientProvider client={client}><BossOnboarding/></QueryClientProvider></MemoryRouter>);
+  return render(<MemoryRouter><QueryClientProvider client={client}><BossOnboarding/></QueryClientProvider></MemoryRouter>);
 }
 
 async function advanceToEvidenceStep() {
@@ -67,6 +67,26 @@ describe("EvidencePrivacyNotice", () => {
 });
 
 describe("BossOnboarding job recovery", () => {
+  it("clears the unfinished draft when the user leaves", async () => {
+    mockedApi.mockImplementation(async (path) => {
+      if (path === "/profile") return { profile } as any;
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderOnboarding();
+    expect(await screen.findByRole("heading", { name: "상사의 모습을 골라주세요." })).toBeInTheDocument();
+    expect(sessionStorage.getItem("askboss:onboarding")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "홈으로 이동" }));
+
+    expect(sessionStorage.getItem("askboss:onboarding")).toBeNull();
+
+    cleanup();
+    renderOnboarding();
+    expect(await screen.findByRole("heading", { name: "상사의 모습을 골라주세요." })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    expect(await screen.findByPlaceholderText("예: 김부장")).toHaveValue("");
+  });
+
   it("saves a new profile after session reset without calling an unavailable handle endpoint", async () => {
     mockedApi.mockImplementation(async (path, options) => {
       if (path === "/profile" && options?.method === "PUT") return { profile: JSON.parse(String(options.body)) } as any;
