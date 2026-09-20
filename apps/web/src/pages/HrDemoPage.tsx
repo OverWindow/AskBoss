@@ -8,9 +8,10 @@ import { SERVICE_NAME } from "../config/brand";
 const SECTIONS = [
   { id: "overview", label: "요약" },
   { id: "topics", label: "주요 주제" },
+  { id: "topic-features", label: "주제·기능" },
   { id: "demographics", label: "직급·나이" },
   { id: "insights", label: "조직 인사이트" },
-  { id: "repeated", label: "반복 시뮬레이션" },
+  { id: "repeated", label: "시뮬레이션 유형" },
 ];
 
 export function HrDemoPage() {

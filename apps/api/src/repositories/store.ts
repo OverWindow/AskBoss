@@ -70,7 +70,7 @@ export interface Store {
   getEvidence(sessionId: string, id: string): Promise<EvidenceRecord | null>;
   listEvidence(sessionId: string, bossId: string): Promise<EvidenceRecord[]>;
   updateEvidence(sessionId: string, id: string, patch: Partial<EvidenceRecord>): Promise<void>;
-  deleteImageEvidenceWithJobs(sessionId: string, bossId: string, id: string): Promise<{ evidence: EvidenceRecord; jobIds: string[] } | null>;
+  deleteEvidenceWithJobs(sessionId: string, bossId: string, id: string): Promise<{ evidence: EvidenceRecord; jobIds: string[] } | null>;
   createGlobalEvidence(input: Omit<GlobalEvidenceRecord, "id" | "createdAt">): Promise<GlobalEvidenceRecord>;
   createGlobalImageEvidenceWithLimit(input: Omit<GlobalEvidenceRecord, "id" | "createdAt">, limit: number): Promise<GlobalEvidenceRecord | null>;
   getGlobalEvidence(id: string): Promise<GlobalEvidenceRecord | null>;

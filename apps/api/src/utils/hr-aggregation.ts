@@ -1,3 +1,5 @@
+import type { RepeatedSimulationType } from "../shared.js";
+
 const politePositive = [
   "감사", "고맙", "죄송", "양해", "부탁", "드리", "요청", "확인",
   "좋", "잘", "축하", "환영", "기쁘", "괜찮", "즐거", "반갑",
@@ -75,16 +77,35 @@ export function computeSurfaceActualGap(rows: GapRow[]): SurfaceActualGapResult 
   return { rate, byBoss };
 }
 
-export function computeTopRepeatedPhrases(rows: { inputText: string }[]): { phrase: string; count: number }[] {
+const simulationTypeRules: { type: Exclude<RepeatedSimulationType, "기타">; keywords: string[] }[] = [
+  { type: "질책·성과 압박", keywords: ["기본", "도대체", "실망", "문제", "성과", "책임져", "이 정도", "왜 못", "왜 안", "왜 아직", "실수"] },
+  { type: "일정·마감 압박", keywords: ["언제", "오늘까지", "내일까지", "마감", "기한", "일정", "지연", "늦", "빨리", "급해", "즉시", "당장"] },
+  { type: "수정·품질 피드백", keywords: ["수정", "다시", "다르", "검토", "보완", "오류", "틀렸", "품질", "완성도", "초안"] },
+  { type: "의사결정·승인", keywords: ["승인", "결정", "선택", "결론", "컨펌", "확정", "판단"] },
+  { type: "업무 위임·책임 요구", keywords: ["알아서", "담당", "책임", "맡아", "맡겨", "처리", "정리", "챙겨", "주도"] },
+  { type: "협업·조율", keywords: ["같이", "함께", "협업", "조율", "회의", "소통", "지원", "합의"] },
+  { type: "진행·보고 확인", keywords: ["진행", "보고", "공유", "상황", "확인", "결과", "알려", "업데이트"] },
+];
+
+export function classifyRepeatedSimulation(inputText: string): RepeatedSimulationType {
+  const normalized = inputText.trim().replace(/\s+/g, " ").toLowerCase();
+  return simulationTypeRules.find((rule) => rule.keywords.some((keyword) => normalized.includes(keyword)))?.type ?? "기타";
+}
+
+export function computeRepeatedSimulationTypes(rows: { inputText: string; simulationCount: number }[]): { type: RepeatedSimulationType; count: number }[] {
   const counts = new Map<string, number>();
-  for (const { inputText } of rows) {
+  for (const { inputText, simulationCount } of rows) {
     const phrase = inputText.trim().replace(/\s+/g, " ");
-    if (!phrase) continue;
-    counts.set(phrase, (counts.get(phrase) ?? 0) + 1);
+    if (!phrase || !Number.isFinite(simulationCount) || simulationCount <= 0) continue;
+    counts.set(phrase, (counts.get(phrase) ?? 0) + simulationCount);
   }
-  return [...counts.entries()]
-    .filter(([, count]) => count >= 2)
-    .map(([phrase, count]) => ({ phrase, count }))
-    .sort((a, b) => b.count - a.count || a.phrase.localeCompare(b.phrase, "ko"))
-    .slice(0, 10);
+  const byType = new Map<RepeatedSimulationType, number>();
+  for (const [phrase, count] of counts) {
+    if (count < 2) continue;
+    const type = classifyRepeatedSimulation(phrase);
+    byType.set(type, (byType.get(type) ?? 0) + count);
+  }
+  return [...byType.entries()]
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type, "ko"));
 }

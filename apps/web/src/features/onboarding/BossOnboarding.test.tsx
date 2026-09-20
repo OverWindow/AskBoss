@@ -2,8 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { EvidencePrivacyNotice } from "../../components/EvidencePrivacyNotice";
 import { api, ApiError } from "../../services/api-client";
-import { BossOnboarding, EvidencePrivacyNotice } from "./BossOnboarding";
+import { BossOnboarding } from "./BossOnboarding";
 
 vi.mock("../../services/api-client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../services/api-client")>();

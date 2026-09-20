@@ -6,8 +6,9 @@ import { useProfile } from "../features/profile/useProfile";
 import { api } from "../services/api-client";
 import { SettingsPage } from "./SettingsPage";
 
+const { mockedBosses } = vi.hoisted(() => ({ mockedBosses: [] as any[] }));
 vi.mock("../components/AppShell", () => ({ AppShell: ({ children }: { children: React.ReactNode }) => <main>{children}</main> }));
-vi.mock("../features/boss/useBosses", () => ({ useBosses: () => ({ data: [] }) }));
+vi.mock("../features/boss/useBosses", () => ({ useBosses: () => ({ data: mockedBosses }) }));
 vi.mock("../services/api-client", () => ({ api: vi.fn() }));
 
 const mockedApi = vi.mocked(api);
@@ -26,6 +27,7 @@ function renderSettings() {
 
 describe("SettingsPage profile saving", () => {
   beforeEach(() => {
+    mockedBosses.length = 0;
     mockedApi.mockReset();
     mockedApi.mockImplementation(async (path, options) => {
       if (path === "/profile" && options?.method === "PUT") return { profile: JSON.parse(String(options.body)) } as any;
@@ -89,5 +91,65 @@ describe("SettingsPage profile saving", () => {
 
     expect(await screen.findByText("내 정보를 저장했습니다.")).toBeInTheDocument();
     expect(savedProfile?.weaknesses).toEqual(["결론부터 말하기 어렵다", "실수를 보고하기 어렵다"]);
+  });
+});
+
+describe("SettingsPage boss evidence saving", () => {
+  beforeEach(() => {
+    mockedBosses.length = 0;
+    mockedBosses.push({
+      id: "boss-1",
+      scope: "SESSION",
+      alias: "김팀장",
+      avatarKey: "boss-male-01",
+      jobFunction: "개발",
+      yearsOfServiceBand: "10~14년",
+      rank: "팀장",
+      companyName: "테스트 회사",
+      ageBand: 40,
+      hierarchyScore: 60,
+      genderBalanceScore: 0,
+      companyResearch: null,
+      persona: { summary: "요약", traits: [], uncertainty: [] },
+      pki: null,
+      status: "READY",
+      personaVersion: 1,
+      personaError: null,
+      createdAt: "2026-09-20T00:00:00.000Z",
+      updatedAt: "2026-09-20T00:00:00.000Z",
+    });
+    mockedApi.mockReset();
+  });
+  afterEach(() => cleanup());
+
+  it("disables explicit persona saving while evidence is processing, then rebuilds once", async () => {
+    let evidenceStatus = "PROCESSING";
+    mockedApi.mockImplementation(async (path, options) => {
+      if (path === "/profile") return { profile: initialProfile } as any;
+      if (path === "/bosses/boss-1/evidence" && !options?.method) return { evidence: [{
+        id: "00000000-0000-4000-8000-000000000001",
+        type: "TEXT",
+        status: evidenceStatus,
+        sourceName: "붙여넣기",
+        errorMessage: null,
+        createdAt: "2026-09-20T00:00:00.000Z",
+      }] } as any;
+      if (path === "/bosses/boss-1" && options?.method === "PATCH") return { boss: mockedBosses[0] } as any;
+      if (path === "/bosses/boss-1/persona/rebuild" && options?.method === "POST") return { jobId: "persona-1" } as any;
+      if (path === "/jobs/persona-1") return { job: { status: "SUCCEEDED", attempts: 1 } } as any;
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    const client = renderSettings();
+
+    const processingButton = await screen.findByRole("button", { name: "자료 분석 중…" });
+    expect(processingButton).toBeDisabled();
+    evidenceStatus = "READY";
+    await client.invalidateQueries({ queryKey: ["boss-evidence", "boss-1"] });
+    const saveButton = await screen.findByRole("button", { name: "저장 후 페르소나 재분석" });
+    expect(saveButton).toBeEnabled();
+    fireEvent.click(saveButton);
+
+    expect(await screen.findByText("상사 정보와 대화 자료를 반영해 페르소나를 다시 만들었습니다.")).toBeInTheDocument();
+    expect(mockedApi.mock.calls.filter(([path]) => path === "/bosses/boss-1/persona/rebuild")).toHaveLength(1);
   });
 });

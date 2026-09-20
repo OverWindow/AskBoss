@@ -3,7 +3,7 @@ import { DEFAULT_AI_PROMPT_INSTRUCTIONS, DEFAULT_PERSONAL_BOSS_BASE_PROMPT, DEFA
 import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRecord, ChatMessageRecord, ChatThreadRecord, CompanyResearch, EvidenceRecord, GlobalEvidenceRecord, GlobalUploadIntentRecord, JobRecord, SessionRecord, SurveyAnswerRecord, TranslationArchiveRecord, TranslationRecord, UploadIntentRecord, UserProfile } from "../types.js";
 import type { AdminPersonalBossPromptContext, ChatMessageCoachingContext, CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
-import { computeTopRepeatedPhrases } from "../utils/hr-aggregation.js";
+import { computeRepeatedSimulationTypes } from "../utils/hr-aggregation.js";
 import { buildActualResponseEvidence } from "../utils/actual-response.js";
 import { encodeChatCursor, InvalidChatCursorError, type ChatCursor } from "../utils/chat-cursor.js";
 import { encodeArchiveCursor, type ArchiveCursor } from "../utils/archive-cursor.js";
@@ -135,7 +135,7 @@ export class MemoryStore implements Store {
   async getEvidence(sessionId: string, id: string) { const row = this.evidence.get(id); return row?.sessionId === sessionId ? row : null; }
   async listEvidence(sessionId: string, bossId: string) { return [...this.evidence.values()].filter((row) => row.sessionId === sessionId && row.bossId === bossId); }
   async updateEvidence(sessionId: string, id: string, patch: Partial<EvidenceRecord>) { const row = await this.getEvidence(sessionId, id); if (!row) throw new Error("근거를 찾을 수 없습니다."); Object.assign(row, patch); }
-  async deleteImageEvidenceWithJobs(sessionId:string,bossId:string,id:string){const evidence=await this.getEvidence(sessionId,id);if(!evidence||evidence.bossId!==bossId||evidence.type!=="IMAGE")return null;const jobIds:string[]=[];for(const [jobId,job] of this.jobs)if(job.sessionId===sessionId&&job.bossId===bossId&&job.type==="EVIDENCE_EXTRACT"&&job.payload?.evidenceId===id){jobIds.push(jobId);this.jobs.delete(jobId);}this.evidence.delete(id);return {evidence,jobIds};}
+  async deleteEvidenceWithJobs(sessionId:string,bossId:string,id:string){const evidence=await this.getEvidence(sessionId,id);if(!evidence||evidence.bossId!==bossId)return null;const jobIds:string[]=[];for(const [jobId,job] of this.jobs)if(job.sessionId===sessionId&&job.bossId===bossId&&job.type==="EVIDENCE_EXTRACT"&&job.payload?.evidenceId===id){jobIds.push(jobId);this.jobs.delete(jobId);}this.evidence.delete(id);return {evidence,jobIds};}
   async createGlobalEvidence(input: Omit<GlobalEvidenceRecord, "id" | "createdAt">) { const row = { ...input, id: randomUUID(), createdAt: new Date().toISOString() }; this.globalEvidence.set(row.id, row); return row; }
   async createGlobalImageEvidenceWithLimit(input: Omit<GlobalEvidenceRecord,"id"|"createdAt">,limit:number){const count=[...this.globalEvidence.values()].filter((item)=>item.bossId===input.bossId&&item.type==="IMAGE").length;if(count>=limit)return null;return this.createGlobalEvidence({...input,type:"IMAGE"});}
   async getGlobalEvidence(id: string) { return this.globalEvidence.get(id) ?? null; }
@@ -234,20 +234,25 @@ export class MemoryStore implements Store {
       { bucket: "SAME" as const, count: sameJobCounts.get("SAME") ?? 0 },
       { bucket: "DIFF" as const, count: sameJobCounts.get("DIFF") ?? 0 },
     ] as { bucket: "SAME" | "DIFF"; count: number }[]).filter((item) => item.count > 0);
-    const topRepeatedPhrases=computeTopRepeatedPhrases([...this.translations.values()].flatMap((row)=>Array.from({length:row.simulationCount},()=>({inputText:row.inputText}))));
+    const repeatedSimulationTypes=computeRepeatedSimulationTypes([...this.translations.values()].map((row)=>({inputText:row.inputText,simulationCount:row.simulationCount})));
     if (actualAnalytics.length) {
       const group = (key:"rankGapBucket"|"ageGapBucket") => [...actualAnalytics.reduce((map,row) => { const label=row[key]; if(label)map.set(label,(map.get(label)??0)+1); return map; },new Map<string,number>())].map(([label,value])=>({label,value}));
       const topicCounts=actualAnalytics.reduce((map,row)=>{for(const topic of row.topicKeywords??[])map.set(topic,(map.get(topic)??0)+1);return map;},new Map<string,number>());
+      const topTopics=[...topicCounts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],"ko")).slice(0,10).map(([topic])=>topic);
+      const topTopicSet=new Set(topTopics);
+      const topicFeatureCounts=actualAnalytics.reduce((map,row)=>{for(const topic of row.topicKeywords??[]){if(!topTopicSet.has(topic))continue;const key=`${topic}\u0000${row.feature}`;const current=map.get(key);if(current)current.value+=1;else map.set(key,{topic,feature:row.feature,value:1});}return map;},new Map<string,{topic:string;feature:string;value:number}>());
+      const topicOrder=new Map(topTopics.map((topic,index)=>[topic,index]));
+      const topicFeature=[...topicFeatureCounts.values()].sort((a,b)=>(topicOrder.get(a.topic)??0)-(topicOrder.get(b.topic)??0)||a.feature.localeCompare(b.feature));
       const featureCounts=actualAnalytics.reduce((map,row)=>map.set(row.feature,(map.get(row.feature)??0)+1),new Map<string,number>());
       const topFeature=[...featureCounts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0]?.[0]??"-";
-      return {dataSource:"ACTUAL",includesDemo:false,overview:{totalUses:actualAnalytics.length,activeSubjects:new Set(actualAnalytics.map(row=>row.subjectHash)).size,topFeature,summary:actualAnalytics.length?"":"아직 집계된 실제 사용자 데이터가 없습니다."},topics:[...topicCounts].map(([text,value])=>({text,value})).sort((a,b)=>b.value-a.value).slice(0,30),rankGap:group("rankGapBucket"),ageGap:group("ageGapBucket"),sameJobFunctionDistribution,surfaceActualGapRate:null,topRepeatedPhrases};
+      return {dataSource:"ACTUAL",includesDemo:false,overview:{totalUses:actualAnalytics.length,activeSubjects:new Set(actualAnalytics.map(row=>row.subjectHash)).size,topFeature,summary:actualAnalytics.length?"":"아직 집계된 실제 사용자 데이터가 없습니다."},topics:[...topicCounts].map(([text,value])=>({text,value})).sort((a,b)=>b.value-a.value).slice(0,30),topicFeature,rankGap:group("rankGapBucket"),ageGap:group("ageGapBucket"),sameJobFunctionDistribution,surfaceActualGapRate:null,repeatedSimulationTypes};
     }
     return {
       dataSource: "ACTUAL",
       includesDemo: false,
       overview: { totalUses: 0, activeSubjects: 0, topFeature: "-", summary: "아직 집계된 실제 사용자 데이터가 없습니다." },
-      topics: [], rankGap: [], ageGap: [], sameJobFunctionDistribution: [], surfaceActualGapRate: null,
-      topRepeatedPhrases,
+      topics: [], topicFeature: [], rankGap: [], ageGap: [], sameJobFunctionDistribution: [], surfaceActualGapRate: null,
+      repeatedSimulationTypes,
     };
   }
   async getMockHrDashboard() { return getMockHrDashboard(); }

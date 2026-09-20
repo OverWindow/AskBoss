@@ -72,6 +72,15 @@ export interface Boss {
   personaVersion?: number;
 }
 
+export interface BossEvidenceSummary {
+  id: string;
+  type: "TEXT" | "TXT" | "IMAGE";
+  status: "PENDING" | "PROCESSING" | "READY" | "FAILED";
+  sourceName: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
 export interface UserProfile {
   handle: string;
   ageBand: number;
@@ -340,12 +349,23 @@ export interface HrDashboard {
   includesDemo: boolean;
   overview: { totalUses: number; activeSubjects: number; topFeature: string; summary: string };
   topics: { text: string; value: number }[];
+  topicFeature: { topic: string; feature: string; value: number }[];
   rankGap: { label: string; value: number }[];
   ageGap: { label: string; value: number }[];
   sameJobFunctionDistribution: { bucket: "SAME" | "DIFF"; count: number }[];
   surfaceActualGapRate: number | null;
-  topRepeatedPhrases: { phrase: string; count: number }[];
+  repeatedSimulationTypes: { type: RepeatedSimulationType; count: number }[];
 }
+
+export type RepeatedSimulationType =
+  | "일정·마감 압박"
+  | "진행·보고 확인"
+  | "수정·품질 피드백"
+  | "업무 위임·책임 요구"
+  | "협업·조율"
+  | "의사결정·승인"
+  | "질책·성과 압박"
+  | "기타";
 
 export interface AdminSessionSummary {
   id: string;

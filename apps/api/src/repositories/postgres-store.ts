@@ -4,7 +4,7 @@ import type { AdminLoginAttempt, AdminSessionRecord, AnalyticsEventInput, BossRe
 import type { AdminPersonalBossPromptContext, ChatMessageCoachingContext, CreateBossInput, Store, UpdateGlobalBossInput } from "./store.js";
 import { safeJobFailureReason, summarizeJobFailures } from "../utils/admin-safety.js";
 import { toIsoTimestamp } from "../utils/database.js";
-import { computeSurfaceActualGap } from "../utils/hr-aggregation.js";
+import { computeRepeatedSimulationTypes, computeSurfaceActualGap } from "../utils/hr-aggregation.js";
 import { buildActualResponseEvidence } from "../utils/actual-response.js";
 import { encodeChatCursor, InvalidChatCursorError, type ChatCursor } from "../utils/chat-cursor.js";
 import { encodeArchiveCursor, type ArchiveCursor } from "../utils/archive-cursor.js";
@@ -149,8 +149,8 @@ export class PostgresStore implements Store {
     for (const [key,column] of Object.entries(map)) if (key in patch) values[column] = key === "parsedData" ? this.sql.json((patch as any)[key]) : (patch as any)[key];
     if (Object.keys(values).length) { values.updated_at = new Date(); await this.sql`update boss_evidence set ${this.sql(values)} where id=${id} and session_id=${sessionId}`; }
   }
-  async deleteImageEvidenceWithJobs(sessionId: string, bossId: string, id: string) { return this.sql.begin(async (sql) => {
-    const [evidence] = await sql`select * from boss_evidence where id=${id} and session_id=${sessionId} and boss_id=${bossId} and type='IMAGE' for update`;
+  async deleteEvidenceWithJobs(sessionId: string, bossId: string, id: string) { return this.sql.begin(async (sql) => {
+    const [evidence] = await sql`select * from boss_evidence where id=${id} and session_id=${sessionId} and boss_id=${bossId} for update`;
     if (!evidence) return null;
     const deletedJobs = await sql`delete from ai_jobs where session_id=${sessionId} and boss_id=${bossId} and type='EVIDENCE_EXTRACT' and payload->>'evidenceId'=${id} returning id`;
     await sql`delete from boss_evidence where id=${id} and session_id=${sessionId} and boss_id=${bossId}`;
@@ -278,20 +278,35 @@ export class PostgresStore implements Store {
     const age=await this.sql<{label:string;value:number}[]>`select age_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and not is_demo and age_gap_bucket is not null group by age_gap_bucket order by label`;
     const sameJob=await this.sql<{bucket:string;count:number}[]>`select same_job_function_bucket bucket,count(*)::int count from analytics_events where expires_at>now() and not is_demo and same_job_function_bucket is not null group by same_job_function_bucket order by bucket`;
     const topics=await this.sql<{text:string;value:number}[]>`select keyword text,count(*)::int value from analytics_events cross join unnest(topic_keywords) keyword where expires_at>now() and not is_demo group by keyword order by value desc limit 30`;
+    const topicFeature=await this.sql<{topic:string;feature:string;value:number}[]>`
+      with topic_events as (
+        select feature,unnest(topic_keywords) topic
+        from analytics_events
+        where expires_at>now() and not is_demo
+      ), top_topics as (
+        select topic,count(*) total
+        from topic_events
+        group by topic
+        order by total desc,topic
+        limit 10
+      )
+      select events.topic,events.feature,count(*)::int value
+      from topic_events events
+      join top_topics top on top.topic=events.topic
+      group by events.topic,events.feature,top.total
+      order by top.total desc,events.topic,events.feature`;
     const [feature]=await this.sql`select feature,count(*)::int value from analytics_events where expires_at>now() and not is_demo group by feature order by value desc,feature limit 1`;
     const translationRows = await this.sql<{ session_id:string; input_text: string; boss_id: string; alias: string | null; plain_meaning: string; caution: string | null; gap_score:number|null }[]>`
       select t.session_id, t.input_text, t.boss_id, b.alias, t.result->>'plainMeaning' as plain_meaning, t.result->>'caution' as caution, (t.result->>'surfaceActualGapScore')::numeric as gap_score
       from translation_requests t
       left join bosses b on b.id = t.boss_id
       where t.expires_at > now()`;
-    const repeatedRows = await this.sql<{ phrase: string; count: number }[]>`
-      select left(input_text,160) phrase, sum(simulation_count)::int count
+    const repeatedRows = await this.sql<{ input_text: string; simulation_count: number }[]>`
+      select input_text, simulation_count::int
       from translation_requests
       where expires_at > now() and simulation_count > 0
-      group by left(input_text,160)
-      having sum(simulation_count) >= 2
-      order by count desc
-      limit 10`;
+      order by created_at desc`;
+    const repeatedSimulationTypes = computeRepeatedSimulationTypes(repeatedRows.map((row: any) => ({ inputText: row.input_text, simulationCount: Number(row.simulation_count) })));
     const gap = computeSurfaceActualGap(translationRows.map((r: any) => ({
       inputText: r.input_text,
       plainMeaning: r.plain_meaning,
@@ -306,11 +321,12 @@ export class PostgresStore implements Store {
       includesDemo: false,
       overview: { totalUses: total?.value??0, activeSubjects: total?.subjects??0, topFeature: feature?.feature??"-", summary: total?.value ? "" : "아직 집계된 실제 사용자 데이터가 없습니다." },
       topics: topics.map((r: any) => ({ text: r.text, value: r.value })),
+      topicFeature: topicFeature.map((r: any) => ({ topic: r.topic, feature: r.feature, value: r.value })),
       rankGap: rank.map((r: any) => ({ label: r.label, value: r.value })),
       ageGap: age.map((r: any) => ({ label: r.label, value: r.value })),
       sameJobFunctionDistribution,
       surfaceActualGapRate: translationRows.length ? gap.rate : null,
-      topRepeatedPhrases: repeatedRows.map((r: any) => ({ phrase: r.phrase, count: Number(r.count) })),
+      repeatedSimulationTypes,
     };
   }
   async getMockHrDashboard() { return getMockHrDashboard(); }

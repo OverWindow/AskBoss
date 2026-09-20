@@ -11,6 +11,7 @@ describe("HR small samples", () => {
     expect(dashboard.rankGap).toContainEqual({ label: "1", value: 1 });
     expect(dashboard.ageGap).toContainEqual({ label: "6~10년", value: 1 });
     expect(dashboard.topics).toContainEqual({ text: "보고", value: 1 });
+    expect(dashboard.topicFeature).toEqual([{ topic: "보고", feature: "CHAT", value: 1 }]);
     expect(dashboard.sameJobFunctionDistribution).toEqual([]);
   });
 
@@ -20,14 +21,17 @@ describe("HR small samples", () => {
     const actual = await store.getHrDashboard();
     expect(actual).toMatchObject({ dataSource: "ACTUAL", includesDemo: false, overview: { totalUses: 0, activeSubjects: 0 } });
     expect(actual.topics).toEqual([]);
+    expect(actual.topicFeature).toEqual([]);
 
     const mock = await store.getMockHrDashboard();
     expect(mock).toMatchObject({ dataSource: "MOCK", includesDemo: true });
     expect(mock.overview.totalUses).toBeGreaterThan(100);
     expect(mock.topics.length).toBeGreaterThan(10);
+    expect(mock.topicFeature.length).toBeGreaterThan(10);
     expect(mock.rankGap.length).toBeGreaterThan(3);
     expect(mock.ageGap.length).toBeGreaterThan(3);
-    expect(mock.topRepeatedPhrases.length).toBeGreaterThan(3);
+    expect(mock.repeatedSimulationTypes.length).toBeGreaterThan(3);
+    expect(JSON.stringify(mock)).not.toContain("이거 언제까지 가능해?");
     expect((await store.getHrDashboard()).overview.totalUses).toBe(0);
   });
 });

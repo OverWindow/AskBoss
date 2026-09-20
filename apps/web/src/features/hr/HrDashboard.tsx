@@ -54,6 +54,16 @@ export function HrDashboard({ dataset }: { dataset: "actual" | "mock" }) {
         {d.topics.length > 0 ? <TopicCloud words={d.topics} colorful/> : <EmptyPlaceholder>아직 집계된 대화 주제가 없습니다.</EmptyPlaceholder>}
       </section>
 
+      <section id="topic-features" className="chart-section">
+        <h3>주제별 기능 사용</h3>
+        <p className="hint">각 주제가 번역, 대화, 시뮬레이션 등 어떤 기능에서 등장했는지 보여줍니다.</p>
+        {(d.topicFeature ?? []).length > 0 ? (
+          <TopicFeatureHeatmap data={d.topicFeature}/>
+        ) : (
+          <EmptyPlaceholder>아직 주제와 기능을 함께 비교할 데이터가 없습니다.</EmptyPlaceholder>
+        )}
+      </section>
+
       <div id="demographics" className="chart-grid">
         <Chart title="직급 차이별 사용량" data={d.rankGap} colorful/>
         <Chart title="나이 차이별 사용량" data={d.ageGap} colorful/>
@@ -95,21 +105,21 @@ export function HrDashboard({ dataset }: { dataset: "actual" | "mock" }) {
       </div>
 
       <section id="repeated" className="chart-section">
-        <h3>반복 시뮬레이션된 상사 발언</h3>
-        <p className="hint">사용자가 같은 발언의 대응 방식을 반복해서 확인한 횟수입니다. 주의가 필요하거나 문제가 반복되는 언행을 파악하는 데 활용할 수 있습니다.</p>
-        {d.topRepeatedPhrases.length > 0 ? (
+        <h3>반복 시뮬레이션 유형</h3>
+        <p className="hint">같은 발언이 두 번 이상 시뮬레이션된 횟수를 원문 노출 없이 유형별로 집계합니다.</p>
+        {d.repeatedSimulationTypes.length > 0 ? (
           <div className="admin-table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>발언</th>
-                  <th>시뮬레이션 횟수</th>
+                  <th>발언 유형</th>
+                  <th>반복 횟수</th>
                 </tr>
               </thead>
               <tbody>
-                {d.topRepeatedPhrases.map((item) => (
-                  <tr key={item.phrase}>
-                    <td>{item.phrase}</td>
+                {d.repeatedSimulationTypes.map((item) => (
+                  <tr key={item.type}>
+                    <td>{item.type}</td>
                     <td>{item.count}회</td>
                   </tr>
                 ))}
@@ -117,7 +127,7 @@ export function HrDashboard({ dataset }: { dataset: "actual" | "mock" }) {
             </table>
           </div>
         ) : (
-          <EmptyPlaceholder>아직 반복적으로 시뮬레이션된 상사 발언이 없습니다.</EmptyPlaceholder>
+          <EmptyPlaceholder>아직 반복 시뮬레이션 유형을 집계할 데이터가 없습니다.</EmptyPlaceholder>
         )}
       </section>
     </main>
@@ -188,6 +198,59 @@ function TopicCloud({ words, colorful }: { words: { text: string; value: number 
         </Wordcloud>
       </svg>
     </div>
+  );
+}
+
+function TopicFeatureHeatmap({ data }: { data: HrDashboard["topicFeature"] }) {
+  const preferredFeatures = ["TRANSLATE", "CHAT", "SIMULATE", "MONOLOGUE", "PERSONA_REBUILD"];
+  const presentFeatures = new Set(data.map((item) => item.feature));
+  const features = [
+    ...preferredFeatures.filter((feature) => presentFeatures.has(feature)),
+    ...[...presentFeatures].filter((feature) => !preferredFeatures.includes(feature)).sort((a, b) => a.localeCompare(b, "ko")),
+  ];
+  const topicTotals = data.reduce((totals, item) => totals.set(item.topic, (totals.get(item.topic) ?? 0) + item.value), new Map<string, number>());
+  const topics = [...topicTotals].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko")).map(([topic]) => topic);
+  const values = new Map(data.map((item) => [`${item.topic}\u0000${item.feature}`, item.value]));
+  const maxValue = Math.max(...data.map((item) => item.value), 1);
+
+  return (
+    <>
+      <div className="topic-feature-heatmap-scroll">
+        <table className="topic-feature-heatmap" aria-label="주제별 기능 사용량 히트맵">
+          <thead>
+            <tr>
+              <th scope="col">주제</th>
+              {features.map((feature) => <th key={feature} scope="col">{featureLabel(feature)}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {topics.map((topic) => (
+              <tr key={topic}>
+                <th scope="row">{topic}</th>
+                {features.map((feature) => {
+                  const value = values.get(`${topic}\u0000${feature}`) ?? 0;
+                  const ratio = value / maxValue;
+                  const alpha = value === 0 ? 0.035 : 0.1 + ratio * 0.8;
+                  return (
+                    <td key={feature} aria-label={`${topic} · ${featureLabel(feature)}: ${value}건`}>
+                      <span
+                        className={`topic-feature-cell${ratio >= 0.58 ? " is-strong" : ""}`}
+                        style={{ backgroundColor: `rgba(55, 93, 243, ${alpha})` }}
+                      >
+                        {value > 0 ? value.toLocaleString() : "–"}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="topic-feature-legend" aria-label="색 농도 범례">
+        <span>낮음</span><i aria-hidden="true"/><span>높음</span>
+      </div>
+    </>
   );
 }
 

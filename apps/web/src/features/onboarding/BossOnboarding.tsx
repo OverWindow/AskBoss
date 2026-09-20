@@ -1,10 +1,11 @@
 import { useEffect,useMemo,useRef,useState } from "react";
 import { AnimatePresence,motion } from "framer-motion";
-import { ChevronRight,FileText,Home,Image,ShieldAlert } from "lucide-react";
+import { ChevronRight,FileText,Home,Image } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery,useQueryClient } from "@tanstack/react-query";
 import { AVATARS,BOSS_RANKS,BOSS_TENURE_BANDS,ENTRY_PATHS,JOB_FUNCTIONS,MAX_IMAGE_EVIDENCE_PER_BOSS,USER_RANKS,USER_TENURE_BANDS,WEAKNESSES,type Boss,type BossSurveyQuestion,type CompanyResearch,type UserProfile } from "@askboss/shared";
 import { EvidenceUploadProgressList } from "../../components/EvidenceUploadProgressList";
+import { EvidencePrivacyNotice } from "../../components/EvidencePrivacyNotice";
 import { api,ApiError } from "../../services/api-client";
 import { getClipboardImageFiles,IMAGE_UPLOAD_CONCURRENCY,mapWithConcurrency,prepareEvidenceFile,prepareEvidenceImageBatch,type EvidenceUploadProgress,uploadToSignedUrl } from "../../services/upload-client";
 import { useUiStore } from "../../stores/ui-store";
@@ -21,8 +22,6 @@ const JOB_WAIT_TIMEOUT_MS=8*60_000;
 const PERSONA_REQUEST_TIMEOUT_MS=60_000;
 class JobFailedError extends Error{constructor(message:string,readonly failedIds:string[]){super(message);this.name="JobFailedError";}}
 class JobMissingError extends Error{constructor(readonly missingIds:string[]){super("작업을 찾을 수 없습니다.");this.name="JobMissingError";}}
-
-export function EvidencePrivacyNotice(){return <aside className="evidence-privacy-notice" role="note" aria-label="자료 업로드 개인정보 안내"><ShieldAlert size={20} aria-hidden="true"/><div><strong>기밀 정보나 개인 정보 노출이 없도록 주의해주세요!</strong><p>이름, 연락처, 계정 정보, 고객정보와 회사 기밀은 업로드 전에 가리거나 삭제해 주세요.</p></div></aside>;}
 
 export function BossOnboarding(){const navigate=useNavigate();const cache=useQueryClient();const ui=useUiStore();const [draft,setDraft]=useState<Draft>(loadDraft);const [index,setIndex]=useState(0);const [questions,setQuestions]=useState<BossSurveyQuestion[]>([]);const [answers,setAnswers]=useState<Record<string,{selectedOption:string|null;freeText:string}>>({});const [error,setError]=useState("");const [busy,setBusy]=useState(false);const [status,setStatus]=useState("");const [uploadItems,setUploadItems]=useState<EvidenceUploadProgress[]>([]);const [removingImageId,setRemovingImageId]=useState<string|null>(null);const companyResearchRef=useRef<Promise<CompanyResearch|null>|null>(null);
 const profileQuery=useQuery({queryKey:["profile"],queryFn:()=>api<{profile:UserProfile|null}>("/profile").then(r=>r.profile)});const hasProfile=Boolean(profileQuery.data);const steps=useMemo(()=>[...(hasProfile?[]:USER_STEPS),...BOSS_STEPS,...questions.map((_,i)=>`S${i}`)],[hasProfile,questions]);const step=steps[index]??"B1";const evidenceQuery=useQuery({queryKey:["boss-evidence",draft.bossId],queryFn:()=>api<{evidence:PersonalEvidence[]}>(`/bosses/${draft.bossId}/evidence`).then(result=>result.evidence),enabled:step==="B9"&&Boolean(draft.bossId),retry:false});useEffect(()=>{sessionStorage.setItem("askboss:onboarding",JSON.stringify(draft));},[draft]);
