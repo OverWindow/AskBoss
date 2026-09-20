@@ -468,7 +468,7 @@ body>.dialog-backdrop{z-index:200}
    scrolled content never shows through or hides beneath it. */
 @media(max-width:767px){
   .onboarding-top{position:sticky;top:0;z-index:14;margin:0 -16px;padding:10px 16px;background:var(--hr-bg)}
-  .onboarding-step{padding-top:56px}
+  .onboarding-step{align-self:start;padding-top:56px}
 }
 /* Mobile workspace panels cover the floating brand logo; nav stays on top */
 @media(max-width:767px){
