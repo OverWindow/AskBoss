@@ -195,6 +195,7 @@ export interface TranslationExamplesSettings {
 export interface AiPromptInstructions {
   translation: string;
   translationReplyStyles: TranslationReplyStyles;
+  coaching: string;
   onboarding: {
     companyResearch: string;
     evidenceExtraction: string;

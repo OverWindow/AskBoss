@@ -15,6 +15,16 @@ export interface PreparedEvidenceFile {
 
 export const IMAGE_UPLOAD_CONCURRENCY = 2;
 let imageSelectionSequence = 0;
+let clipboardPasteSequence = 0;
+
+const EXTENSION_BY_IMAGE_MIME: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/jpg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+const GENERIC_CLIPBOARD_IMAGE_NAME = /^(?:image|clipboard|screenshot|blob)(?:[-_ ]?\d+)?(?:\.[^.]+)?$/i;
 
 export type EvidenceUploadStatus = "VALIDATING" | "UPLOADING" | "REGISTERING" | "ANALYZING" | "SUCCEEDED" | "FAILED";
 
@@ -32,6 +42,26 @@ export interface PreparedEvidenceImage {
   source: File;
   prepared: PreparedEvidenceFile | null;
   error: string | null;
+}
+
+function clipboardTimestamp(date: Date) {
+  return date.toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
+}
+
+export function getClipboardImageFiles(clipboardData: Pick<DataTransfer, "items" | "files">, now = new Date()): File[] {
+  const itemFiles = Array.from(clipboardData.items).flatMap((item) => {
+    if (item.kind !== "file") return [];
+    const file = item.getAsFile();
+    return file?.type.toLowerCase().startsWith("image/") ? [file] : [];
+  });
+  const candidates = itemFiles.length ? itemFiles : Array.from(clipboardData.files).filter((file) => file.type.toLowerCase().startsWith("image/"));
+  if (!candidates.length) return [];
+  const pasteId = ++clipboardPasteSequence;
+  return candidates.map((file, index) => {
+    if (file.name && !GENERIC_CLIPBOARD_IMAGE_NAME.test(file.name)) return file;
+    const extension = EXTENSION_BY_IMAGE_MIME[file.type.toLowerCase()] ?? file.name.split(".").pop()?.toLowerCase() ?? "img";
+    return new File([file], `pasted-image-${clipboardTimestamp(now)}-${pasteId}-${index + 1}.${extension}`, { type: file.type, lastModified: file.lastModified || now.getTime() });
+  });
 }
 
 export function prepareEvidenceFile(file: File): PreparedEvidenceFile {

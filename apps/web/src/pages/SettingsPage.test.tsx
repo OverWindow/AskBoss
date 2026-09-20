@@ -28,7 +28,7 @@ describe("SettingsPage profile saving", () => {
   beforeEach(() => {
     mockedApi.mockReset();
     mockedApi.mockImplementation(async (path, options) => {
-      if (path === "/profile" && options?.method === "PUT") return { profile: { ...initialProfile, handle: JSON.parse(String(options.body)).handle } } as any;
+      if (path === "/profile" && options?.method === "PUT") return { profile: JSON.parse(String(options.body)) } as any;
       if (path === "/profile") return { profile: initialProfile } as any;
       return {} as any;
     });
@@ -64,5 +64,30 @@ describe("SettingsPage profile saving", () => {
     expect(await screen.findByText("내 정보를 저장하지 못했습니다.")).toBeInTheDocument();
     expect(screen.queryByText("내 정보를 저장했습니다.")).not.toBeInTheDocument();
     await waitFor(() => expect(input).toHaveValue("새이름"));
+  });
+
+  it("shows the current weakness choices and removes hidden legacy values when saving", async () => {
+    let savedProfile: typeof initialProfile | undefined;
+    mockedApi.mockImplementation(async (path, options) => {
+      if (path === "/profile" && options?.method === "PUT") {
+        savedProfile = JSON.parse(String(options.body));
+        return { profile: savedProfile } as any;
+      }
+      if (path === "/profile") return { profile: { ...initialProfile, weaknesses: ["거절을 잘 못함", "답장이 너무 김"] } } as any;
+      return {} as any;
+    });
+    renderSettings();
+
+    const conclusionFirst = await screen.findByLabelText("결론부터 말하기 어렵다");
+    expect(screen.getByLabelText("거절하기 어렵다")).toBeInTheDocument();
+    expect(screen.getByLabelText("되묻기 어렵다")).toBeInTheDocument();
+    expect(screen.getByLabelText("실수를 보고하기 어렵다")).toBeInTheDocument();
+    expect(screen.queryByLabelText("거절을 잘 못함")).not.toBeInTheDocument();
+    fireEvent.click(conclusionFirst);
+    fireEvent.click(screen.getByLabelText("실수를 보고하기 어렵다"));
+    fireEvent.click(screen.getByRole("button", { name: "내 정보 저장" }));
+
+    expect(await screen.findByText("내 정보를 저장했습니다.")).toBeInTheDocument();
+    expect(savedProfile?.weaknesses).toEqual(["결론부터 말하기 어렵다", "실수를 보고하기 어렵다"]);
   });
 });

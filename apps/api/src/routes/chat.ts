@@ -57,12 +57,14 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
       throw new HttpError(400, "일반 사용자 대화만 문장 코칭을 받을 수 있습니다.", "COACHING_UNSUPPORTED_MESSAGE");
     }
     if (context.message.coaching) return { coaching: context.message.coaching };
+    const prompts = await store.getAiPromptSettings();
     const coaching = await ai.reviewUserMessage({
       profile,
       boss,
       summary: context.conversationSummary,
       messages: context.previousMessages,
       message: context.message.content,
+      promptInstruction: prompts.coaching,
     }, AbortSignal.timeout(30_000));
     const saved = await store.setChatMessageCoaching(session.id, bossId, messageId, coaching);
     if (!saved) throw new HttpError(404, "대화 메시지를 찾을 수 없습니다.", "CHAT_MESSAGE_NOT_FOUND");

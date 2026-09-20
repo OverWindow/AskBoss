@@ -150,6 +150,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     const changedKeys = [
       previous.translation !== settings.translation ? "translation" : null,
       previous.translationReplyStyles.some((style: string, index: number) => style !== settings.translationReplyStyles[index]) ? "translationReplyStyles" : null,
+      previous.coaching !== settings.coaching ? "coaching" : null,
       previous.onboarding.companyResearch !== settings.onboarding.companyResearch ? "companyResearch" : null,
       previous.onboarding.evidenceExtraction !== settings.onboarding.evidenceExtraction ? "evidenceExtraction" : null,
       previous.onboarding.surveyGeneration !== settings.onboarding.surveyGeneration ? "surveyGeneration" : null,
@@ -160,7 +161,7 @@ export const adminRoutes: FastifyPluginAsync = async (app) => {
     await store.recordAdminOperation("AI_PROMPT_SETTINGS_UPDATE", "SUCCEEDED", {
       changedCount: changedKeys.length,
       changedKeys: changedKeys.join(","),
-      totalLength: settings.translation.length + settings.translationReplyStyles.reduce((sum, style) => sum + style.length, 0) + Object.values(settings.onboarding).reduce((sum, prompt) => sum + prompt.length, 0),
+      totalLength: settings.translation.length + settings.translationReplyStyles.reduce((sum, style) => sum + style.length, 0) + settings.coaching.length + Object.values(settings.onboarding).reduce((sum, prompt) => sum + prompt.length, 0),
     });
     return saved;
   });

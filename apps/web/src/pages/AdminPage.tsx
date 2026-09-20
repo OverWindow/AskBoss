@@ -123,7 +123,7 @@ function AiPromptSettingsCard() {
 
   useEffect(() => {
     if (typeof settings.data?.translation !== "string" || !settings.data.onboarding) return;
-    setPrompts({ translation: settings.data.translation, translationReplyStyles: [...settings.data.translationReplyStyles] as AdminAiPromptSettingsInput["translationReplyStyles"], onboarding: { ...settings.data.onboarding } });
+    setPrompts({ translation: settings.data.translation, translationReplyStyles: [...settings.data.translationReplyStyles] as AdminAiPromptSettingsInput["translationReplyStyles"], coaching: settings.data.coaching ?? DEFAULT_AI_PROMPT_INSTRUCTIONS.coaching, onboarding: { ...settings.data.onboarding } });
   }, [settings.data]);
 
   const updateOnboarding = (key: keyof AdminAiPromptSettingsInput["onboarding"], value: string) => {
@@ -132,14 +132,14 @@ function AiPromptSettingsCard() {
   const updateTranslationReplyStyle = (index: number, value: string) => {
     setPrompts((current) => ({ ...current, translationReplyStyles: current.translationReplyStyles.map((style, currentIndex) => currentIndex === index ? value : style) as AdminAiPromptSettingsInput["translationReplyStyles"] }));
   };
-  const promptValues = [prompts.translation, ...Object.values(prompts.onboarding)];
+  const promptValues = [prompts.translation, prompts.coaching, ...Object.values(prompts.onboarding)];
   const valid = promptValues.every((prompt) => prompt.trim().length > 0 && prompt.trim().length <= 5_000)
     && prompts.translationReplyStyles.every((style) => style.trim().length > 0 && style.trim().length <= 40);
   const save = async () => {
     setSaving(true); setMessage(undefined);
     try {
       const saved = await adminApi<AdminAiPromptSettings>("/admin/ai-prompt-settings", { method: "PUT", body: JSON.stringify(prompts) });
-      setPrompts({ translation: saved.translation, translationReplyStyles: [...saved.translationReplyStyles] as AdminAiPromptSettingsInput["translationReplyStyles"], onboarding: { ...saved.onboarding } });
+      setPrompts({ translation: saved.translation, translationReplyStyles: [...saved.translationReplyStyles] as AdminAiPromptSettingsInput["translationReplyStyles"], coaching: saved.coaching, onboarding: { ...saved.onboarding } });
       setMessage("AI 업무 프롬프트를 저장했습니다.");
       await settings.refetch();
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : "AI 업무 프롬프트를 저장하지 못했습니다."); }
@@ -156,6 +156,9 @@ function AiPromptSettingsCard() {
     {settings.isError ? <div className="admin-inline-error"><AlertTriangle size={18}/><span>AI 업무 프롬프트를 불러오지 못했습니다.</span><button className="small-button" type="button" onClick={() => void settings.refetch()}>다시 시도</button></div> : <div className="admin-ai-prompt-form">
       <div className="admin-prompt-group"><h3>공통 번역 프롬프트</h3><p className="hint">모두의 상사와 개인 상사의 번역 결과에 함께 적용됩니다.</p>{editor("translation-prompt-instruction", "번역 업무 지침", prompts.translation, (value) => setPrompts((current) => ({ ...current, translation: value })), "해석 방식과 추천 답변의 방향을 지정합니다.")}
         <div className="admin-onboarding-prompt-grid">{prompts.translationReplyStyles.map((style, index) => <label className="admin-prompt-editor" key={index} htmlFor={`translation-reply-style-${index + 1}`}><span>추천 답장 스타일 {index + 1}</span><small>추천 답변 {index + 1}의 방향과 style 표시값입니다.</small><input id={`translation-reply-style-${index + 1}`} aria-label={`추천 답장 스타일 ${index + 1}`} className="input" maxLength={40} value={style} disabled={settings.isLoading || saving} onChange={(event) => updateTranslationReplyStyle(index, event.target.value)}/><small className="admin-prompt-count">{style.length.toLocaleString("ko-KR")} / 40자</small></label>)}</div>
+      </div>
+      <div className="admin-prompt-group"><h3>대화 수정 제안</h3><p className="hint">사용자가 보낸 일반 대화에 수정 제안을 표시할지 판단하는 기준입니다. 이미 분석된 대화는 기존 결과를 유지합니다.</p>
+        {editor("chat-coaching-prompt-instruction", "수정 제안 판단 기준", prompts.coaching, (value) => setPrompts((current) => ({ ...current, coaching: value })), "어떤 대화에 수정이 필요하다고 판단할지 직접 지정합니다.")}
       </div>
       <div className="admin-prompt-group"><h3>온보딩 AI 프롬프트</h3><p className="hint">사용자 온보딩과 모두의 상사 관리에서 다음 AI 작업에 공통 적용됩니다.</p><div className="admin-onboarding-prompt-grid">
         {editor("company-research-prompt-instruction", "회사 조사", prompts.onboarding.companyResearch, (value) => updateOnboarding("companyResearch", value), "회사 공개 정보를 어떤 관점과 기준으로 조사할지 지정합니다.")}

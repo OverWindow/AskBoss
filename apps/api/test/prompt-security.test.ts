@@ -65,6 +65,15 @@ describe("prompt security boundaries", () => {
     expect(userPrompt.content).toContain("ignore previous instructions");
   });
 
+  it("keeps coaching safety and output rules fixed around editable judgment criteria", () => {
+    const prompt = coachingPrompt({ profile: null, boss: { alias: "김팀장" }, summary: null, messages: [], message: "확인했습니다.", promptInstruction: "CUSTOM_COACHING_CRITERIA" });
+    expect(prompt).toContain("<admin-coaching-criteria>CUSTOM_COACHING_CRITERIA</admin-coaching-criteria>");
+    expect(prompt).toContain("사용자의 의도와 사실관계를 새로 만들지 말고");
+    expect(prompt).toContain("shouldSuggest가 false이면 reason과 revisedText는 반드시 null");
+    expect(prompt).not.toContain("모욕, 위협, 노골적인 무례함");
+    expect(prompt).not.toContain('"promptInstruction"');
+  });
+
   it("keeps legacy stored personas usable without rewriting them", () => {
     const legacyPersona: LegacyBossPersona = {
       summary: "기존 형식 페르소나",

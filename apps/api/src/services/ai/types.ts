@@ -28,6 +28,7 @@ export interface ChatMessageCoachingInput {
   summary: string | null;
   messages: ChatMessageRecord[];
   message: string;
+  promptInstruction?: string;
 }
 
 export interface AiService {

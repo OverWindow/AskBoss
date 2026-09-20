@@ -92,6 +92,7 @@
 .onboarding-step .upload-box>div,.onboarding-step .upload-box>small{display:block;margin:0;text-align:center}
 .onboarding-step .upload-box>small{color:var(--hr-muted)}
 .upload-box.is-disabled,.secondary-button.is-disabled{opacity:.5;cursor:not-allowed}
+.evidence-paste-zone{padding:14px;border:1px dashed rgba(55,93,243,.28);border-radius:13px;outline:none;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}.evidence-paste-zone:focus,.evidence-paste-zone:focus-within{border-color:var(--hr-accent);background:rgba(55,93,243,.025);box-shadow:0 0 0 3px rgba(55,93,243,.08)}.evidence-paste-hint{margin:0 0 12px;color:var(--hr-muted);font-size:.78rem;line-height:1.5}
 @media(max-width:520px){.onboarding-actions{width:calc(100% - 32px)}.onboarding-step .upload-box{min-height:104px;padding:16px 8px}}
 .settings-panel>header{position:sticky;top:0;z-index:12;margin-bottom:20px;padding:14px 0;background:rgba(254,254,254,.94);backdrop-filter:blur(10px)}
 .onboarding-step .avatar-option:hover img,.settings-form .avatar-option:hover img{transform:none;filter:drop-shadow(0 9px 8px rgba(33,34,50,.16))}

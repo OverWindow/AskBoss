@@ -207,6 +207,7 @@ describe("admin API", () => {
     const settings = {
       translation: "상사의 표현과 가능한 의도를 구분해서 설명한다.",
       translationReplyStyles: ["바로 수락", "조건 조율", "정중한 거절"],
+      coaching: "약속한 기한이나 담당 주체가 불명확할 때만 수정 제안을 표시한다.",
       onboarding: {
         companyResearch: "검증 가능한 공개 정보와 추정을 분리한다.",
         evidenceExtraction: "메시지의 발신자와 앞뒤 맥락을 우선 추출한다.",
@@ -221,8 +222,14 @@ describe("admin API", () => {
       expect(blank.statusCode).toBe(400);
       const blankStyle = await app.inject({ method: "PUT", url: "/api/admin/ai-prompt-settings", headers: { cookie, origin }, payload: { ...settings, translationReplyStyles: [settings.translationReplyStyles[0], " ", settings.translationReplyStyles[2]] } });
       expect(blankStyle.statusCode).toBe(400);
+      const blankCoaching = await app.inject({ method: "PUT", url: "/api/admin/ai-prompt-settings", headers: { cookie, origin }, payload: { ...settings, coaching: " " } });
+      expect(blankCoaching.statusCode).toBe(400);
       const tooLong = await app.inject({ method: "PUT", url: "/api/admin/ai-prompt-settings", headers: { cookie, origin }, payload: { ...settings, onboarding: { ...settings.onboarding, personaGeneration: "가".repeat(5_001) } } });
       expect(tooLong.statusCode).toBe(400);
+
+      const legacyClient = await app.inject({ method: "PUT", url: "/api/admin/ai-prompt-settings", headers: { cookie, origin }, payload: { translation: before.translation, translationReplyStyles: before.translationReplyStyles, onboarding: before.onboarding } });
+      expect(legacyClient.statusCode).toBe(200);
+      expect(legacyClient.json().coaching).toBe(DEFAULT_AI_PROMPT_INSTRUCTIONS.coaching);
 
       await store.saveCompanyResearch("prompt-cache-test", { companyName: "테스트", industry: null, companySizeHint: null, businessSummary: "캐시", organizationHints: [], workCultureSignals: [], confidence: 0.5, sourceSummary: [] });
       expect(await store.getCompanyResearch("prompt-cache-test")).not.toBeNull();
@@ -235,10 +242,11 @@ describe("admin API", () => {
       const operation = dashboard.json().recentOperations.find((item: any) => item.type === "AI_PROMPT_SETTINGS_UPDATE");
       expect(operation.detail.changedKeys).toContain("translation");
       expect(operation.detail.changedKeys).toContain("translationReplyStyles");
+      expect(operation.detail.changedKeys).toContain("coaching");
       expect(operation.detail.changedKeys).toContain("companyResearch");
       expect(JSON.stringify(operation)).not.toContain(settings.translation);
     } finally {
-      await store.updateAiPromptSettings({ translation: before.translation, translationReplyStyles: before.translationReplyStyles, onboarding: before.onboarding });
+      await store.updateAiPromptSettings({ translation: before.translation, translationReplyStyles: before.translationReplyStyles, coaching: before.coaching, onboarding: before.onboarding });
       expect((await store.getAiPromptSettings()).translation).toBe(before.translation);
     }
   });

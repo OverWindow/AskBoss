@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AGE_BANDS, ALLOWED_MIME_TYPES, AVATARS, CHANNELS, ENTRY_PATHS } from "../constants/options.js";
+import { AGE_BANDS, ALLOWED_MIME_TYPES, AVATARS, CHANNELS, DEFAULT_CHAT_COACHING_PROMPT_INSTRUCTION, ENTRY_PATHS } from "../constants/options.js";
 import { companyResearchSchema } from "./ai.js";
 
 export const handleSchema = z.string()
@@ -68,6 +68,7 @@ const translationReplyStylesSchema = z.tuple([
 export const adminAiPromptSettingsSchema = z.object({
   translation: adminPromptInstructionSchema,
   translationReplyStyles: translationReplyStylesSchema,
+  coaching: adminPromptInstructionSchema.default(DEFAULT_CHAT_COACHING_PROMPT_INSTRUCTION),
   onboarding: z.object({
     companyResearch: adminPromptInstructionSchema,
     evidenceExtraction: adminPromptInstructionSchema,

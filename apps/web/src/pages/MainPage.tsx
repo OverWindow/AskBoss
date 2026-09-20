@@ -135,7 +135,7 @@ export function MainPage() {
   };
 
   if (session.isLoading || bosses.isLoading) return <div className="loading-state"><div className="boss-loading"><img className="loading-boss-avatar" src="/avatars/boss-male-01-loading.png" alt="모두의 상사 픽셀 아바타" width="150" height="150" fetchPriority="high"/><div className="spinner"/><p>모두의 상사를 부르는 중입니다.</p></div></div>;
-  if (session.isError || bosses.isError || !boss) return <div className="empty-state"><div><h1>서비스를 시작하지 못했습니다.</h1><p>API 서버 연결을 확인한 뒤 다시 시도해 주세요.</p></div></div>;
+  if (session.isError || bosses.isError || !boss) return <div className="empty-state"><div><h1>서비스를 시작하지 못했습니다.</h1><p>API 서버 연결을 확인한 뒤 다시 시도해 주세요.</p><button className="secondary-button" type="button" onClick={()=>{if(session.isError)void session.refetch();else void bosses.refetch();}}>다시 시도</button></div></div>;
 
   return <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: .25, ease: "easeOut" }}>
     <AppShell>

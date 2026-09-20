@@ -34,7 +34,7 @@ describe("translation API", () => {
     await store.updatePersonalBossDefaults("개인 상사 전용 테스트 성격");
     await store.updateGlobalBossDefaults("모두의 상사 전용 테스트 성격");
     const beforePrompts = await store.getAiPromptSettings();
-    await store.updateAiPromptSettings({ translation: "모든 상사 공통 번역 테스트 지침", translationReplyStyles: ["수락형", "조율형", "거절형"], onboarding: beforePrompts.onboarding });
+    await store.updateAiPromptSettings({ translation: "모든 상사 공통 번역 테스트 지침", translationReplyStyles: ["수락형", "조율형", "거절형"], coaching: beforePrompts.coaching, onboarding: beforePrompts.onboarding });
     try {
       const session = await app.inject({ method: "POST", url: "/api/session" });
       const cookie = String(session.headers["set-cookie"]).split(";")[0]!;
@@ -59,7 +59,7 @@ describe("translation API", () => {
     } finally {
       await store.updatePersonalBossDefaults(DEFAULT_PERSONAL_BOSS_BASE_PROMPT);
       await store.updateGlobalBossDefaults("");
-      await store.updateAiPromptSettings({ translation: beforePrompts.translation, translationReplyStyles: beforePrompts.translationReplyStyles, onboarding: beforePrompts.onboarding });
+      await store.updateAiPromptSettings({ translation: beforePrompts.translation, translationReplyStyles: beforePrompts.translationReplyStyles, coaching: beforePrompts.coaching, onboarding: beforePrompts.onboarding });
     }
   });
 

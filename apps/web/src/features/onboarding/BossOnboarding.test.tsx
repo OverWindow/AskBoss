@@ -89,10 +89,17 @@ describe("BossOnboarding job recovery", () => {
       fireEvent.click(screen.getByRole("button", { name: "다음" }));
       expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
     }
+    expect(screen.getByRole("button", { name: "결론부터 말하기 어렵다" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "거절하기 어렵다" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "되묻기 어렵다" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "실수를 보고하기 어렵다" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "답장이 너무 김" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "결론부터 말하기 어렵다" }));
+    fireEvent.click(screen.getByRole("button", { name: "되묻기 어렵다" }));
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
 
     expect(await screen.findByRole("heading", { name: "상사의 모습을 골라주세요." })).toBeInTheDocument();
-    expect(mockedApi).toHaveBeenCalledWith("/profile", { method: "PUT", body: JSON.stringify({ ...profile, handle: "새사용자" }) });
+    expect(mockedApi).toHaveBeenCalledWith("/profile", { method: "PUT", body: JSON.stringify({ ...profile, handle: "새사용자", weaknesses: ["결론부터 말하기 어렵다", "되묻기 어렵다"] }) });
     expect(mockedApi.mock.calls.some(([path]) => String(path).includes("handle-availability"))).toBe(false);
   });
 
@@ -115,6 +122,7 @@ describe("BossOnboarding job recovery", () => {
 
   it("drops missing evidence jobs and recreates a missing persona job once", async () => {
     let personaBuilds = 0;
+    let completedPersonaPolls = 0;
     mockedApi.mockImplementation(async (path, options) => {
       if (path === "/profile") return { profile } as any;
       if (path === "/company/research") return { research: null } as any;
@@ -127,7 +135,12 @@ describe("BossOnboarding job recovery", () => {
         return { jobId: personaBuilds === 1 ? "missing-persona" : "completed-persona" } as any;
       }
       if (path === "/jobs/missing-evidence" || path === "/jobs/missing-persona") throw new ApiError(404, "REQUEST_ERROR", "작업을 찾을 수 없습니다.");
-      if (path === "/jobs/completed-persona") return { job: { status: "SUCCEEDED", attempts: 1 } } as any;
+      if (path === "/jobs/completed-persona") {
+        completedPersonaPolls += 1;
+        if (completedPersonaPolls === 1) throw new ApiError(0, "REQUEST_TIMEOUT", "응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.");
+        return { job: { status: "SUCCEEDED", attempts: 1 } } as any;
+      }
+      if (path === "/bosses") return { bosses: [{ id: "new-boss" }] } as any;
       throw new Error(`Unexpected API call: ${path}`);
     });
     renderOnboarding();
@@ -140,10 +153,12 @@ describe("BossOnboarding job recovery", () => {
     fireEvent.click(screen.getByRole("button", { name: "페르소나 만들기" }));
 
     await waitFor(() => expect(personaBuilds).toBe(2));
-    await waitFor(() => expect(sessionStorage.getItem("askboss:onboarding")).toBeNull());
+    await waitFor(() => expect(sessionStorage.getItem("askboss:onboarding")).toBeNull(), { timeout: 3_000 });
+    expect(completedPersonaPolls).toBe(2);
     expect(mockedApi).toHaveBeenCalledWith("/jobs/missing-evidence");
     expect(mockedApi).toHaveBeenCalledWith("/jobs/missing-persona");
     expect(mockedApi).toHaveBeenCalledWith("/jobs/completed-persona");
+    expect(mockedApi).toHaveBeenCalledWith("/bosses", { timeoutMs: 60_000 });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
@@ -187,7 +202,8 @@ describe("BossOnboarding job recovery", () => {
       const input = screen.getByText("이미지 업로드").closest("label")!.querySelector("input")!;
       fireEvent.change(input, { target: { files } });
     };
-    selectImages([
+    const pasteImages = (files: File[]) => fireEvent.paste(screen.getByLabelText("이미지 붙여넣기 영역"), { clipboardData: { items: files.map((file) => ({ kind: "file", type: file.type, getAsFile: () => file })), files: [] } });
+    pasteImages([
       new File(["1"], "one.png", { type: "image/png" }),
       new File(["2"], "two.png", { type: "image/png" }),
     ]);

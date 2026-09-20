@@ -33,7 +33,7 @@ export function PkiIndicator({ boss }: { boss: Boss }) {
         <div><span><b>정보 충족도</b><small>5개 업무 상황별 관찰이 충분히 쌓였는지 반영합니다.</small></span><b>{pki?.completeness ?? 0}점</b></div>
         <div><span><b>근거 신뢰도</b><small>페르소나 특성과 연결된 근거 수와 맥락 품질을 반영합니다.</small></span><b>{pki?.evidenceReliability ?? 0}점</b></div>
         <div><span><b>상황 다양성</b><small>서로 다른 시기와 업무 상황에서 관찰됐는지 반영합니다.</small></span><b>{pki?.diversity ?? 0}점</b></div>
-        <div><span><b>최신성</b><small>최근 관찰일수록 높게 반영하며 시간이 지나면 점차 낮아집니다.</small></span><b>{pki?.freshness ?? 0}점</b></div>
+        <div><span><b>최신성</b><small>최근 관찰일수록 높게 반영하며 약 2년에 걸쳐 완만하게 낮아집니다.</small></span><b>{pki?.freshness ?? 0}점</b></div>
       </div>
     </motion.div>}</AnimatePresence>
   </div>;

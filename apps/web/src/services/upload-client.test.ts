@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { IMAGE_UPLOAD_CONCURRENCY, mapWithConcurrency, prepareEvidenceFile, prepareEvidenceImageBatch, uploadToSignedUrl } from "./upload-client";
+import { getClipboardImageFiles, IMAGE_UPLOAD_CONCURRENCY, mapWithConcurrency, prepareEvidenceFile, prepareEvidenceImageBatch, uploadToSignedUrl } from "./upload-client";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -54,6 +54,33 @@ describe("evidence upload client", () => {
   it("uses unique progress ids across repeated selections of the same file", () => {
     const file = new File(["one"], "same.png", { type: "image/png", lastModified: 1 });
     expect(prepareEvidenceImageBatch([file])[0]?.id).not.toBe(prepareEvidenceImageBatch([file])[0]?.id);
+  });
+
+  it("extracts clipboard images, gives generic images useful names, and ignores text", () => {
+    const generic = new File(["png"], "image.png", { type: "image/png" });
+    const named = new File(["jpg"], "meeting.jpg", { type: "image/jpeg" });
+    const clipboardData = {
+      items: [
+        { kind: "string", type: "text/plain", getAsFile: () => null },
+        { kind: "file", type: "image/png", getAsFile: () => generic },
+        { kind: "file", type: "image/jpeg", getAsFile: () => named },
+      ],
+      files: [],
+    } as unknown as Pick<DataTransfer, "items" | "files">;
+
+    const files = getClipboardImageFiles(clipboardData, new Date("2026-09-20T12:34:56.000Z"));
+
+    expect(files).toHaveLength(2);
+    expect(files[0]?.name).toMatch(/^pasted-image-20260920-123456-\d+-1\.png$/);
+    expect(files[1]?.name).toBe("meeting.jpg");
+    expect(getClipboardImageFiles({ items: [{ kind: "string", type: "text/plain", getAsFile: () => null }], files: [] } as any)).toEqual([]);
+  });
+
+  it("falls back to clipboard files and leaves unsupported images for per-file validation", () => {
+    const gif = new File(["gif"], "image.gif", { type: "image/gif" });
+    const files = getClipboardImageFiles({ items: [] as any, files: [gif] as any } as Pick<DataTransfer, "items" | "files">);
+    expect(files[0]?.name).toMatch(/\.gif$/);
+    expect(prepareEvidenceImageBatch(files)[0]).toMatchObject({ prepared: null, error: expect.stringContaining("PNG, JPG, JPEG, WebP") });
   });
 
   it("runs batch work with no more than two concurrent uploads", async () => {

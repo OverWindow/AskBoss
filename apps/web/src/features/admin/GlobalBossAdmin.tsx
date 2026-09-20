@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ClipboardEvent } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Bot, FileText, Image, LogOut, RefreshCw, Save, Settings2, Trash2, Upload } from "lucide-react";
 import { AGE_BANDS, AVATARS, BOSS_RANKS, BOSS_TENURE_BANDS, JOB_FUNCTIONS, MAX_IMAGE_EVIDENCE_PER_BOSS, type AdminGlobalBossDetail, type Boss, type BossSurveyQuestion, type CompanyResearch, type GlobalBossDefaults, type GlobalBossPromptPreview } from "@askboss/shared";
 import { EvidenceUploadProgressList } from "../../components/EvidenceUploadProgressList";
 import { api } from "../../services/api-client";
-import { IMAGE_UPLOAD_CONCURRENCY,mapWithConcurrency,prepareEvidenceFile,prepareEvidenceImageBatch,type EvidenceUploadProgress,uploadToSignedUrl } from "../../services/upload-client";
+import { getClipboardImageFiles,IMAGE_UPLOAD_CONCURRENCY,mapWithConcurrency,prepareEvidenceFile,prepareEvidenceImageBatch,type EvidenceUploadProgress,uploadToSignedUrl } from "../../services/upload-client";
 import { eulReul } from "../../lib/korean";
 
 const TIMEOUT = 60_000;
@@ -106,7 +106,7 @@ export function GlobalBossAdmin({ onLogout }: Props) {
   };
   const updateUploadItem = (id: string, patch: Partial<EvidenceUploadProgress>) => setUploadItems((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item));
   const uploadImages = async (files: File[]) => {
-    if (!files.length) return;
+    if (!files.length || busy) return;
     setMessage("");
     const batch = prepareEvidenceImageBatch(files, Math.max(0, MAX_IMAGE_EVIDENCE_PER_BOSS - imageCount));
     setUploadItems((items) => [...items, ...batch.map((item) => ({ id: item.id, name: item.source.name, status: item.error ? "FAILED" as const : "VALIDATING" as const, error: item.error }))]);
@@ -176,6 +176,13 @@ export function GlobalBossAdmin({ onLogout }: Props) {
   const evidence = detail.data?.evidence ?? [];
   const imageCount = evidence.filter((item) => item.type === "IMAGE").length;
   const processing = evidence.some((item) => item.status === "PENDING" || item.status === "PROCESSING");
+  const pasteImages = (event: ClipboardEvent<HTMLElement>) => {
+    const files = getClipboardImageFiles(event.clipboardData);
+    if (!files.length) return;
+    event.preventDefault();
+    if (busy) { setMessage("현재 작업이 끝난 뒤 이미지를 다시 붙여넣어 주세요."); return; }
+    void uploadImages(files);
+  };
 
   return <main className="admin-page global-boss-admin">
     <header className="admin-topbar"><div><p className="panel-kicker">ASKBOSS OPERATIONS</p><h1>모두의 상사 관리</h1><p>입력 자료를 검토한 뒤 새 페르소나를 명시적으로 반영합니다.</p></div><div className="admin-top-actions"><Link className="secondary-button" to="/admin"><ArrowLeft size={16}/>운영 현황</Link><button className="text-button" onClick={() => void onLogout()}><LogOut size={16}/>로그아웃</button></div></header>
@@ -213,10 +220,13 @@ export function GlobalBossAdmin({ onLogout }: Props) {
     </section>
 
     <section className="admin-section"><div className="admin-section-title"><FileText/><div><h2>관찰 자료</h2><p>카톡 대화 붙여넣기와 TXT·이미지 자료를 영구 보관합니다.</p></div></div>
-      <div className="admin-evidence-input"><textarea className="textarea" value={textEvidence} onChange={(event) => setTextEvidence(event.target.value)} placeholder="대화 내용을 붙여넣으세요."/><button className="primary-button" disabled={!textEvidence.trim() || Boolean(busy)} onClick={() => void addTextEvidence()}><Upload size={16}/>텍스트 추가</button></div>
-      <div className="admin-upload-actions"><label className="secondary-button"><FileText size={16}/>TXT 업로드<input hidden disabled={Boolean(busy)} type="file" accept=".txt,text/plain" onChange={(event) => { const file=event.target.files?.[0];if(file)void uploadFile(file);event.currentTarget.value=""; }}/></label><label className={`secondary-button ${imageCount>=MAX_IMAGE_EVIDENCE_PER_BOSS?"is-disabled":""}`}><Image size={16}/>이미지 업로드 ({imageCount}/{MAX_IMAGE_EVIDENCE_PER_BOSS}장)<input hidden multiple disabled={Boolean(busy)||imageCount>=MAX_IMAGE_EVIDENCE_PER_BOSS} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" onChange={(event) => { const files=Array.from(event.target.files??[]);event.currentTarget.value="";if(files.length)void uploadImages(files); }}/></label></div>
-      <EvidenceUploadProgressList items={uploadItems} onRemove={(item)=>void removeUploadItem(item)} removingId={busy}/>
-      <div className="admin-evidence-list">{evidence.map((item) => <article key={item.id}><div><strong>{item.sourceName ?? item.type}</strong><span className={`job-status status-${item.status.toLowerCase()}`}>{item.status}</span><small>{new Date(item.createdAt).toLocaleString("ko-KR")}</small>{item.rawText && <p>{item.rawText}</p>}{item.errorMessage && <p className="error-text">{item.errorMessage}</p>}</div><button className="icon-button" aria-label={`${item.sourceName ?? item.type} 삭제`} disabled={busy === item.id} onClick={() => void deleteEvidence(item.id)}><Trash2 size={16}/></button></article>)}{!evidence.length && <p className="hint">등록된 관찰 자료가 없습니다.</p>}</div>
+      <div className="evidence-paste-zone" tabIndex={0} aria-label="이미지 붙여넣기 영역" onPaste={pasteImages}>
+        <p className="evidence-paste-hint">복사한 이미지는 이 영역을 선택하고 Ctrl/Cmd+V로 추가할 수 있습니다.</p>
+        <div className="admin-evidence-input"><textarea className="textarea" value={textEvidence} onChange={(event) => setTextEvidence(event.target.value)} placeholder="대화 내용을 붙여넣으세요."/><button className="primary-button" disabled={!textEvidence.trim() || Boolean(busy)} onClick={() => void addTextEvidence()}><Upload size={16}/>텍스트 추가</button></div>
+        <div className="admin-upload-actions"><label className="secondary-button"><FileText size={16}/>TXT 업로드<input hidden disabled={Boolean(busy)} type="file" accept=".txt,text/plain" onChange={(event) => { const file=event.target.files?.[0];if(file)void uploadFile(file);event.currentTarget.value=""; }}/></label><label className={`secondary-button ${imageCount>=MAX_IMAGE_EVIDENCE_PER_BOSS?"is-disabled":""}`}><Image size={16}/>이미지 업로드 ({imageCount}/{MAX_IMAGE_EVIDENCE_PER_BOSS}장)<input hidden multiple disabled={Boolean(busy)||imageCount>=MAX_IMAGE_EVIDENCE_PER_BOSS} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" onChange={(event) => { const files=Array.from(event.target.files??[]);event.currentTarget.value="";if(files.length)void uploadImages(files); }}/></label></div>
+        <EvidenceUploadProgressList items={uploadItems} onRemove={(item)=>void removeUploadItem(item)} removingId={busy}/>
+        <div className="admin-evidence-list">{evidence.map((item) => <article key={item.id}><div><strong>{item.sourceName ?? item.type}</strong><span className={`job-status status-${item.status.toLowerCase()}`}>{item.status}</span><small>{new Date(item.createdAt).toLocaleString("ko-KR")}</small>{item.rawText && <p>{item.rawText}</p>}{item.errorMessage && <p className="error-text">{item.errorMessage}</p>}</div><button className="icon-button" aria-label={`${item.sourceName ?? item.type} 삭제`} disabled={busy === item.id} onClick={() => void deleteEvidence(item.id)}><Trash2 size={16}/></button></article>)}{!evidence.length && <p className="hint">등록된 관찰 자료가 없습니다.</p>}</div>
+      </div>
     </section>
 
     <section className="admin-section"><div className="admin-section-title"><FileText/><div><h2>상황 설문</h2><p>모두의 상사에게 맞는 상황 질문을 생성하고 답변합니다.</p></div></div><button className="secondary-button" disabled={Boolean(busy)} onClick={() => void generateSurvey()}><RefreshCw size={16}/>{questions.length ? "질문 다시 생성" : "질문 생성"}</button>

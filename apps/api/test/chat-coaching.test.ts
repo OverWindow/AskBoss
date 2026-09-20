@@ -1,5 +1,6 @@
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { buildApp } from "../src/app";
+import { store } from "../src/repositories";
 import { ai } from "../src/services/ai";
 import { FakeAiService } from "../src/services/ai/fake";
 
@@ -57,6 +58,27 @@ describe("chat message coaching", () => {
     const unauthenticated = await app.inject({ method: "POST", url: `/api/bosses/${globalBossId}/chat/messages/${message.id}/coaching` });
     expect(unauthenticated.statusCode).toBe(401);
     expect(review).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the latest admin judgment criteria only for messages without a stored review", async () => {
+    const before = await store.getAiPromptSettings();
+    const criteria = "기한이나 담당자가 불분명해 실행 오류가 예상될 때만 수정 제안을 표시한다.";
+    await store.updateAiPromptSettings({ translation: before.translation, translationReplyStyles: before.translationReplyStyles, coaching: criteria, onboarding: before.onboarding });
+    const cookie = await createSession();
+    const message = await sendMessage(cookie, "그건 나중에 처리할게요.");
+    const review = vi.spyOn(ai, "reviewUserMessage").mockResolvedValue({ shouldSuggest: true, reason: "기한이 불분명합니다.", revisedText: "오늘 오후까지 처리하겠습니다." });
+    try {
+      const first = await app.inject({ method: "POST", url: `/api/bosses/${globalBossId}/chat/messages/${message.id}/coaching`, headers: { cookie } });
+      expect(first.statusCode).toBe(200);
+      expect(review).toHaveBeenCalledWith(expect.objectContaining({ promptInstruction: criteria }), expect.any(AbortSignal));
+
+      await store.updateAiPromptSettings({ translation: before.translation, translationReplyStyles: before.translationReplyStyles, coaching: "항상 수정 제안을 표시한다.", onboarding: before.onboarding });
+      const cached = await app.inject({ method: "POST", url: `/api/bosses/${globalBossId}/chat/messages/${message.id}/coaching`, headers: { cookie } });
+      expect(cached.json()).toEqual(first.json());
+      expect(review).toHaveBeenCalledTimes(1);
+    } finally {
+      await store.updateAiPromptSettings({ translation: before.translation, translationReplyStyles: before.translationReplyStyles, coaching: before.coaching, onboarding: before.onboarding });
+    }
   });
 
   it("rejects translation simulation replies", async () => {
