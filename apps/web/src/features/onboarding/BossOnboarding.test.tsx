@@ -65,6 +65,36 @@ describe("EvidencePrivacyNotice", () => {
 });
 
 describe("BossOnboarding job recovery", () => {
+  it("saves a new profile after session reset without calling an unavailable handle endpoint", async () => {
+    mockedApi.mockImplementation(async (path, options) => {
+      if (path === "/profile" && options?.method === "PUT") return { profile: JSON.parse(String(options.body)) } as any;
+      if (path === "/profile") return { profile: null } as any;
+      throw new Error(`Unexpected API call: ${path}`);
+    });
+    renderOnboarding();
+
+    const userHeadings = [
+      "어떻게 불러드리면 될까요?",
+      "나이대가 어떻게 되시나요?",
+      "회사 생활은 몇 년째인가요?",
+      "어떤 직무를 하고 계신가요?",
+      "현재 직급은 무엇인가요?",
+      "어떤 경로로 입사했나요?",
+      "업무 대화에서 어려운 점이 있나요?",
+    ];
+    expect(await screen.findByRole("heading", { name: userHeadings[0] })).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("username"), { target: { value: "새사용자" } });
+    for (const heading of userHeadings.slice(1)) {
+      fireEvent.click(screen.getByRole("button", { name: "다음" }));
+      expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+
+    expect(await screen.findByRole("heading", { name: "상사의 모습을 골라주세요." })).toBeInTheDocument();
+    expect(mockedApi).toHaveBeenCalledWith("/profile", { method: "PUT", body: JSON.stringify({ ...profile, handle: "새사용자" }) });
+    expect(mockedApi.mock.calls.some(([path]) => String(path).includes("handle-availability"))).toBe(false);
+  });
+
   it("clears job ids left by a previous boss when it creates a new boss", async () => {
     mockedApi.mockImplementation(async (path, options) => {
       if (path === "/profile") return { profile } as any;
