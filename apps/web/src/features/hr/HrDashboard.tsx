@@ -81,7 +81,7 @@ export function HrDashboard({ dataset }: { dataset: "actual" | "mock" }) {
           )}
         </section>
 
-        <section className="chart-section">
+        <section className="chart-section gap-rate-section">
           <h3>표면·실제 메시지 괴리율</h3>
           <div className="metric-line" style={{ marginBottom: 16 }}>
             <div>

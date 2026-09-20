@@ -24,6 +24,9 @@ function TutorialTargets() {
     <button data-tutorial="chat">대화</button>
     <button data-tutorial="translate">번역</button>
     <button data-tutorial="pki">상사 파악도</button>
+    <button data-tutorial="mobile-home">모바일 홈</button>
+    <button data-tutorial="mobile-translate">모바일 번역</button>
+    <button data-tutorial="mobile-chat">모바일 대화</button>
     <main data-tutorial="workspace">메인 상사 화면</main>
   </>;
 }
@@ -94,6 +97,14 @@ describe("Tutorial", () => {
     expect(useUiStore.getState().mobileNavOpen).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "다음" }));
     await waitFor(() => expect(useUiStore.getState().mobileNavOpen).toBe(false));
+    expect(useUiStore.getState()).toMatchObject({ activeWorkspaceTab: "translator", mobilePanelExpanded: true });
+    expect(screen.getByText(/화면을 왼쪽으로 밀면/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    expect(useUiStore.getState()).toMatchObject({ activeWorkspaceTab: "chat", mobilePanelExpanded: true });
+    expect(screen.getByText(/대화 화면/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다음" }));
+    expect(useUiStore.getState().mobilePanelExpanded).toBe(false);
+    expect(screen.getByText(/좌우로 스와이프/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "건너뛰기" }));
     expect(useUiStore.getState().mobileNavOpen).toBe(false);
   });
@@ -112,5 +123,12 @@ describe("positionTutorialBubble", () => {
     expect(position.side).toBe("left");
     expect(position.left).toBeGreaterThanOrEqual(12);
     expect(position.left + 180).toBeLessThanOrEqual(388);
+  });
+
+  it("places a mobile bottom-navigation guide fully above its highlighted target", () => {
+    const target = rect(130, 720, 100, 52);
+    const position = positionTutorialBubble(target, { width: 336, height: 170 }, "top", { width: 360, height: 800 });
+    expect(position.side).toBe("top");
+    expect(position.top + 170).toBeLessThan(target.top);
   });
 });

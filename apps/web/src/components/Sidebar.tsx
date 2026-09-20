@@ -57,7 +57,7 @@ export function Sidebar() {
     <aside className={`sidebar ${ui.mobileNavOpen ? "is-mobile-open" : ""}`} aria-label="주요 메뉴">
       <div className="brand"><span className="hide-collapsed"><img className="brand-logo" src="/image.png" alt={SERVICE_NAME} /></span></div>
       <button className="sidebar-toggle" onClick={() => ui.set({ sidebarCollapsed: !ui.sidebarCollapsed })} aria-label={ui.sidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기"}>{ui.sidebarCollapsed ? <ChevronRight size={16}/> : <ChevronLeft size={16}/>}</button>
-      {ui.mobileNavOpen && <button className="icon-button" style={{ position: "absolute", right: 12, top: 24 }} onClick={() => ui.set({ mobileNavOpen: false })} aria-label="메뉴 닫기"><X size={18}/></button>}
+      {ui.mobileNavOpen && <button className="sidebar-close-button" type="button" onClick={() => ui.set({ mobileNavOpen: false })} aria-label="메뉴 닫기"><X size={18}/></button>}
       <nav className="boss-nav">
         <div className="nav-section-label hide-collapsed">상사</div>
         {bosses.map((boss, index) => {
@@ -74,9 +74,9 @@ export function Sidebar() {
         <Link to="/boss/new" data-tutorial="add-boss" className="boss-nav-item add-boss" onClick={() => ui.set({ mobileNavOpen: false })} title="상사 추가"><Plus size={18}/><span className="hide-collapsed">상사 추가</span></Link>
         <div className="nav-divider"/>
         <button className="nav-link" type="button" title="아카이브" onClick={() => ui.set({ archiveOpen: true, mobileNavOpen: false, settingsOpen: false })}><Archive size={19}/><span className="hide-collapsed">아카이브</span></button>
-        <Link className="nav-link" to="/hr-demo" title="HR 데모"><BarChart3 size={19}/><span className="hide-collapsed">HR 데모</span></Link>
+        <Link className="nav-link" to="/hr-demo" title="HR 데모" onClick={() => ui.set({ mobileNavOpen: false })}><BarChart3 size={19}/><span className="hide-collapsed">HR 데모</span></Link>
         <button className="sidebar-user" onClick={() => ui.set({ settingsOpen: !ui.settingsOpen })} title={profile ? profile.handle : "사용자 설정"}><UserRound size={19}/><span className="hide-collapsed">{profile ? profile.handle : "사용자 설정"}</span></button>
-        <AnimatePresence>{ui.settingsOpen && <motion.div className="profile-menu" initial={{ opacity: 0, y: 8, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: .97 }} transition={{ duration: .2, ease: [0.22, 1, 0.36, 1] }}><Link to="/settings" onClick={() => ui.set({ settingsOpen: false })}>내 정보 · 상사 관리</Link><button onClick={() => { try { localStorage.removeItem(TUTORIAL_STORAGE_KEY); } catch { /* Storage may be unavailable. */ } ui.set({ tutorialOpen: true, settingsOpen: false }); navigate("/"); }}>튜토리얼 다시 보기</button><button className="danger-button" onClick={reset}>세션 데이터 초기화</button></motion.div>}</AnimatePresence>
+        <AnimatePresence>{ui.settingsOpen && <motion.div className="profile-menu" initial={{ opacity: 0, y: 8, scale: .97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 8, scale: .97 }} transition={{ duration: .2, ease: [0.22, 1, 0.36, 1] }}><Link to="/settings" onClick={() => ui.set({ settingsOpen: false, mobileNavOpen: false })}>내 정보 · 상사 관리</Link><button onClick={() => { try { localStorage.removeItem(TUTORIAL_STORAGE_KEY); } catch { /* Storage may be unavailable. */ } ui.set({ tutorialOpen: true, settingsOpen: false, mobileNavOpen: false }); navigate("/"); }}>튜토리얼 다시 보기</button><button className="danger-button" onClick={reset}>세션 데이터 초기화</button></motion.div>}</AnimatePresence>
       </div>
     </aside>
     <Dialog compact open={Boolean(deleteTarget)} title="상사 데이터 삭제" onClose={() => { if (!deleting) setDeleteTarget(null); }}>

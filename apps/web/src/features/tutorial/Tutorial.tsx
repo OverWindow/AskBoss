@@ -22,7 +22,7 @@ interface ViewportSize {
   height: number;
 }
 
-const steps: TutorialStep[] = [
+const desktopSteps: TutorialStep[] = [
   {
     target: "global-boss",
     message: "처음 왔나? 나는 ‘모두의 상사’야. 여기서 대화할 상사를 선택할 수 있지.",
@@ -52,6 +52,39 @@ const steps: TutorialStep[] = [
     target: "workspace",
     message: "그럼, 일해 볼까? 아바타를 누르면 내 한마디도 바꿀 수 있어.",
     preferredSide: "top",
+  },
+];
+
+const mobileSteps: TutorialStep[] = [
+  {
+    target: "global-boss",
+    message: "메뉴에서 대화할 상사를 선택할 수 있어. 처음에는 ‘모두의 상사’로 시작해 봐.",
+    preferredSide: "right",
+  },
+  {
+    target: "add-boss",
+    message: "상사 추가를 누르면 실제 상사의 말투와 업무 스타일을 등록할 수 있어.",
+    preferredSide: "right",
+  },
+  {
+    target: "mobile-translate",
+    message: "하단의 번역을 누르거나 화면을 왼쪽으로 밀면 상사의 말을 쉽게 풀어볼 수 있어.",
+    preferredSide: "top",
+  },
+  {
+    target: "mobile-chat",
+    message: "한 번 더 왼쪽으로 밀면 대화 화면이야. 여기서 업무 상황을 미리 연습해 봐.",
+    preferredSide: "top",
+  },
+  {
+    target: "mobile-home",
+    message: "홈·번역·대화는 하단 메뉴를 누르거나 좌우로 스와이프해서 자연스럽게 이동할 수 있어.",
+    preferredSide: "top",
+  },
+  {
+    target: "pki",
+    message: "홈에서는 상사 파악도를 확인할 수 있어. 정보가 쌓일수록 점수가 올라간다.",
+    preferredSide: "bottom",
   },
 ];
 
@@ -120,8 +153,10 @@ export function Tutorial() {
   const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed);
   const mobileNavOpen = useUiStore((state) => state.mobileNavOpen);
   const setUi = useUiStore((state) => state.set);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 850px)").matches);
   const [step, setStep] = useState(0);
-  const activeStep = steps[step] ?? steps[0]!;
+  const activeSteps = isMobile ? mobileSteps : desktopSteps;
+  const activeStep = activeSteps[step] ?? activeSteps[0]!;
   const [targetRect, setTargetRect] = useState<DOMRect>();
   const [position, setPosition] = useState<BubblePosition>({ left: EDGE_GAP, top: EDGE_GAP, side: "bottom" });
   const bubbleRef = useRef<HTMLElement>(null);
@@ -134,23 +169,34 @@ export function Tutorial() {
   }, [setUi]);
 
   useEffect(() => {
+    const media = window.matchMedia("(max-width: 850px)");
+    const onChange = () => setIsMobile(media.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
     if (tutorialOpen && !wasOpen.current) {
       const state = useUiStore.getState();
       previousLayout.current = { sidebarCollapsed, mobileNavOpen, activeWorkspaceTab: state.activeWorkspaceTab, mobilePanelExpanded: state.mobilePanelExpanded };
       setStep(0);
       setUi({
         activeWorkspaceTab: "translator",
-        mobilePanelExpanded: true,
+        mobilePanelExpanded: !isMobile,
         sidebarCollapsed: false,
       });
     }
     wasOpen.current = tutorialOpen;
-  }, [mobileNavOpen, setUi, sidebarCollapsed, tutorialOpen]);
+  }, [isMobile, mobileNavOpen, setUi, sidebarCollapsed, tutorialOpen]);
 
   useEffect(() => {
-    if (!tutorialOpen || !window.matchMedia("(max-width: 850px)").matches) return;
-    setUi({ mobileNavOpen: step < 2 });
-  }, [setUi, step, tutorialOpen]);
+    if (!tutorialOpen || !isMobile) return;
+    const target = activeStep.target;
+    if (target === "global-boss" || target === "add-boss") setUi({ mobileNavOpen: true, mobilePanelExpanded: false });
+    else if (target === "mobile-translate") setUi({ mobileNavOpen: false, activeWorkspaceTab: "translator", mobilePanelExpanded: true });
+    else if (target === "mobile-chat") setUi({ mobileNavOpen: false, activeWorkspaceTab: "chat", mobilePanelExpanded: true });
+    else setUi({ mobileNavOpen: false, mobilePanelExpanded: false });
+  }, [activeStep.target, isMobile, setUi, tutorialOpen]);
 
   useLayoutEffect(() => {
     if (!tutorialOpen) return;
@@ -231,7 +277,7 @@ export function Tutorial() {
   };
 
   const next = () => {
-    if (step === steps.length - 1) close();
+    if (step === activeSteps.length - 1) close();
     else setStep((current) => current + 1);
   };
 
@@ -255,11 +301,11 @@ export function Tutorial() {
         aria-modal="true"
         aria-label="서비스 사용 안내"
       >
-        <div className="tutorial-count">{step + 1} / {steps.length}</div>
+        <div className="tutorial-count">{step + 1} / {activeSteps.length}</div>
         <p>{activeStep.message}</p>
         <div className="tutorial-actions">
           <button className="tutorial-skip" type="button" onClick={close}>건너뛰기</button>
-          <button className="tutorial-next" type="button" onClick={next}>{step === steps.length - 1 ? "시작하기" : "다음"}</button>
+          <button className="tutorial-next" type="button" onClick={next}>{step === activeSteps.length - 1 ? "시작하기" : "다음"}</button>
         </div>
       </aside>
     </div>

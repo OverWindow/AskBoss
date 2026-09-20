@@ -154,9 +154,9 @@ export function MainPage() {
       </aside>
       <nav className="mobile-bottom-nav" aria-label="작업 이동">
         <span className={`mobile-bottom-nav-indicator ${!ui.mobilePanelExpanded ? "is-home" : ui.activeWorkspaceTab === "translator" ? "is-translator" : "is-chat"}`} aria-hidden="true"/>
-        <button type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded ? "" : "is-active"}`} aria-current={ui.mobilePanelExpanded ? undefined : "page"} onClick={goHome}><Home size={18}/><span>홈</span></button>
-        <button type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded && ui.activeWorkspaceTab === "translator" ? "is-active" : ""}`} aria-current={ui.mobilePanelExpanded && ui.activeWorkspaceTab === "translator" ? "page" : undefined} onClick={() => selectTab("translator")}><Languages size={18}/><span>번역</span></button>
-        <button type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded && ui.activeWorkspaceTab === "chat" ? "is-active" : ""}`} aria-current={ui.mobilePanelExpanded && ui.activeWorkspaceTab === "chat" ? "page" : undefined} onClick={() => selectTab("chat")}><MessageCircle size={18}/><span>대화</span></button>
+        <button data-tutorial="mobile-home" type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded ? "" : "is-active"}`} aria-current={ui.mobilePanelExpanded ? undefined : "page"} onClick={goHome}><Home size={18}/><span>홈</span></button>
+        <button data-tutorial="mobile-translate" type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded && ui.activeWorkspaceTab === "translator" ? "is-active" : ""}`} aria-current={ui.mobilePanelExpanded && ui.activeWorkspaceTab === "translator" ? "page" : undefined} onClick={() => selectTab("translator")}><Languages size={18}/><span>번역</span></button>
+        <button data-tutorial="mobile-chat" type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded && ui.activeWorkspaceTab === "chat" ? "is-active" : ""}`} aria-current={ui.mobilePanelExpanded && ui.activeWorkspaceTab === "chat" ? "page" : undefined} onClick={() => selectTab("chat")}><MessageCircle size={18}/><span>대화</span></button>
       </nav>
     </div>
     <Tutorial/>

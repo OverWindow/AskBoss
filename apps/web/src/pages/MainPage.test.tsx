@@ -53,13 +53,15 @@ describe("MainPage workspace", () => {
     expect(indicator).toHaveClass("is-translator");
   });
 
-  it("모바일 패널을 기본으로 펼친 후 접고 다시 펼 수 있다", () => {
+  it("모바일 패널은 기본으로 접혀 있고 펼쳤다가 다시 접을 수 있다", () => {
+    useUiStore.setState({ mobilePanelExpanded: false });
     render(<MainPage/>);
-    const toggle = screen.getByRole("button", { name: "패널 접기" });
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const toggle = screen.getByRole("button", { name: "패널 펼치기" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle.closest(".interaction-workspace")).toHaveClass("is-mobile-panel-collapsed");
     fireEvent.click(toggle);
-    expect(screen.getByRole("button", { name: "패널 펼치기" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByRole("button", { name: "패널 펼치기" }).closest(".interaction-workspace")).toHaveClass("is-mobile-panel-collapsed");
+    expect(screen.getByRole("button", { name: "패널 접기" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "패널 접기" }).closest(".interaction-workspace")).not.toHaveClass("is-mobile-panel-collapsed");
   });
 
   it("번역 추천 시뮬레이션을 대화 탭으로 이동시킨다", () => {

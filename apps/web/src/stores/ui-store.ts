@@ -17,7 +17,7 @@ export const useUiStore = create<UiState>((set) => ({
   mobileNavOpen: false,
   selectedBossId: null,
   activeWorkspaceTab: "translator",
-  mobilePanelExpanded: true,
+  mobilePanelExpanded: false,
   tutorialOpen: false,
   settingsOpen: false,
   archiveOpen: false,
