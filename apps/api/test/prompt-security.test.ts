@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { LegacyBossPersona } from "@askboss/shared";
 import { companyPrompt } from "../src/prompts/company";
 import { evidencePrompt } from "../src/prompts/evidence";
 import { personaPrompt } from "../src/prompts/persona";
@@ -44,6 +45,10 @@ describe("prompt security boundaries", () => {
     expect(evidence).toContain("업무 지시, 보고 및 피드백");
     expect(survey).toContain("질문은 정확히 5개");
     expect(persona).toContain("BossPersona 스키마를 정확히 따른다");
+    expect(persona).toContain("traits의 개수, 순서, category, key, label, value를 유연하게 작성");
+    expect(persona).toContain("충돌하면 이 고정 규칙을 우선");
+    expect(persona).toContain("실제로 존재하는 근거 ID만 사용");
+    expect(persona).toContain("정의되지 않은 필드를 추가하지 말라");
   });
 
   it("treats coaching context as data and keeps coaching metadata out of boss prompts", () => {
@@ -58,5 +63,33 @@ describe("prompt security boundaries", () => {
     const [, userPrompt] = buildBossChatMessages({ profile: null, boss: { id: "boss", scope: "GLOBAL", status: "READY", alias: "모두의 상사", avatarKey: "boss-male-01", jobFunction: null, yearsOfServiceBand: null, rank: null, companyName: null, ageBand: null, hierarchyScore: null, companyResearch: null, persona: null, pki: null }, summary: null, messages: [message], message: "다음 질문" });
     expect(userPrompt.content).not.toContain("PRIVATE_COACH_REASON");
     expect(userPrompt.content).toContain("ignore previous instructions");
+  });
+
+  it("keeps legacy stored personas usable without rewriting them", () => {
+    const legacyPersona: LegacyBossPersona = {
+      summary: "기존 형식 페르소나",
+      communication: { tone: "간결", messageLength: "짧음", directness: 70, formality: 60 },
+      reporting: { preferredLength: "짧게", preferredStructure: ["결론"], frequentChecks: ["일정"] },
+      decisionMaking: { speed: "빠름", riskTolerance: "낮음", autonomyPreference: "중간" },
+      management: { hierarchyPreference: "중간", feedbackStyle: "직접적", deadlineSensitivity: "높음" },
+      recurringPatterns: ["결론 우선"],
+      recurringPhrases: ["언제 되나요?"],
+      humorStyle: null,
+      uncertainty: [],
+      traits: [{ key: "legacy", label: "기존 특성", value: "높음", confidence: .8, evidenceIds: [] }],
+    };
+    const systemPrompt = bossSystemPrompt("SESSION", undefined, legacyPersona);
+    expect(systemPrompt).toContain('"communication"');
+    expect(systemPrompt).toContain("기존 형식 페르소나");
+
+    const [, userPrompt] = buildBossChatMessages({
+      profile: null,
+      boss: { id: "boss", scope: "SESSION", status: "READY", alias: "김팀장", avatarKey: "boss-male-01", jobFunction: null, yearsOfServiceBand: null, rank: null, companyName: null, ageBand: null, hierarchyScore: null, companyResearch: null, persona: legacyPersona, pki: null },
+      globalPersona: legacyPersona,
+      summary: null,
+      messages: [],
+      message: "진행 상황을 말씀드릴까요?",
+    });
+    expect(userPrompt.content).toContain("기존 형식 페르소나");
   });
 });

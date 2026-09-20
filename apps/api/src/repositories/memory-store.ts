@@ -11,12 +11,12 @@ import { getMockHrDashboard } from "../services/hr-mock.js";
 
 const globalPersona: BossPersona = {
   summary: "한국 회사에서 흔히 볼 수 있는 중간관리자형의 가상 공통 페르소나입니다.",
-  communication: { tone: "약간 무뚝뚝하지만 악의적이지 않음", messageLength: "짧음", directness: 68, formality: 62 },
-  reporting: { preferredLength: "결론부터 간결하게", preferredStructure: ["결론", "현재 상태", "다음 행동"], frequentChecks: ["일정", "진행률"] },
-  decisionMaking: { speed: "보통", riskTolerance: "낮음", autonomyPreference: "중간" },
-  management: { hierarchyPreference: "중간", feedbackStyle: "실무 중심", deadlineSensitivity: "높음" },
-  recurringPatterns: ["결론을 먼저 확인함", "진행 상황을 중간에 점검함"], recurringPhrases: ["그래서 결론이 뭐지?", "이거 언제 되나?"],
-  humorStyle: "가끔 아재개그", uncertainty: ["특정 실제 인물을 모델링하지 않은 기본값"], traits: [],
+  traits: [
+    { category: "소통", key: "concise_tone", label: "간결한 말투", value: "약간 무뚝뚝하지만 악의적이지 않으며 짧게 말함", confidence: 0.5, evidenceIds: [] },
+    { category: "보고", key: "conclusion_first", label: "결론 우선", value: "결론, 현재 상태, 다음 행동 순서의 보고를 선호함", confidence: 0.5, evidenceIds: [] },
+    { category: "일정", key: "deadline_sensitive", label: "일정 민감도", value: "마감과 진행률을 자주 확인함", confidence: 0.5, evidenceIds: [] },
+  ],
+  uncertainty: ["특정 실제 인물을 모델링하지 않은 기본값"],
 };
 
 const globalBoss: BossRecord = {

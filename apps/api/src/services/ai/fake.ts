@@ -7,7 +7,14 @@ export class FakeAiService implements AiService {
   async extractEvidence(input: { content: string; kind: string }) { return { observations:[{category:"보고 및 피드백",summary:input.content.slice(0,120),observedAt:null,contextQuality:0.55,messages:[{speaker:null,timestamp:null,content:input.content.slice(0,500)}]}] }; }
   async buildPersona(input: any): Promise<BossPersona> {
     const ids=input.evidence.filter((e:any)=>e.status==="READY").map((e:any)=>e.id);
-    return { summary:`${input.boss.alias}은(는) 결론과 다음 행동이 분명한 보고를 선호하는 것으로 추정됩니다.`,communication:{tone:"간결하고 실무적",messageLength:"짧음",directness:70,formality:65},reporting:{preferredLength:"핵심 위주",preferredStructure:["결론","진행 상황","다음 일정"],frequentChecks:["마감","진행률"]},decisionMaking:{speed:"보통",riskTolerance:"중간 이하",autonomyPreference:"중간"},management:{hierarchyPreference:input.boss.hierarchyScore>60?"높음":"중간",feedbackStyle:"문제 해결 중심",deadlineSensitivity:"높음"},recurringPatterns:["결론을 먼저 확인함","중간 진행 상황을 확인함"],recurringPhrases:["그래서 언제 되나?","진행 상황은 어때?"],humorStyle:null,uncertainty:ids.length?["더 다양한 상황의 관찰이 쌓이면 정확도가 높아집니다."]:["실제 대화 근거가 아직 적습니다."],traits:[{key:"conclusion_first",label:"결론 우선",value:"높음",confidence:ids.length?0.72:0.45,evidenceIds:ids.slice(0,3)}] };
+    return {
+      summary: `${input.boss.alias}은(는) 결론과 다음 행동이 분명한 보고를 선호하는 것으로 추정됩니다.`,
+      traits: [
+        { category: "보고", key: "conclusion_first", label: "결론 우선", value: "결론과 다음 행동을 먼저 확인함", confidence: ids.length ? 0.72 : 0.45, evidenceIds: ids.slice(0,3) },
+        { category: "관리", key: "hierarchy_preference", label: "위계 선호", value: input.boss.hierarchyScore > 60 ? "직급과 역할 구분을 분명히 하는 편" : "상황에 따라 실무 판단을 위임하는 편", confidence: 0.55, evidenceIds: ids.slice(0,3) },
+      ],
+      uncertainty: ids.length ? ["더 다양한 상황의 관찰이 쌓이면 정확도가 높아집니다."] : ["실제 대화 근거가 아직 적습니다."],
+    };
   }
   async generateSurvey(): Promise<BossSurveyQuestion[]> { return OBSERVATION_CATEGORIES.map((category,index)=>({id:`survey-${index+1}`,category,situation:["마감 전날 진척이 예상보다 느립니다. 상사는 보통 어떻게 반응하나요?","보고 자료에서 작은 오류를 발견했습니다. 상사의 첫 반응은 어떤가요?","예정된 일정이 바뀔 가능성이 생겼습니다. 상사는 무엇을 먼저 확인하나요?","선택지가 두 개이고 정보가 충분하지 않습니다. 상사는 어떻게 결정하나요?","업무가 한가한 오후, 상사는 팀원에게 어떻게 말을 거나요?"][index]!,options:[{id:"A",label:"현재 상황을 먼저 확인한다"},{id:"B",label:"이유와 책임을 먼저 묻는다"},{id:"C",label:"구체적인 해결책을 제시한다"},{id:"D",label:"담당자가 판단하도록 맡긴다"}],allowFreeText:true})); }
   async *streamChatWithBoss(input:any, signal?:AbortSignal) {

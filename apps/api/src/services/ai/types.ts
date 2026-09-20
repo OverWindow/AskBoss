@@ -1,11 +1,11 @@
-import type { Boss, BossPersona, BossSurveyQuestion, ChatMessageCoaching, CompanyResearch, TranslationReplyStyles, TranslationResult, UserProfile } from "../../shared.js";
+import type { Boss, BossPersona, BossSurveyQuestion, ChatMessageCoaching, CompanyResearch, ReadableBossPersona, TranslationReplyStyles, TranslationResult, UserProfile } from "../../shared.js";
 import type { ChatMessageRecord, EvidenceRecord, GlobalEvidenceRecord, SurveyAnswerRecord } from "../../types.js";
 
 export interface BossChatInput {
   profile: UserProfile | null;
   boss: Boss;
   basePrompt?: string;
-  globalPersona?: BossPersona | null;
+  globalPersona?: ReadableBossPersona | null;
   sessionCalibration?: unknown[];
   summary: string | null;
   messages: ChatMessageRecord[];

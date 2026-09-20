@@ -14,6 +14,7 @@ export interface CompanyResearch {
 }
 
 export interface PersonaTrait {
+  category: string;
   key: string;
   label: string;
   value: string;
@@ -23,6 +24,20 @@ export interface PersonaTrait {
 
 export interface BossPersona {
   summary: string;
+  traits: PersonaTrait[];
+  uncertainty: string[];
+}
+
+export interface LegacyPersonaTrait {
+  key: string;
+  label: string;
+  value: string;
+  confidence: number;
+  evidenceIds: string[];
+}
+
+export interface LegacyBossPersona {
+  summary: string;
   communication: { tone: string; messageLength: string; directness: number; formality: number };
   reporting: { preferredLength: string; preferredStructure: string[]; frequentChecks: string[] };
   decisionMaking: { speed: string; riskTolerance: string; autonomyPreference: string };
@@ -31,8 +46,10 @@ export interface BossPersona {
   recurringPhrases: string[];
   humorStyle: string | null;
   uncertainty: string[];
-  traits: PersonaTrait[];
+  traits: LegacyPersonaTrait[];
 }
+
+export type ReadableBossPersona = BossPersona | LegacyBossPersona;
 
 export interface PkiBreakdown { completeness: number; evidenceReliability: number; diversity: number; freshness: number; score: number }
 
@@ -49,7 +66,7 @@ export interface Boss {
   ageBand: number | null;
   hierarchyScore: number | null;
   companyResearch: CompanyResearch | null;
-  persona: BossPersona | null;
+  persona: ReadableBossPersona | null;
   pki: PkiBreakdown | null;
   personaError?: string | null;
   personaVersion?: number;

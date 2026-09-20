@@ -1,18 +1,15 @@
 import type OpenAI from "openai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { bossPersonaSchema } from "@askboss/shared";
 import { MindlogicAiService } from "../src/services/ai/mindlogic";
 
 const persona = {
   summary: "요약",
-  communication: { tone: "차분함", messageLength: "짧음", directness: 70, formality: 60 },
-  reporting: { preferredLength: "짧음", preferredStructure: ["결론"], frequentChecks: ["일정"] },
-  decisionMaking: { speed: "빠름", riskTolerance: "낮음", autonomyPreference: "중간" },
-  management: { hierarchyPreference: "중간", feedbackStyle: "직접적", deadlineSensitivity: "높음" },
-  recurringPatterns: ["결론 우선"],
-  recurringPhrases: ["언제 되나요?"],
-  humorStyle: null,
   uncertainty: [],
-  traits: [{ key: "direct", label: "직접성", value: "높음", confidence: .8, evidenceIds: [] }],
+  traits: [
+    { category: "소통", key: "direct", label: "직접성", value: "높음", confidence: .8, evidenceIds: [] },
+    { category: "회의", key: "pre_read", label: "사전 공유 선호", value: "회의 전에 핵심 내용을 미리 확인함", confidence: .65, evidenceIds: ["evidence-1"] },
+  ],
 };
 
 const input = {
@@ -61,9 +58,14 @@ describe("MindlogicAiService persona generation", () => {
       type: "json_schema",
       json_schema: { name: "boss_persona", strict: true },
     });
-    expect(JSON.stringify(request.response_format.json_schema.schema)).toContain('"communication"');
+    expect(request.response_format.json_schema.schema).toMatchObject({
+      additionalProperties: false,
+      required: ["summary", "traits", "uncertainty"],
+    });
+    expect(JSON.stringify(request.response_format.json_schema.schema)).toContain('"category"');
+    expect(JSON.stringify(request.response_format.json_schema.schema)).not.toContain('"communication"');
     expect(request.messages.at(-1).content).toContain("<output-json-schema>");
-    expect(request.messages.at(-1).content).toContain('"communication"');
+    expect(request.messages.at(-1).content).toContain('"category"');
   });
 
   it("falls back to schema-in-prompt mode when the gateway rejects strict output", async () => {
@@ -100,6 +102,13 @@ describe("MindlogicAiService persona generation", () => {
       expect.objectContaining({ event: "ai_phase", phase: "repair", outcome: "succeeded", requestId: "req-repair" }),
       expect.objectContaining({ event: "ai_phase", phase: "total", outcome: "succeeded" }),
     ]));
+  });
+
+  it("keeps trait contents flexible while enforcing the fixed JSON contract", () => {
+    expect(bossPersonaSchema.parse(persona)).toEqual(persona);
+    expect(() => bossPersonaSchema.parse({ ...persona, traits: [{ ...persona.traits[0], value: ["높음"] }] })).toThrow();
+    expect(() => bossPersonaSchema.parse({ ...persona, traits: [{ ...persona.traits[0], confidence: 1.1 }] })).toThrow();
+    expect(() => bossPersonaSchema.parse({ ...persona, communication: { tone: "간결" } })).toThrow();
   });
 
   it("aborts the complete generate-and-repair operation at the hard deadline", async () => {
