@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useUiStore } from "../../stores/ui-store";
 
 export const TUTORIAL_STORAGE_KEY = "askboss:tutorial-seen:v1";
@@ -44,11 +45,6 @@ const desktopSteps: TutorialStep[] = [
     preferredSide: "right",
   },
   {
-    target: "pki",
-    message: "개인 상사의 정보가 쌓일수록 상사 파악도도 올라간다.",
-    preferredSide: "bottom",
-  },
-  {
     target: "workspace",
     message: "그럼, 일해 볼까? 아바타를 누르면 내 한마디도 바꿀 수 있어.",
     preferredSide: "top",
@@ -80,11 +76,6 @@ const mobileSteps: TutorialStep[] = [
     target: "mobile-home",
     message: "홈·번역·대화는 하단 메뉴를 누르거나 좌우로 스와이프해서 자연스럽게 이동할 수 있어.",
     preferredSide: "top",
-  },
-  {
-    target: "pki",
-    message: "홈에서는 상사 파악도를 확인할 수 있어. 정보가 쌓일수록 점수가 올라간다.",
-    preferredSide: "bottom",
   },
 ];
 
@@ -290,7 +281,7 @@ export function Tutorial() {
     height: targetRect.height + 16,
   } : undefined;
 
-  return (
+  return createPortal(
     <div className="tutorial-layer" aria-live="polite">
       <div className="tutorial-interaction-blocker" aria-hidden="true" />
       <div className={`tutorial-spotlight${spotlight ? "" : " tutorial-spotlight-full"}`} style={spotlight} aria-hidden="true" />
@@ -310,6 +301,7 @@ export function Tutorial() {
           <button className="tutorial-next" type="button" onClick={next}>{step === activeSteps.length - 1 ? "시작하기" : "다음"}</button>
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -16,6 +16,24 @@ export function AppShell({children}:PropsWithChildren){
     return () => media.removeEventListener("change", apply);
   }, []);
   useEffect(() => {
+    // Crossing the mobile breakpoint flips the sidebar between grid column and
+    // off-canvas fixed positioning; suppress its transform transition during the
+    // switch so it does not flash and slide away.
+    const media = window.matchMedia("(max-width:850px)");
+    let timer = 0;
+    const suppress = () => {
+      document.documentElement.classList.add("sidebar-no-motion");
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => document.documentElement.classList.remove("sidebar-no-motion"), 320);
+    };
+    media.addEventListener("change", suppress);
+    return () => {
+      media.removeEventListener("change", suppress);
+      window.clearTimeout(timer);
+      document.documentElement.classList.remove("sidebar-no-motion");
+    };
+  }, []);
+  useEffect(() => {
     if (!ui.mobileNavOpen || !window.matchMedia("(max-width:850px)").matches) return;
     const previousBodyOverflow = document.body.style.overflow;
     const previousBodyTouchAction = document.body.style.touchAction;

@@ -58,6 +58,10 @@ export function MainPage() {
     setChatState((current) => current.hasContent === next.hasContent && current.hasUnsavedActualResponse === next.hasUnsavedActualResponse && current.busy === next.busy ? current : next);
   }, []);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [ui.mobilePanelExpanded, ui.activeWorkspaceTab]);
+
   const resetBossSpeech = useCallback(() => {
     setSpeech(profile.data?.handle ? `${profile.data.handle}씨, 밥은 먹었나?` : "밥은 먹었나?");
     setThinking(false);
@@ -66,6 +70,7 @@ export function MainPage() {
   type MobileView = "home" | PanelName;
 
   const goToView = (view: MobileView) => {
+    window.scrollTo(0, 0);
     if (view === "home") ui.set({ mobilePanelExpanded: false });
     else ui.set({ activeWorkspaceTab: view, mobilePanelExpanded: true });
   };
