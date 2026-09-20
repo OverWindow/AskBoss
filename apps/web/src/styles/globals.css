@@ -79,7 +79,7 @@
 }
 
 /* Boss onboarding interactions */
-.onboarding-home-button{color:var(--hr-accent)}
+.onboarding-home-button{border:0;border-radius:0;background:transparent;color:var(--hr-accent)}
 .onboarding-step input:focus-visible,.onboarding-step textarea:focus-visible{box-shadow:none}
 .onboarding-nav-button{border:1px solid var(--hr-accent);border-radius:11px;background:var(--hr-accent);color:#fff;min-height:44px;padding:10px 16px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font-weight:750;transition:background .18s ease,transform .18s ease}
 .onboarding-nav-button:hover{background:#151d55;transform:translateY(-1px)}
@@ -430,6 +430,7 @@
 
 /* Suppress sidebar slide animation while crossing the mobile breakpoint. */
 .sidebar-anim-in .sidebar{animation:sidebar-in .36s cubic-bezier(.22,1,.36,1)}
+.sidebar-anim-out .sidebar{transition:none!important}
 .sidebar-anim-out .mobile-nav-trigger{animation:sidebar-in .28s ease}
 @keyframes sidebar-in{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:none}}
 @keyframes sidebar-close-reveal{from{opacity:0;transform:scale(.88)}to{opacity:1;transform:scale(1)}}
@@ -463,9 +464,9 @@ body>.dialog-backdrop{z-index:200}
 }
 
 
-/* Mobile onboarding: keep home button and progress bar pinned at top */
+/* Keep onboarding navigation in normal flow so uploaded evidence cannot slide beneath it. */
 @media(max-width:767px){
-  .onboarding-top{position:sticky;top:0;z-index:14;margin:0 -16px;padding:10px 16px;background:linear-gradient(to bottom,var(--hr-bg) 72%,rgba(254,254,254,0))}
+  .onboarding-top{position:relative;top:auto;z-index:14;margin:0 -16px;padding:10px 16px;background:var(--hr-bg)}
 }
 /* Mobile workspace panels cover the floating brand logo; nav stays on top */
 @media(max-width:767px){

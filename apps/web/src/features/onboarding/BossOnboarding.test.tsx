@@ -197,7 +197,7 @@ describe("BossOnboarding job recovery", () => {
     });
     renderOnboarding();
     await advanceToEvidenceStep();
-    expect(await screen.findByText("0/5장 · 여러 번 선택 가능")).toBeInTheDocument();
+    expect(await screen.findByText("0/5장")).toBeInTheDocument();
 
     const selectImages = (files: File[]) => {
       const input = screen.getByText("이미지 업로드").closest("label")!.querySelector("input")!;
@@ -209,7 +209,7 @@ describe("BossOnboarding job recovery", () => {
       new File(["2"], "two.png", { type: "image/png" }),
     ]);
     await waitFor(() => expect(images).toHaveLength(2));
-    await screen.findByText("2/5장 · 여러 번 선택 가능");
+    await screen.findByText("2/5장");
 
     selectImages([
       new File(["3"], "three.png", { type: "image/png" }),
@@ -218,13 +218,13 @@ describe("BossOnboarding job recovery", () => {
       new File(["6"], "six.png", { type: "image/png" }),
     ]);
     await waitFor(() => expect(images).toHaveLength(5));
-    expect(await screen.findByText("5/5장 · 여러 번 선택 가능")).toBeInTheDocument();
+    expect(await screen.findByText("5/5장")).toBeInTheDocument();
     expect(screen.getByText("six.png").closest("li")).toHaveTextContent("최대 5장");
     expect(mockedApi.mock.calls.filter(([path, options]) => path === "/bosses/new-boss/evidence" && options?.method === "POST")).toHaveLength(5);
 
     fireEvent.click(screen.getByRole("button", { name: "one.png 삭제" }));
     await waitFor(() => expect(images).toHaveLength(4));
-    expect(await screen.findByText("4/5장 · 여러 번 선택 가능")).toBeInTheDocument();
+    expect(await screen.findByText("4/5장")).toBeInTheDocument();
     const input = screen.getByText("이미지 업로드").closest("label")!.querySelector("input")!;
     expect(input).not.toBeDisabled();
     await waitFor(() => expect(JSON.parse(sessionStorage.getItem("askboss:onboarding")!).evidenceJobIds).not.toContain("job-1"));
@@ -247,7 +247,7 @@ describe("BossOnboarding job recovery", () => {
     });
     renderOnboarding();
     await advanceToEvidenceStep();
-    expect(await screen.findByText("5/5장 · 여러 번 선택 가능")).toBeInTheDocument();
+    expect(await screen.findByText("5/5장")).toBeInTheDocument();
     expect(screen.getByText("restored-1.png")).toBeInTheDocument();
     const input = screen.getByText("이미지 업로드").closest("label")!.querySelector("input")!;
     expect(input).toBeDisabled();

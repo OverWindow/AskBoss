@@ -134,7 +134,7 @@ export function SettingsPage() {
       </div> : <p>아직 내 정보가 없습니다.</p>}
     </section>
     <section className="settings-section">
-      <div className="settings-heading"><h2>상사 정보</h2></div>
+      <h2>상사 정보</h2>
       {personal.length > 0 && <select className="select" value={bossId} onChange={(event) => setBossId(event.target.value)}>{personal.map((item) => <option key={item.id} value={item.id}>{item.alias}</option>)}</select>}
       {boss ? <div className="settings-form">
         <div className="avatar-options compact">{AVATARS.map((key) => { const active = boss.avatarKey === key; return <button key={key} type="button" className={`avatar-option ${active ? "is-selected" : ""}`} onClick={() => setBoss({ ...boss, avatarKey: key })}>{active && <motion.span className="avatar-selection" layoutId="settings-selected-boss-avatar" transition={{ type: "spring", stiffness: 420, damping: 34 }}/>}<img src={`/avatars/${key}.png`} alt={key}/></button>; })}</div>
