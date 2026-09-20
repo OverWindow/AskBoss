@@ -249,7 +249,7 @@
 .boss-nav-row:hover,.boss-nav-row:focus-within{background:rgba(55,93,243,.07)}
 .boss-nav-row.is-active{color:#1e286b}
 .boss-nav-row .boss-nav-item:hover{background:transparent}
-.boss-delete-button{position:absolute;right:7px;width:27px;height:27px;border:0;border-radius:50%;display:grid;place-items:center;background:transparent;color:var(--hr-muted);opacity:0;pointer-events:none;transition:opacity .16s ease,background .16s ease,color .16s ease}
+.boss-delete-button{position:absolute;right:7px;width:27px;height:27px;border:0;border-radius:0;display:grid;place-items:center;background:transparent;color:var(--hr-muted);opacity:0;pointer-events:none;transition:opacity .16s ease,background .16s ease,color .16s ease}
 .boss-nav-row:hover .boss-delete-button,.boss-delete-button:focus-visible{opacity:1;pointer-events:auto}
 .boss-delete-button:hover{background:#fff0f0;color:var(--hr-danger)}
 .app-shell.is-collapsed .boss-nav-row .boss-nav-item{padding-inline:11px}

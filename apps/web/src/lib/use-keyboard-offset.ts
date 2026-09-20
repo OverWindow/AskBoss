@@ -19,28 +19,62 @@ export function useKeyboardOffset() {
     // is also moving, which made the old gate report "shrunk" and zero the offset
     // exactly when the keyboard was overlaid.
     let baselineClientHeight = document.documentElement.clientHeight;
+    let editableFocused = false;
+    let reapplyTimer = 0;
     const KEYBOARD_MIN_SHRINK = 100;
     const apply = () => {
       const clientHeight = document.documentElement.clientHeight;
       baselineClientHeight = Math.max(baselineClientHeight, clientHeight);
-      const offset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+      const rawOffset = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
       const layoutShrank = baselineClientHeight - clientHeight > KEYBOARD_MIN_SHRINK;
-      document.documentElement.style.setProperty("--keyboard-offset", layoutShrank ? "0px" : `${Math.round(offset)}px`);
+      // Belt and braces: iOS often delivers focusin before the keyboard animates
+      // and then coalesces the final viewport events, leaving a mid-animation
+      // (near-zero) offset stuck. While an editable element is focused and the
+      // visual viewport is provably shorter than the layout viewport, apply the
+      // raw diff regardless of the gate. This stays correct on Android resize
+      // mode because the layout shrinks along with the visual viewport there,
+      // making rawOffset ~0 on its own.
+      const keyboardVisible = editableFocused && rawOffset > 50;
+      const offset = layoutShrank && !keyboardVisible ? 0 : Math.round(rawOffset);
+      document.documentElement.style.setProperty("--keyboard-offset", `${offset}px`);
       // The mobile workspace body is scroll-locked, but momentum scrolling and
       // Chrome's scroll restoration around keyboard show/hide can still leave a
       // stale document offset that drags the fixed nav and panel titles away.
       if (window.scrollY && window.matchMedia("(max-width:767px)").matches) window.scrollTo(0, 0);
     };
+    // Re-apply for ~540ms after focus transitions: the keyboard animation
+    // outlives the single focusin/focusout event, and iOS may fire no further
+    // viewport events after a coalesced scroll/resize, so a one-shot apply can
+    // otherwise freeze on a stale value.
+    const scheduleReapply = () => {
+      window.clearTimeout(reapplyTimer);
+      let remaining = 6;
+      const tick = () => {
+        apply();
+        remaining -= 1;
+        if (remaining > 0) reapplyTimer = window.setTimeout(tick, 90);
+      };
+      tick();
+    };
+    const onFocusIn = (event: FocusEvent) => {
+      editableFocused = event.target instanceof HTMLElement && Boolean(event.target.closest("input, textarea, select, [contenteditable]"));
+      scheduleReapply();
+    };
+    const onFocusOut = () => {
+      editableFocused = false;
+      scheduleReapply();
+    };
     apply();
     viewport.addEventListener("resize", apply);
     viewport.addEventListener("scroll", apply);
-    window.addEventListener("focusin", apply);
-    window.addEventListener("focusout", apply);
+    window.addEventListener("focusin", onFocusIn);
+    window.addEventListener("focusout", onFocusOut);
     return () => {
       viewport.removeEventListener("resize", apply);
       viewport.removeEventListener("scroll", apply);
-      window.removeEventListener("focusin", apply);
-      window.removeEventListener("focusout", apply);
+      window.removeEventListener("focusin", onFocusIn);
+      window.removeEventListener("focusout", onFocusOut);
+      window.clearTimeout(reapplyTimer);
       document.documentElement.style.removeProperty("--keyboard-offset");
     };
   }, []);
