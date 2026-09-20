@@ -78,7 +78,13 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
   }, [history.data]);
 
   useEffect(() => {
-    if (active && !window.matchMedia("(max-width:1024px), (pointer:coarse)").matches) window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+    if (!active || window.matchMedia("(max-width:1024px), (pointer:coarse)").matches) return;
+    const frame = window.requestAnimationFrame(() => {
+      // A delayed desktop autofocus must not steal focus and jump to the bottom
+      // after the user has already scrolled upward to load older messages.
+      if (stickToBottomRef.current) inputRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [active]);
 
   useLayoutEffect(() => {

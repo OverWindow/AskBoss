@@ -169,6 +169,8 @@ describe("ChatPanel simulations", () => {
 
   it("automatically prepends older bubbles at the top without moving the visible position", async () => {
     let scrollHeight = 600;
+    const pendingFrames: FrameRequestCallback[] = [];
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => { pendingFrames.push(callback); return pendingFrames.length; });
     vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockImplementation(() => scrollHeight);
     const current = {
       id: "message-current",
@@ -199,6 +201,8 @@ describe("ChatPanel simulations", () => {
     expect(screen.getAllByText(current.content)).toHaveLength(1);
     expect(screen.getByText("현재 보이던 수정 제안")).toBeInTheDocument();
     await waitFor(() => expect(list.scrollTop).toBe(310));
+    pendingFrames.splice(0).forEach((callback) => callback(performance.now()));
+    expect(list.scrollTop).toBe(310);
     expect(api).toHaveBeenCalledWith(`/bosses/${boss.id}/chat?cursor=cursor-1&limit=50`, expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 
