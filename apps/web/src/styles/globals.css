@@ -466,4 +466,5 @@
 @media(max-width:767px){
   .interaction-workspace .boss-stage,.interaction-workspace .workspace-tab-panel{z-index:35}
   .mobile-bottom-nav{z-index:40}
+  .mobile-nav-trigger{z-index:45}
 }
