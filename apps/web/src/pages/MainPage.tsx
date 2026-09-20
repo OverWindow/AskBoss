@@ -14,6 +14,7 @@ import { useTranslationExamples } from "../features/translator/useTranslationExa
 import { Tutorial } from "../features/tutorial/Tutorial";
 import { useUiStore } from "../stores/ui-store";
 import { useProfile } from "../features/profile/useProfile";
+import { useKeyboardOffset } from "../lib/use-keyboard-offset";
 
 type PanelName = "chat" | "translator";
 const AVATAR_SPEECHES = [
@@ -30,6 +31,7 @@ export function MainPage() {
   const profile = useProfile(session.isSuccess);
   const translationExamples = useTranslationExamples(session.isSuccess);
   const ui = useUiStore();
+  useKeyboardOffset();
   const boss = useMemo(() => bosses.data?.find((item) => item.id === ui.selectedBossId) ?? bosses.data?.[0], [bosses.data, ui.selectedBossId]);
   const [speech, setSpeech] = useState("밥은 먹었나?");
   const [thinking, setThinking] = useState(false);
