@@ -27,8 +27,9 @@ const MOCK_HR_DASHBOARD: HrDashboard = {
     { topic: "협업", feature: "TRANSLATE", value: 19 }, { topic: "협업", feature: "CHAT", value: 25 }, { topic: "협업", feature: "SIMULATE", value: 11 },
   ],
   rankGap: [
-    { label: "0", value: 318 }, { label: "1단계", value: 914 },
-    { label: "2단계", value: 1_486 }, { label: "3단계+", value: 2_154 },
+    { label: "0단계", value: 318 }, { label: "1단계", value: 914 },
+    { label: "2단계", value: 1_486 }, { label: "3단계", value: 1_012 },
+    { label: "4단계", value: 702 }, { label: "5단계+", value: 440 },
   ],
   ageGap: [
     { label: "0~5년", value: 642 }, { label: "6~10년", value: 1_108 },
@@ -36,6 +37,20 @@ const MOCK_HR_DASHBOARD: HrDashboard = {
   ],
   sameJobFunctionDistribution: [
     { bucket: "SAME", count: 1_934 }, { bucket: "DIFF", count: 2_938 },
+  ],
+  jobFunctionPairs: [
+    { userJobFunction: "개발", bossJobFunction: "기획", count: 486 },
+    { userJobFunction: "개발", bossJobFunction: "개발", count: 372 },
+    { userJobFunction: "개발", bossJobFunction: "디자인", count: 164 },
+    { userJobFunction: "기획", bossJobFunction: "개발", count: 428 },
+    { userJobFunction: "기획", bossJobFunction: "기획", count: 318 },
+    { userJobFunction: "기획", bossJobFunction: "디자인", count: 276 },
+    { userJobFunction: "디자인", bossJobFunction: "기획", count: 354 },
+    { userJobFunction: "디자인", bossJobFunction: "디자인", count: 221 },
+    { userJobFunction: "마케팅", bossJobFunction: "영업", count: 297 },
+    { userJobFunction: "마케팅", bossJobFunction: "기획", count: 183 },
+    { userJobFunction: "영업", bossJobFunction: "마케팅", count: 239 },
+    { userJobFunction: "영업", bossJobFunction: "영업", count: 196 },
   ],
   surfaceActualGapRate: 37.6,
   repeatedSimulationTypes: [

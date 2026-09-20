@@ -1,7 +1,15 @@
 import { describe,expect,it } from "vitest";
-import { classifyRepeatedSimulation,computeRepeatedSimulationTypes,computeSurfaceActualGap } from "../src/utils/hr-aggregation";
+import { classifyRankGap,classifyRepeatedSimulation,computeRepeatedSimulationTypes,computeSurfaceActualGap } from "../src/utils/hr-aggregation";
 
 describe("HR aggregation",()=>{
+  it("splits rank gaps into individual steps through four and groups five or more",()=>{
+    expect(classifyRankGap("대리","대리")).toBe("0단계");
+    expect(classifyRankGap("사원","대리")).toBe("2단계");
+    expect(classifyRankGap("인턴","과장")).toBe("4단계");
+    expect(classifyRankGap("인턴","대표")).toBe("5단계+");
+    expect(classifyRankGap("기타","대표")).toBeNull();
+  });
+
   it("uses the AI gap score and aggregates it by boss",()=>{
     const rows=[
       {inputText:"좋은 의견이네요.",plainMeaning:"수정이 필요합니다.",surfaceActualGapScore:80,bossId:"boss-1",alias:"김 팀장"},

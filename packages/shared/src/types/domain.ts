@@ -353,6 +353,7 @@ export interface HrDashboard {
   rankGap: { label: string; value: number }[];
   ageGap: { label: string; value: number }[];
   sameJobFunctionDistribution: { bucket: "SAME" | "DIFF"; count: number }[];
+  jobFunctionPairs: { userJobFunction: string; bossJobFunction: string; count: number }[];
   surfaceActualGapRate: number | null;
   repeatedSimulationTypes: { type: RepeatedSimulationType; count: number }[];
 }

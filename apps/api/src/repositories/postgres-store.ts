@@ -271,12 +271,13 @@ export class PostgresStore implements Store {
   async incrementTranslationSimulation(sessionId:string,id:string) { await this.sql`update translation_requests set simulation_count=simulation_count+1 where id=${id} and session_id=${sessionId} and expires_at>now()`; }
   async listMonologues(sessionId:string,bossId:string,limit:number) { const rows=await this.sql`select content from monologue_history where session_id=${sessionId} and boss_id=${bossId} order by created_at desc limit ${limit}`; return rows.map((r:any)=>r.content); }
   async addMonologue(sessionId:string,bossId:string,content:string) { await this.sql`insert into monologue_history(session_id,boss_id,content) values(${sessionId},${bossId},${content})`; }
-  async trackAnalytics(subjectHash:string,i:AnalyticsEventInput) { await this.sql`insert into analytics_events(anonymous_subject_hash,event_type,feature,user_age_band,boss_age_band,rank_gap_bucket,age_gap_bucket,same_job_function_bucket,topic_keywords,persona_confidence_bucket,is_demo,expires_at) values(${subjectHash},${i.eventType},${i.feature},${i.userAgeBand??null},${i.bossAgeBand??null},${i.rankGapBucket??null},${i.ageGapBucket??null},${i.sameJobFunctionBucket??null},${i.topicKeywords??[]},${i.personaConfidenceBucket??null},${i.isDemo??false},now()+interval '31 days')`; }
+  async trackAnalytics(subjectHash:string,i:AnalyticsEventInput) { await this.sql`insert into analytics_events(anonymous_subject_hash,event_type,feature,user_age_band,boss_age_band,rank_gap_bucket,age_gap_bucket,same_job_function_bucket,user_job_function,boss_job_function,topic_keywords,persona_confidence_bucket,is_demo,expires_at) values(${subjectHash},${i.eventType},${i.feature},${i.userAgeBand??null},${i.bossAgeBand??null},${i.rankGapBucket??null},${i.ageGapBucket??null},${i.sameJobFunctionBucket??null},${i.userJobFunction??null},${i.bossJobFunction??null},${i.topicKeywords??[]},${i.personaConfidenceBucket??null},${i.isDemo??false},now()+interval '31 days')`; }
   async getHrDashboard(): Promise<HrDashboard> {
     const [total] = await this.sql`select count(*)::int value,count(distinct anonymous_subject_hash)::int subjects from analytics_events where expires_at>now() and not is_demo`;
     const rank=await this.sql<{label:string;value:number}[]>`select rank_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and not is_demo and rank_gap_bucket is not null group by rank_gap_bucket order by label`;
     const age=await this.sql<{label:string;value:number}[]>`select age_gap_bucket label,count(*)::int value from analytics_events where expires_at>now() and not is_demo and age_gap_bucket is not null group by age_gap_bucket order by label`;
     const sameJob=await this.sql<{bucket:string;count:number}[]>`select same_job_function_bucket bucket,count(*)::int count from analytics_events where expires_at>now() and not is_demo and same_job_function_bucket is not null group by same_job_function_bucket order by bucket`;
+    const jobFunctionPairs=await this.sql<{userJobFunction:string;bossJobFunction:string;count:number}[]>`select user_job_function "userJobFunction",boss_job_function "bossJobFunction",count(*)::int count from analytics_events where expires_at>now() and not is_demo and user_job_function is not null and boss_job_function is not null group by user_job_function,boss_job_function order by count desc,user_job_function,boss_job_function`;
     const topics=await this.sql<{text:string;value:number}[]>`select keyword text,count(*)::int value from analytics_events cross join unnest(topic_keywords) keyword where expires_at>now() and not is_demo group by keyword order by value desc limit 30`;
     const topicFeature=await this.sql<{topic:string;feature:string;value:number}[]>`
       with topic_events as (
@@ -325,6 +326,7 @@ export class PostgresStore implements Store {
       rankGap: rank.map((r: any) => ({ label: r.label, value: r.value })),
       ageGap: age.map((r: any) => ({ label: r.label, value: r.value })),
       sameJobFunctionDistribution,
+      jobFunctionPairs: jobFunctionPairs.map((r: any) => ({ userJobFunction: r.userJobFunction, bossJobFunction: r.bossJobFunction, count: Number(r.count) })),
       surfaceActualGapRate: translationRows.length ? gap.rate : null,
       repeatedSimulationTypes,
     };

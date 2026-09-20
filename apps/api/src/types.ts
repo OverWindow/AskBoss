@@ -12,7 +12,7 @@ export interface TranslationArchiveRecord extends TranslationArchiveDetail { own
 export type TranslationArchiveBranchRecord = TranslationArchiveBranch;
 export interface UploadIntentRecord { id: string; sessionId: string; bossId: string; storagePath: string; originalName: string; contentType: string; sizeBytes: number; completedAt: string | null; expiresAt: string }
 export interface GlobalUploadIntentRecord { id: string; bossId: string; storagePath: string; originalName: string; contentType: string; sizeBytes: number; completedAt: string | null; expiresAt: string }
-export interface AnalyticsEventInput { eventType: string; feature: string; userAgeBand?: number | null; bossAgeBand?: number | null; rankGapBucket?: string | null; ageGapBucket?: string | null; sameJobFunctionBucket?: string | null; topicKeywords?: string[]; personaConfidenceBucket?: string | null; isDemo?: boolean }
+export interface AnalyticsEventInput { eventType: string; feature: string; userAgeBand?: number | null; bossAgeBand?: number | null; rankGapBucket?: string | null; ageGapBucket?: string | null; sameJobFunctionBucket?: string | null; userJobFunction?: string | null; bossJobFunction?: string | null; topicKeywords?: string[]; personaConfidenceBucket?: string | null; isDemo?: boolean }
 export interface AdminSessionRecord { id: string; tokenHash: string; ipHash: string; createdAt: string; lastSeenAt: string; expiresAt: string }
 export interface AdminLoginAttempt { ipHash: string; attempts: number; windowStartedAt: string; lockedUntil: string | null }
 export interface BossRecord extends Boss { sessionId: string | null; expiresAt: string | null }

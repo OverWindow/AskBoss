@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Wordcloud } from "@visx/wordcloud";
 import { Text } from "@visx/text";
-import type { HrDashboard } from "@askboss/shared";
+import { JOB_FUNCTIONS, type HrDashboard } from "@askboss/shared";
 import { api } from "../../services/api-client";
 
 const featureLabel=(feature:string)=>({TRANSLATE:"번역",CHAT:"대화",SIMULATE:"시뮬레이션",MONOLOGUE:"혼잣말",PERSONA_REBUILD:"페르소나 재생성"}[feature]??feature);
@@ -61,6 +61,16 @@ export function HrDashboard({ dataset }: { dataset: "actual" | "mock" }) {
           <TopicFeatureHeatmap data={d.topicFeature}/>
         ) : (
           <EmptyPlaceholder>아직 주제와 기능을 함께 비교할 데이터가 없습니다.</EmptyPlaceholder>
+        )}
+      </section>
+
+      <section id="job-function-pairs" className="chart-section">
+        <h3>사용자 직무 × 상사 직무</h3>
+        <p className="hint">행은 사용자 직무, 열은 상사 직무입니다. 색이 진할수록 해당 조합에서 AI 기능을 사용한 횟수가 많습니다.</p>
+        {(d.jobFunctionPairs ?? []).length > 0 ? (
+          <JobFunctionHeatmap data={d.jobFunctionPairs}/>
+        ) : (
+          <EmptyPlaceholder>아직 사용자·상사 직무를 함께 비교할 데이터가 없습니다.</EmptyPlaceholder>
         )}
       </section>
 
@@ -235,6 +245,55 @@ function TopicFeatureHeatmap({ data }: { data: HrDashboard["topicFeature"] }) {
                     <td key={feature} aria-label={`${topic} · ${featureLabel(feature)}: ${value}건`}>
                       <span
                         className={`topic-feature-cell${ratio >= 0.58 ? " is-strong" : ""}`}
+                        style={{ backgroundColor: `rgba(55, 93, 243, ${alpha})` }}
+                      >
+                        {value > 0 ? value.toLocaleString() : "–"}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="topic-feature-legend" aria-label="색 농도 범례">
+        <span>낮음</span><i aria-hidden="true"/><span>높음</span>
+      </div>
+    </>
+  );
+}
+
+function JobFunctionHeatmap({ data }: { data: HrDashboard["jobFunctionPairs"] }) {
+  const preferredOrder = new Map<string, number>(JOB_FUNCTIONS.map((jobFunction, index) => [jobFunction, index]));
+  const compareJobFunctions = (left: string, right: string) => (preferredOrder.get(left) ?? Number.MAX_SAFE_INTEGER) - (preferredOrder.get(right) ?? Number.MAX_SAFE_INTEGER) || left.localeCompare(right, "ko");
+  const userJobFunctions = [...new Set(data.map((item) => item.userJobFunction))].sort(compareJobFunctions);
+  const bossJobFunctions = [...new Set(data.map((item) => item.bossJobFunction))].sort(compareJobFunctions);
+  const values = new Map(data.map((item) => [`${item.userJobFunction}\u0000${item.bossJobFunction}`, item.count]));
+  const maxValue = Math.max(...data.map((item) => item.count), 1);
+
+  return (
+    <>
+      <div className="job-function-heatmap-scroll">
+        <table className="job-function-heatmap" aria-label="사용자 직무와 상사 직무별 AI 기능 사용량 히트맵" style={{ minWidth: Math.max(560, bossJobFunctions.length * 92 + 132) }}>
+          <thead>
+            <tr>
+              <th scope="col">사용자 ↓ / 상사 →</th>
+              {bossJobFunctions.map((jobFunction) => <th key={jobFunction} scope="col">{jobFunction}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {userJobFunctions.map((userJobFunction) => (
+              <tr key={userJobFunction}>
+                <th scope="row">{userJobFunction}</th>
+                {bossJobFunctions.map((bossJobFunction) => {
+                  const value = values.get(`${userJobFunction}\u0000${bossJobFunction}`) ?? 0;
+                  const ratio = value / maxValue;
+                  const alpha = value === 0 ? 0.035 : 0.1 + ratio * 0.8;
+                  return (
+                    <td key={bossJobFunction} aria-label={`${userJobFunction} 사용자 · ${bossJobFunction} 상사: ${value}건`}>
+                      <span
+                        className={`job-function-heatmap-cell${ratio >= 0.58 ? " is-strong" : ""}`}
                         style={{ backgroundColor: `rgba(55, 93, 243, ${alpha})` }}
                       >
                         {value > 0 ? value.toLocaleString() : "–"}

@@ -9,6 +9,7 @@ const SECTIONS = [
   { id: "overview", label: "요약" },
   { id: "topics", label: "주요 주제" },
   { id: "topic-features", label: "주제·기능" },
+  { id: "job-function-pairs", label: "직무 조합" },
   { id: "demographics", label: "직급·나이" },
   { id: "insights", label: "조직 인사이트" },
   { id: "repeated", label: "시뮬레이션 유형" },

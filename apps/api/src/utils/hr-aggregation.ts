@@ -1,5 +1,15 @@
 import type { RepeatedSimulationType } from "../shared.js";
 
+const rankOrder = ["인턴", "사원", "주임", "대리", "과장", "차장", "부장", "팀장", "실장", "임원", "대표"];
+
+export function classifyRankGap(user?: string | null, boss?: string | null): string | null {
+  const userIndex = rankOrder.indexOf(user ?? "");
+  const bossIndex = rankOrder.indexOf(boss ?? "");
+  if (userIndex < 0 || bossIndex < 0) return null;
+  const gap = Math.max(0, bossIndex - userIndex);
+  return gap >= 5 ? "5단계+" : `${gap}단계`;
+}
+
 const politePositive = [
   "감사", "고맙", "죄송", "양해", "부탁", "드리", "요청", "확인",
   "좋", "잘", "축하", "환영", "기쁘", "괜찮", "즐거", "반갑",

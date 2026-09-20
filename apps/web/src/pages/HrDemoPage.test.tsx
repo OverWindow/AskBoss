@@ -19,7 +19,7 @@ vi.mock("@visx/text", () => ({ Text: ({ children }: any) => <text>{children}</te
 const actual: HrDashboardData = {
   dataSource: "ACTUAL", includesDemo: false,
   overview: { totalUses: 0, activeSubjects: 0, topFeature: "-", summary: "아직 집계된 실제 사용자 데이터가 없습니다." },
-  topics: [], topicFeature: [], rankGap: [], ageGap: [], sameJobFunctionDistribution: [], surfaceActualGapRate: null, repeatedSimulationTypes: [],
+  topics: [], topicFeature: [], rankGap: [], ageGap: [], sameJobFunctionDistribution: [], jobFunctionPairs: [], surfaceActualGapRate: null, repeatedSimulationTypes: [],
 };
 const mock: HrDashboardData = {
   dataSource: "MOCK", includesDemo: true,
@@ -33,6 +33,10 @@ const mock: HrDashboardData = {
   ],
   rankGap: [{ label: "1단계", value: 914 }], ageGap: [{ label: "6~10년", value: 1_108 }],
   sameJobFunctionDistribution: [{ bucket: "SAME", count: 1_934 }, { bucket: "DIFF", count: 2_938 }],
+  jobFunctionPairs: [
+    { userJobFunction: "개발", bossJobFunction: "기획", count: 1 },
+    { userJobFunction: "기획", bossJobFunction: "개발", count: 428 },
+  ],
   surfaceActualGapRate: 37.6, repeatedSimulationTypes: [{ type: "일정·마감 압박", count: 184 }],
 };
 
@@ -56,6 +60,10 @@ describe("HrDemoPage datasets", () => {
     expect(screen.getAllByText("보고")).toHaveLength(2);
     expect(screen.getByRole("heading", { name: "주제별 기능 사용" })).toBeInTheDocument();
     expect(screen.getByLabelText("보고 · 번역: 41건")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "사용자 직무 × 상사 직무" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "직무 조합" })).toHaveAttribute("href", "#job-function-pairs");
+    expect(screen.getByLabelText("개발 사용자 · 기획 상사: 1건")).toBeInTheDocument();
+    expect(screen.getByLabelText("개발 사용자 · 개발 상사: 0건")).toBeInTheDocument();
     await waitFor(() => expect(api).toHaveBeenCalledWith("/hr/dashboard?dataset=actual"));
     expect(api).toHaveBeenCalledWith("/hr/dashboard?dataset=mock");
   });

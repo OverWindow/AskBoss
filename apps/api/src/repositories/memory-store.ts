@@ -234,6 +234,8 @@ export class MemoryStore implements Store {
       { bucket: "SAME" as const, count: sameJobCounts.get("SAME") ?? 0 },
       { bucket: "DIFF" as const, count: sameJobCounts.get("DIFF") ?? 0 },
     ] as { bucket: "SAME" | "DIFF"; count: number }[]).filter((item) => item.count > 0);
+    const jobFunctionPairCounts=actualAnalytics.reduce((map,row)=>{if(!row.userJobFunction||!row.bossJobFunction)return map;const key=`${row.userJobFunction}\u0000${row.bossJobFunction}`;const current=map.get(key);if(current)current.count+=1;else map.set(key,{userJobFunction:row.userJobFunction,bossJobFunction:row.bossJobFunction,count:1});return map;},new Map<string,{userJobFunction:string;bossJobFunction:string;count:number}>());
+    const jobFunctionPairs=[...jobFunctionPairCounts.values()].sort((a,b)=>b.count-a.count||a.userJobFunction.localeCompare(b.userJobFunction,"ko")||a.bossJobFunction.localeCompare(b.bossJobFunction,"ko"));
     const repeatedSimulationTypes=computeRepeatedSimulationTypes([...this.translations.values()].map((row)=>({inputText:row.inputText,simulationCount:row.simulationCount})));
     if (actualAnalytics.length) {
       const group = (key:"rankGapBucket"|"ageGapBucket") => [...actualAnalytics.reduce((map,row) => { const label=row[key]; if(label)map.set(label,(map.get(label)??0)+1); return map; },new Map<string,number>())].map(([label,value])=>({label,value}));
@@ -245,13 +247,13 @@ export class MemoryStore implements Store {
       const topicFeature=[...topicFeatureCounts.values()].sort((a,b)=>(topicOrder.get(a.topic)??0)-(topicOrder.get(b.topic)??0)||a.feature.localeCompare(b.feature));
       const featureCounts=actualAnalytics.reduce((map,row)=>map.set(row.feature,(map.get(row.feature)??0)+1),new Map<string,number>());
       const topFeature=[...featureCounts].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0]?.[0]??"-";
-      return {dataSource:"ACTUAL",includesDemo:false,overview:{totalUses:actualAnalytics.length,activeSubjects:new Set(actualAnalytics.map(row=>row.subjectHash)).size,topFeature,summary:actualAnalytics.length?"":"아직 집계된 실제 사용자 데이터가 없습니다."},topics:[...topicCounts].map(([text,value])=>({text,value})).sort((a,b)=>b.value-a.value).slice(0,30),topicFeature,rankGap:group("rankGapBucket"),ageGap:group("ageGapBucket"),sameJobFunctionDistribution,surfaceActualGapRate:null,repeatedSimulationTypes};
+      return {dataSource:"ACTUAL",includesDemo:false,overview:{totalUses:actualAnalytics.length,activeSubjects:new Set(actualAnalytics.map(row=>row.subjectHash)).size,topFeature,summary:actualAnalytics.length?"":"아직 집계된 실제 사용자 데이터가 없습니다."},topics:[...topicCounts].map(([text,value])=>({text,value})).sort((a,b)=>b.value-a.value).slice(0,30),topicFeature,rankGap:group("rankGapBucket"),ageGap:group("ageGapBucket"),sameJobFunctionDistribution,jobFunctionPairs,surfaceActualGapRate:null,repeatedSimulationTypes};
     }
     return {
       dataSource: "ACTUAL",
       includesDemo: false,
       overview: { totalUses: 0, activeSubjects: 0, topFeature: "-", summary: "아직 집계된 실제 사용자 데이터가 없습니다." },
-      topics: [], topicFeature: [], rankGap: [], ageGap: [], sameJobFunctionDistribution: [], surfaceActualGapRate: null,
+      topics: [], topicFeature: [], rankGap: [], ageGap: [], sameJobFunctionDistribution: [], jobFunctionPairs: [], surfaceActualGapRate: null,
       repeatedSimulationTypes,
     };
   }
