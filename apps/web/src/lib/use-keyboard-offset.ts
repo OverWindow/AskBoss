@@ -2,9 +2,10 @@ import { useEffect } from "react";
 
 /**
  * Tracks the soft keyboard through window.visualViewport and exposes its height
- * as the `--keyboard-offset` CSS custom property on <html>. Mobile dock/panel
- * styles add this offset to their bottom padding so the composer rises flush
- * with the keyboard. No-ops when visualViewport is unavailable (desktop/jsdom).
+ * as the `--keyboard-offset` CSS custom property on <html>. The mobile chat
+ * layout uses it to reserve either the bottom-nav clearance or the keyboard
+ * height, so the composer sits directly above the keyboard while the title
+ * remains fixed. No-ops when visualViewport is unavailable (desktop/jsdom).
  */
 export function useKeyboardOffset() {
   useEffect(() => {

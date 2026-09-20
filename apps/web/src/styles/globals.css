@@ -32,7 +32,7 @@
 .panel-kicker{display:block;color:var(--hr-accent);font-size:.7rem;font-weight:850;letter-spacing:.11em}
 .panel-close-button{width:36px;height:36px;flex:none;border:1px solid var(--hr-border);border-radius:50%;background:#f8fafc;display:grid;place-items:center}
 .panel-close-button:hover{border-color:rgba(55,93,243,.38);background:#fff}
-.panel-hint{margin:0;padding:12px 18px;color:var(--hr-muted);font-size:.78rem;border-bottom:1px solid rgba(33,34,50,.08)}
+.panel-hint{margin:0;padding:12px 18px;color:var(--hr-muted);font-size:.78rem;border-bottom:1px solid rgba(33,34,50,.08);flex:none}
 .workspace-panel .chat-list{min-height:0;flex:1;overflow:auto;padding:18px}
 .workspace-panel .chat-composer{padding:14px 16px 16px;background:#fff}
 .panel-empty{margin:auto;display:grid;place-items:center;text-align:center;color:var(--hr-muted);padding:40px 20px}
@@ -173,7 +173,7 @@
 .chat-reset-button{width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:9px;background:transparent;color:var(--hr-muted)}
 .chat-reset-button:hover,.chat-reset-button:focus-visible{background:rgba(53,87,107,.08);color:var(--hr-primary)}
 .chat-reset-button:disabled{opacity:.42;cursor:not-allowed}
-.workspace-tab-panel .chat-list{min-height:0;flex:1;overflow:auto;padding:18px}
+.workspace-tab-panel .chat-list{min-height:0;flex:1;overflow-y:auto;overflow-x:hidden;padding:18px}
 .workspace-tab-panel .chat-composer{padding:14px 16px 16px;background:#fff}
 .chat-composer{align-items:flex-end}.chat-composer>.primary-button{height:46px;min-height:46px;padding:0 14px}.chat-input{min-height:46px;max-height:120px;resize:none;overflow-y:auto;line-height:1.45}
 .workspace-tab-panel .chat-list{overscroll-behavior:contain}
@@ -221,6 +221,8 @@
   .mobile-bottom-nav{isolation:isolate;overflow:hidden}
   .mobile-bottom-nav-item{flex:1;min-width:0;border:0;border-radius:20px;background:transparent;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--hr-muted);font-size:.74rem;font-weight:750}
   .mobile-bottom-nav-item.is-active{color:var(--hr-primary);background:rgba(55,93,243,.08)}
+  .hr-title-row h2{font-size:1.5rem}
+  .settings-panel>header h1{font-size:1.5rem}
   .mobile-bottom-nav-item{position:relative;z-index:1}
   .mobile-bottom-nav-indicator{position:absolute;z-index:0;top:6px;bottom:6px;left:6px;width:calc((100% - 20px)/3);border-radius:20px;background:rgba(55,93,243,.09);transform:translate3d(0,0,0);transition:transform .34s cubic-bezier(.22,1,.36,1);pointer-events:none}
   .mobile-bottom-nav-indicator.is-translator{transform:translate3d(calc((100% - 20px)/3 + 4px),0,0)}
@@ -351,7 +353,10 @@
   .interaction-workspace .boss-stage{z-index:1;padding:max(72px,calc(env(safe-area-inset-top) + 62px)) 24px max(98px,calc(env(safe-area-inset-bottom) + 88px));justify-content:center;overflow:auto;transform:translate3d(0,0,0)}
   .workspace-dock,.workspace-dock-body{display:contents}
   .workspace-tabs-header{display:none}
-  .workspace-tab-panel,.workspace-tab-panel[hidden]{z-index:2;display:flex;min-width:0;overflow:hidden;padding-top:max(58px,calc(env(safe-area-inset-top) + 50px));padding-bottom:calc(max(82px,calc(env(safe-area-inset-bottom) + 72px)) + var(--keyboard-offset,0px));border:0;border-radius:0;background:#fff;visibility:visible}
+  .workspace-tab-panel,.workspace-tab-panel[hidden]{z-index:2;display:flex;min-width:0;overflow:hidden;padding-top:max(58px,calc(env(safe-area-inset-top) + 50px));padding-bottom:max(82px,calc(env(safe-area-inset-bottom) + 72px));border:0;border-radius:0;background:#fff;visibility:visible}
+  #chat-panel{padding-bottom:max(max(82px,calc(env(safe-area-inset-bottom) + 72px)),var(--keyboard-offset,0px))}
+  #chat-panel .workspace-panel-title,#chat-panel .panel-hint,#chat-panel .chat-composer{flex:none}
+  #chat-panel .chat-list{min-height:0;flex:1 1 auto;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
   #translator-panel{transform:translate3d(100%,0,0)}
   #chat-panel{transform:translate3d(200%,0,0)}
   .is-mobile-home .boss-stage{transform:translate3d(0,0,0);pointer-events:auto}

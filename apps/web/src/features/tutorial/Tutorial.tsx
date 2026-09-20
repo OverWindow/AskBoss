@@ -246,12 +246,14 @@ export function Tutorial() {
   useLayoutEffect(() => {
     if (!tutorialOpen) return;
     const frame = requestAnimationFrame(measure);
-    const afterLayout = window.setTimeout(measure, 320);
+    // The mobile view track transitions over .38s — re-measure until it settles so
+    // the highlight ring lands on the target's final position, not mid-slide.
+    const settleTimers = [320, 420, 540].map((delay) => window.setTimeout(measure, delay));
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, true);
     return () => {
       cancelAnimationFrame(frame);
-      window.clearTimeout(afterLayout);
+      settleTimers.forEach((timer) => window.clearTimeout(timer));
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
