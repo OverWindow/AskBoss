@@ -75,6 +75,11 @@ export function MainPage() {
 
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const onWorkspaceTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest("button, a, input, textarea, .chat-list, .translator-scroll")) {
+      touchStart.current = null;
+      return;
+    }
     const touch = event.touches[0];
     if (!touch) return;
     touchStart.current = { x: touch.clientX, y: touch.clientY };
