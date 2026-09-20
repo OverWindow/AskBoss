@@ -34,6 +34,13 @@ export function AppShell({children}:PropsWithChildren){
     };
   }, []);
   useEffect(() => {
+    const media = window.matchMedia("(max-width:850px)");
+    const closeNav = () => { if (!media.matches) ui.set({ mobileNavOpen: false }); };
+    closeNav();
+    media.addEventListener("change", closeNav);
+    return () => media.removeEventListener("change", closeNav);
+  }, []);
+  useEffect(() => {
     if (!ui.mobileNavOpen || !window.matchMedia("(max-width:850px)").matches) return;
     const previousBodyOverflow = document.body.style.overflow;
     const previousBodyTouchAction = document.body.style.touchAction;
