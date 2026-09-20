@@ -33,7 +33,7 @@ export function HrDashboard({ dataset }: { dataset: "actual" | "mock" }) {
     <main className={`hr-main${isMock ? " is-mock" : ""}`}>
       {d.overview.summary && <p className="hr-summary">{d.overview.summary}</p>}
 
-      <div className="metric-line">
+      <div className="metric-line overview-metrics">
         <div>
           <strong>{d.overview.totalUses.toLocaleString()}</strong>
           <span>AI 기능 사용</span>
@@ -142,6 +142,7 @@ function EmptyPlaceholder({ children }: { children: React.ReactNode }) {
 }
 
 function TopicCloud({ words, colorful }: { words: { text: string; value: number }[]; colorful: boolean }) {
+  const maxValue = Math.max(...words.map((word) => word.value), 1);
   return (
     <div className="word-cloud">
       <svg viewBox="0 0 720 240" role="img" aria-label="주요 대화 주제 워드 클라우드">
@@ -150,7 +151,7 @@ function TopicCloud({ words, colorful }: { words: { text: string; value: number 
           width={720}
           height={240}
           font="Pretendard, sans-serif"
-          fontSize={(word) => Math.max(16, Math.min(46, word.value / 2))}
+          fontSize={(word) => 18 + (word.value / maxValue) * 30}
           padding={5}
           spiral="archimedean"
           rotate={() => 0}

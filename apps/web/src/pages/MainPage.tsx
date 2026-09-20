@@ -61,9 +61,15 @@ export function MainPage() {
     setThinking(false);
   }, [profile.data?.handle]);
 
-  const selectTab = (tab: PanelName) => ui.set({ activeWorkspaceTab: tab, mobilePanelExpanded: true });
+  type MobileView = "home" | PanelName;
 
-  const goHome = () => ui.set({ mobilePanelExpanded: false });
+  const goToView = (view: MobileView) => {
+    if (view === "home") ui.set({ mobilePanelExpanded: false });
+    else ui.set({ activeWorkspaceTab: view, mobilePanelExpanded: true });
+  };
+
+  const selectTab = (tab: PanelName) => goToView(tab);
+  const goHome = () => goToView("home");
 
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const onWorkspaceTouchStart = (event: TouchEvent<HTMLDivElement>) => {
@@ -79,7 +85,10 @@ export function MainPage() {
     const deltaX = touch.clientX - start.x;
     const deltaY = touch.clientY - start.y;
     if (Math.abs(deltaX) < 50 || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
-    selectTab(ui.activeWorkspaceTab === "chat" ? "translator" : "chat");
+    if (deltaX < 0 && !ui.mobilePanelExpanded) selectTab("translator");
+    else if (deltaX < 0 && ui.activeWorkspaceTab === "translator") selectTab("chat");
+    else if (deltaX > 0 && ui.mobilePanelExpanded && ui.activeWorkspaceTab === "chat") selectTab("translator");
+    else if (deltaX > 0 && ui.mobilePanelExpanded && ui.activeWorkspaceTab === "translator") goHome();
   };
 
   const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, tab: PanelName) => {
@@ -115,7 +124,7 @@ export function MainPage() {
 
   return <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} transition={{ duration: .25, ease: "easeOut" }}>
     <AppShell>
-    <div className={`interaction-workspace ${ui.mobilePanelExpanded ? "" : "is-mobile-panel-collapsed"}`} onTouchStart={onWorkspaceTouchStart} onTouchEnd={onWorkspaceTouchEnd}>
+    <div className={`interaction-workspace ${!ui.mobilePanelExpanded ? "is-mobile-home is-mobile-panel-collapsed" : ui.activeWorkspaceTab === "translator" ? "is-mobile-translator" : "is-mobile-chat"}`} onTouchStart={onWorkspaceTouchStart} onTouchEnd={onWorkspaceTouchEnd}>
       <section data-tutorial="workspace" className={`boss-stage ${thinking ? "is-thinking" : ""}`} aria-labelledby="boss-alias">
         <div aria-live="polite" className="speech-bubble-wrap"><AnimatePresence mode="popLayout" initial={false}><motion.div key={`${boss.id}:${speech}`} className="speech-bubble" initial={{ opacity: 0, scale: .97, y: 4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: .97, y: -4 }} transition={{ duration: .5, ease: [0.22, 1, 0.36, 1] }}>{speech}</motion.div></AnimatePresence></div>
         <button className="avatar-frame avatar-button" type="button" onClick={changeAvatarSpeech} aria-label={`${boss.alias}의 한마디 바꾸기`}>
@@ -144,6 +153,7 @@ export function MainPage() {
         </div>
       </aside>
       <nav className="mobile-bottom-nav" aria-label="작업 이동">
+        <span className={`mobile-bottom-nav-indicator ${!ui.mobilePanelExpanded ? "is-home" : ui.activeWorkspaceTab === "translator" ? "is-translator" : "is-chat"}`} aria-hidden="true"/>
         <button type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded ? "" : "is-active"}`} aria-current={ui.mobilePanelExpanded ? undefined : "page"} onClick={goHome}><Home size={18}/><span>홈</span></button>
         <button type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded && ui.activeWorkspaceTab === "translator" ? "is-active" : ""}`} aria-current={ui.mobilePanelExpanded && ui.activeWorkspaceTab === "translator" ? "page" : undefined} onClick={() => selectTab("translator")}><Languages size={18}/><span>번역</span></button>
         <button type="button" className={`mobile-bottom-nav-item ${ui.mobilePanelExpanded && ui.activeWorkspaceTab === "chat" ? "is-active" : ""}`} aria-current={ui.mobilePanelExpanded && ui.activeWorkspaceTab === "chat" ? "page" : undefined} onClick={() => selectTab("chat")}><MessageCircle size={18}/><span>대화</span></button>

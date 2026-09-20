@@ -37,6 +37,22 @@ describe("MainPage workspace", () => {
     expect(screen.getByLabelText("상사의 말 번역")).not.toHaveAttribute("hidden");
   });
 
+  it("모바일 스와이프 방향에 맞춰 번역과 대화 화면 및 하단 표시를 함께 이동한다", () => {
+    const { container } = render(<MainPage/>);
+    const workspace = container.querySelector(".interaction-workspace")!;
+    const indicator = container.querySelector(".mobile-bottom-nav-indicator")!;
+
+    fireEvent.touchStart(workspace, { touches: [{ clientX: 280, clientY: 200 }] });
+    fireEvent.touchEnd(workspace, { changedTouches: [{ clientX: 120, clientY: 205 }] });
+    expect(screen.getByRole("tab", { name: "대화" })).toHaveAttribute("aria-selected", "true");
+    expect(indicator).toHaveClass("is-chat");
+
+    fireEvent.touchStart(workspace, { touches: [{ clientX: 120, clientY: 200 }] });
+    fireEvent.touchEnd(workspace, { changedTouches: [{ clientX: 280, clientY: 198 }] });
+    expect(screen.getByRole("tab", { name: "번역" })).toHaveAttribute("aria-selected", "true");
+    expect(indicator).toHaveClass("is-translator");
+  });
+
   it("모바일 패널을 기본으로 펼친 후 접고 다시 펼 수 있다", () => {
     render(<MainPage/>);
     const toggle = screen.getByRole("button", { name: "패널 접기" });

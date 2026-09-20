@@ -380,7 +380,7 @@ export function ChatPanel({ boss, active, simulationRequest, onActivity, onConve
         {coaching.reason && <p>{coaching.reason}</p>}
         <div className="chat-coaching-revision"><span>{coaching.revisedText}</span><button type="button" onClick={() => void copyCoaching(message.id, coaching.revisedText!)} aria-label={copiedCoachingId === message.id ? "수정본 복사됨" : "수정본 복사"}>{copiedCoachingId === message.id ? <Check size={14}/> : <Copy size={14}/>}<span>{copiedCoachingId === message.id ? "복사됨" : "수정본 복사"}</span></button></div>
       </aside>}
-      {canCollectActual && <button className="actual-response-trigger" type="button" disabled={actualSaving || simulationLoading} onClick={() => { setActualMessage(message); setActualError(undefined); }}>{message.kind === "ACTUAL_RESPONSE" ? "실제 답변 수정" : "실제로 답변은 달랐어요"}</button>}
+      {canCollectActual && <button className="actual-response-trigger" type="button" disabled={actualSaving || simulationLoading} onClick={() => { setActualMessage(message); setActualError(undefined); }}>{message.kind === "ACTUAL_RESPONSE" ? "실제 답변 수정" : "실제 답변은 달랐어요"}</button>}
     </div>;
   };
 

@@ -79,8 +79,8 @@ describe("ChatPanel simulations", () => {
     renderPanel();
 
     expect(await screen.findByText(reaction.content)).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "실제로 답변은 달랐어요" })).toHaveLength(1);
-    fireEvent.click(screen.getByRole("button", { name: "실제로 답변은 달랐어요" }));
+    expect(screen.getAllByRole("button", { name: "실제 답변은 달랐어요" })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "실제 답변은 달랐어요" }));
     fireEvent.change(screen.getByLabelText("실제로 상사는 뭐라고 답했나요?"), { target: { value: "좋아, 네 시에 다시 보자." } });
     fireEvent.click(screen.getByRole("button", { name: "실제 답변 반영" }));
     await waitFor(() => expect(screen.queryByLabelText("실제로 상사는 뭐라고 답했나요?")).not.toBeInTheDocument());

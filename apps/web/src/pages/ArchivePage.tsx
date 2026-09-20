@@ -41,17 +41,21 @@ function ArchiveCard({ summary, onDelete, deleting }: { summary: TranslationArch
       </button>
       <button className="archive-delete-button" type="button" aria-label="번역 아카이브 삭제" title={summary.inputText} disabled={deleting} onClick={onDelete}><Trash2 size={17}/></button>
     </div>
-    {expanded && <div className="archive-card-body">
-      {detail.isLoading && <p className="hint">아카이브를 불러오는 중입니다.</p>}
-      {detail.isError && <p className="error-text">아카이브를 불러오지 못했습니다.</p>}
-      {archive && <>
-        <section><h3>쉽게 말하면</h3><p>{archive.result.plainMeaning}</p></section>
-        <section><h3>가능성이 높은 의도</h3><ul>{archive.result.likelyIntent.map((intent) => <li key={intent}>{intent}</li>)}</ul></section>
-        <section><h3>추천 답변</h3>{archive.result.replies.map((reply, index) => <div className={`archive-reply${archive.lastCopiedReplyIndex === index ? " is-copied" : ""}`} key={reply.style}><span>{reply.style}</span><p>{reply.text}</p>{archive.lastCopiedReplyIndex === index && <small>마지막으로 복사한 답변</small>}</div>)}</section>
-        <section className="archive-actual"><div><h3>실제 답변</h3>{archive.actualResponse ? <p>{archive.actualResponse.content}</p> : <p className="hint">아직 실제 답변이 없습니다.</p>}</div><button className="secondary-button" type="button" onClick={() => setActualOpen(true)}>{archive.actualResponse ? "수정" : "추가"}</button></section>
-        <section><h3>저장된 대화</h3>{archive.branches.length === 0 ? <p className="hint">아직 연결된 시뮬레이션 대화가 없습니다.</p> : <div className="archive-branches">{archive.branches.map((branch) => <div className="archive-branch" key={branch.id}><div className="archive-branch-label"><MessageCircle size={14}/>{branch.kind === "PREDICTED" ? "예상 답변 기반 대화" : "실제 답변 기반 대화"}{branch.status === "ACTIVE" ? " · 현재 대화" : ""}</div>{branch.messages.map((message) => <div className={`archive-message ${message.role}`} key={message.id}>{message.kind === "ACTUAL_RESPONSE" && <small>실제 답변</small>}<p>{message.content}</p></div>)}</div>)}</div>}</section>
-      </>}
-    </div>}
+    <div className={`archive-card-expand${expanded ? " is-open" : ""}`}>
+      <div className="archive-card-expand-inner">
+        {expanded && <div className="archive-card-body">
+          {detail.isLoading && <p className="hint">아카이브를 불러오는 중입니다.</p>}
+          {detail.isError && <p className="error-text">아카이브를 불러오지 못했습니다.</p>}
+          {archive && <>
+            <section><h3>쉽게 말하면</h3><p>{archive.result.plainMeaning}</p></section>
+            <section><h3>가능성이 높은 의도</h3><ul>{archive.result.likelyIntent.map((intent) => <li key={intent}>{intent}</li>)}</ul></section>
+            <section><h3>추천 답변</h3>{archive.result.replies.map((reply, index) => <div className={`archive-reply${archive.lastCopiedReplyIndex === index ? " is-copied" : ""}`} key={reply.style}><span>{reply.style}</span><p>{reply.text}</p>{archive.lastCopiedReplyIndex === index && <small>마지막으로 복사한 답변</small>}</div>)}</section>
+            <section className="archive-actual"><div><h3>실제 답변</h3>{archive.actualResponse ? <p>{archive.actualResponse.content}</p> : <p className="hint">아직 실제 답변이 없습니다.</p>}</div><button className="secondary-button" type="button" onClick={() => setActualOpen(true)}>{archive.actualResponse ? "수정" : "추가"}</button></section>
+            <section><h3>저장된 대화</h3>{archive.branches.length === 0 ? <p className="hint">아직 연결된 시뮬레이션 대화가 없습니다.</p> : <div className="archive-branches">{archive.branches.map((branch) => <div className="archive-branch" key={branch.id}><div className="archive-branch-label"><MessageCircle size={14}/>{branch.kind === "PREDICTED" ? "예상 답변 기반 대화" : "실제 답변 기반 대화"}{branch.status === "ACTIVE" ? " · 현재 대화" : ""}</div>{branch.messages.map((message) => <div className={`archive-message ${message.role}`} key={message.id}>{message.kind === "ACTUAL_RESPONSE" && <small>실제 답변</small>}<p>{message.content}</p></div>)}</div>)}</div>}</section>
+          </>}
+        </div>}
+      </div>
+    </div>
     <ActualResponseDialog open={actualOpen} initialValue={archive?.actualResponse?.content ?? summary.actualResponse?.content} saving={saving} error={error} onClose={() => { setActualOpen(false); setError(undefined); }} onSubmit={(content) => void saveActual(content)}/>
   </article>;
 }
