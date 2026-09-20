@@ -8,6 +8,28 @@
 
 ![개인 상사에 맞춘 해석과 상사 파악도를 제공하는 상사어 번역기 실제 화면](docs/images/askboss-product-screen.png)
 
+## 기능 화면
+
+### 1. 번역
+
+![상사의 말에 담긴 속뜻과 가능한 의도, 상황별 답장 세 가지를 제공하는 번역 화면](docs/images/feature-01-translation.png)
+
+### 2. 온보딩 질문
+
+![나의 상사 성격을 정확히 파악하기 위한 심층 온보딩 질문 화면](docs/images/feature-02-onboarding.png)
+
+### 3. 대화
+
+![실제 메시지를 보내기 전에 가상의 상사와 대화를 연습하는 화면](docs/images/feature-03-conversation.png)
+
+### 4. 번역 아카이브
+
+![상사어 번역과 대화 기록을 다시 확인하는 번역 아카이브 화면](docs/images/feature-04-archive.png)
+
+### 5. HR 대시보드
+
+![조직의 커뮤니케이션 분위기를 여러 차트로 살펴보는 HR 대시보드 화면](docs/images/feature-05-hr-dashboard.png)
+
 ## 주요 기능
 
 - **상사 대화 시뮬레이션** — 분석된 페르소나로 가상 대화, 응답을 실제 상사 반응으로 교체 가능
